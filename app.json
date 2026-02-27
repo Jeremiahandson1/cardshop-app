@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Card Shop",
+    "slug": "cardshop-twomiah",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0f"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.twomiah.cardshop",
+      "infoPlist": {
+        "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
+        "NSCameraUsageDescription": "Used to scan QR codes on card inserts",
+        "NSPhotoLibraryUsageDescription": "Used to upload card photos"
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": [
+          "NDEF",
+          "TAG"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a0f"
+      },
+      "package": "com.twomiah.cardshop",
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Card Shop to scan QR codes"
+        }
+      ],
+      "react-native-nfc-manager"
+    ],
+    "scheme": "cardshop",
+    "extra": {
+      "API_URL": "https://cardshop-api-pc6b.onrender.com",
+      "eas": {
+        "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
+      }
+    }
+  }
+}
