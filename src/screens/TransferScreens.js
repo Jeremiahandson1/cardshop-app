@@ -40,7 +40,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
 
   const transferMutation = useMutation({
     mutationFn: (data) => transfersApi.initiate(data),
-    onSuccess: () => {
+    onSuccess: async () => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         'Transfer Initiated',
@@ -55,7 +55,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
 
   const nfcMutation = useMutation({
     mutationFn: (data) => transfersApi.nfc(data),
-    onSuccess: () => {
+    onSuccess: async () => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Transfer Complete!', 'Card ownership transferred via NFC.', [
         { text: 'Done', onPress: () => navigation.goBack() }
