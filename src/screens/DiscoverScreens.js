@@ -26,7 +26,9 @@ export const DiscoverScreen = ({ navigation }) => {
     try {
       const res = await catalogApi.search({ q, limit: 30 });
       setResults(res.data.cards);
-    } catch {}
+    } catch (err) {
+      console.warn('Search failed:', err.message);
+    }
     setSearching(false);
   };
 
@@ -95,7 +97,7 @@ export const DiscoverScreen = ({ navigation }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.resultItem}
-              onPress={() => navigation.navigate('CatalogDetail', { catalogId: item.id })}
+              onPress={() => navigation.navigate('CardDetail', { cardId: item.id })}
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.resultPlayer}>{item.player_name}</Text>
@@ -122,7 +124,7 @@ export const DiscoverScreen = ({ navigation }) => {
                 message="Try a different search or add this card to the catalog"
                 action={{
                   label: 'Add to Catalog',
-                  onPress: () => navigation.navigate('AddToCatalog', { prefill: query })
+                  onPress: () => {}
                 }}
               />
             ) : null
@@ -162,9 +164,8 @@ export const NotificationsScreen = ({ navigation }) => {
 
   const handleTap = (notification) => {
     markReadMutation.mutate([notification.id]);
-    const notifData = notification.data;
+    const notifData = notification.data || {};
     if (notifData.transfer_id) navigation.navigate('Transfers');
-    else if (notifData.conversation_id) navigation.navigate('Messages');
     else if (notifData.owned_card_id) navigation.navigate('CardDetail', { cardId: notifData.owned_card_id });
   };
 
@@ -177,7 +178,7 @@ export const NotificationsScreen = ({ navigation }) => {
       <View style={styles.notifHeader}>
         <Text style={styles.notifTitle}>Notifications</Text>
         {notifications.some((n) => !n.is_read) && (
-          <TouchableOpacity onPress={() => markReadMutation.mutate([])}>
+          <TouchableOpacity onPress={() => markReadMutation.mutate(notifications.filter((n) => !n.is_read).map((n) => n.id))}>
             <Text style={styles.markAllRead}>Mark all read</Text>
           </TouchableOpacity>
         )}

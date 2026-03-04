@@ -19,7 +19,11 @@ import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScre
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
 import { ProfileScreen, WantListScreen } from '../screens/ProfileScreens';
 
-const Stack = createNativeStackNavigator();
+const CollectionStackNav = createNativeStackNavigator();
+const DiscoverStackNav = createNativeStackNavigator();
+const TransferStackNav = createNativeStackNavigator();
+const ProfileStackNav = createNativeStackNavigator();
+const AuthStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const screenOptions = {
@@ -123,50 +127,51 @@ const TabNavigator = () => {
 // STACK NAVIGATORS (nested in tabs)
 // ============================================================
 const CollectionStack = () => (
-  <Stack.Navigator screenOptions={screenOptions}>
-    <Stack.Screen name="CollectionMain" component={CollectionScreen} />
-    <Stack.Screen name="CardDetail" component={CardDetailScreen} />
-    <Stack.Screen name="RegisterCard" component={RegisterCardScreen} />
-    <Stack.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
-    <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-  </Stack.Navigator>
+  <CollectionStackNav.Navigator screenOptions={screenOptions}>
+    <CollectionStackNav.Screen name="CollectionMain" component={CollectionScreen} />
+    <CollectionStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <CollectionStackNav.Screen name="QRScanner" component={QRScannerScreen} />
+  </CollectionStackNav.Navigator>
 );
 
 const DiscoverStack = () => (
-  <Stack.Navigator screenOptions={screenOptions}>
-    <Stack.Screen name="DiscoverMain" component={DiscoverScreen} />
-    <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-    <Stack.Screen name="CardDetail" component={CardDetailScreen} />
-  </Stack.Navigator>
+  <DiscoverStackNav.Navigator screenOptions={screenOptions}>
+    <DiscoverStackNav.Screen name="DiscoverMain" component={DiscoverScreen} />
+    <DiscoverStackNav.Screen name="QRScanner" component={QRScannerScreen} />
+    <DiscoverStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+  </DiscoverStackNav.Navigator>
 );
 
 const TransferStack = () => (
-  <Stack.Navigator screenOptions={screenOptions}>
-    <Stack.Screen name="TransfersMain" component={TransfersScreen} />
-    <Stack.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
-    <Stack.Screen name="CardDetail" component={CardDetailScreen} />
-  </Stack.Navigator>
+  <TransferStackNav.Navigator screenOptions={screenOptions}>
+    <TransferStackNav.Screen name="TransfersMain" component={TransfersScreen} />
+    <TransferStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <TransferStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+  </TransferStackNav.Navigator>
 );
 
 const ProfileStack = () => (
-  <Stack.Navigator screenOptions={screenOptions}>
-    <Stack.Screen name="ProfileMain" component={ProfileScreen} />
-    <Stack.Screen name="WantList" component={WantListScreen} />
-    <Stack.Screen name="Notifications" component={NotificationsScreen} />
-    <Stack.Screen name="Transfers" component={TransfersScreen} />
-    <Stack.Screen name="Discover" component={DiscoverScreen} />
-    <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-  </Stack.Navigator>
+  <ProfileStackNav.Navigator screenOptions={screenOptions}>
+    <ProfileStackNav.Screen name="ProfileMain" component={ProfileScreen} />
+    <ProfileStackNav.Screen name="WantList" component={WantListScreen} />
+    <ProfileStackNav.Screen name="Notifications" component={NotificationsScreen} />
+    <ProfileStackNav.Screen name="Transfers" component={TransfersScreen} />
+    <ProfileStackNav.Screen name="Discover" component={DiscoverScreen} />
+    <ProfileStackNav.Screen name="QRScanner" component={QRScannerScreen} />
+    <ProfileStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+  </ProfileStackNav.Navigator>
 );
 
 // ============================================================
 // AUTH STACK
 // ============================================================
 const AuthStack = () => (
-  <Stack.Navigator screenOptions={{ ...screenOptions, animation: 'fade' }}>
-    <Stack.Screen name="Login" component={LoginScreen} />
-    <Stack.Screen name="Register" component={RegisterScreen} />
-  </Stack.Navigator>
+  <AuthStackNav.Navigator screenOptions={{ ...screenOptions, animation: 'fade' }}>
+    <AuthStackNav.Screen name="Login" component={LoginScreen} />
+    <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+  </AuthStackNav.Navigator>
 );
 
 // ============================================================

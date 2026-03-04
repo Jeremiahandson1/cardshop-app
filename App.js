@@ -10,7 +10,7 @@ import { useAuthStore } from './src/store/authStore';
 import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
@@ -26,7 +26,7 @@ const AppInner = () => {
 
   useEffect(() => {
     initialize();
-  }, []);
+  }, [initialize]);
 
   if (isLoading) return <LoadingScreen message="Card Shop by Twomiah" />;
 

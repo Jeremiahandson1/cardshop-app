@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Vibration, Alert
+  View, Text, StyleSheet, TouchableOpacity, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -14,10 +14,12 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const mode = route.params?.mode || 'register'; // 'register' | 'lookup'
+  const scanGuardRef = useRef(false);
+  const mode = route?.params?.mode || 'register'; // 'register' | 'lookup'
 
   const handleBarCodeScanned = async ({ data }) => {
-    if (scanned || scanning) return;
+    if (scanGuardRef.current) return;
+    scanGuardRef.current = true;
 
     // Extract code from deep link: cardshop://card/UUID
     let code = data;
@@ -48,6 +50,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
           Alert.alert('Not Registered', 'This card has not been registered yet.');
           setScanned(false);
           setScanning(false);
+          scanGuardRef.current = false;
         }
       } else {
         // Just lookup
@@ -56,7 +59,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
         } else {
           Alert.alert('Unregistered', 'This QR insert has not been registered to a card yet.', [
             { text: 'Register It', onPress: () => navigation.replace('RegisterCard', { qrCode: code }) },
-            { text: 'Cancel', onPress: () => setScanned(false), style: 'cancel' }
+            { text: 'Cancel', onPress: () => { setScanned(false); scanGuardRef.current = false; }, style: 'cancel' }
           ]);
           setScanning(false);
         }
@@ -65,6 +68,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
       Alert.alert('Error', err.response?.data?.error || 'Failed to look up QR code');
       setScanned(false);
       setScanning(false);
+      scanGuardRef.current = false;
     }
   };
 
@@ -131,7 +135,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
         {/* Bottom actions */}
         <View style={styles.bottomBar}>
           {scanned && !scanning && (
-            <TouchableOpacity style={styles.rescanBtn} onPress={() => setScanned(false)}>
+            <TouchableOpacity style={styles.rescanBtn} onPress={() => { setScanned(false); scanGuardRef.current = false; }}>
               <Text style={styles.rescanText}>Tap to Scan Again</Text>
             </TouchableOpacity>
           )}

@@ -46,6 +46,9 @@ export const useAuthStore = create((set, get) => ({
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
     set({ user: null, isAuthenticated: false });
+    // Clear query cache on logout to prevent stale data for next user
+    const { queryClient } = require('../../App');
+    queryClient.clear();
   },
 
   updateUser: (updates) => {

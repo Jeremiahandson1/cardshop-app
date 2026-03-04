@@ -7,11 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsApi } from '../services/api';
-import { useAuthStore } from '../store/authStore';
 import { CardTile, EmptyState, LoadingScreen, ScreenHeader, Button } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get('window'); // Note: static at module load, use useWindowDimensions for responsive
 const COLUMN_GAP = Spacing.sm;
 const CARD_WIDTH = (width - Spacing.base * 2 - COLUMN_GAP) / 2;
 
@@ -24,7 +23,6 @@ const STATUS_FILTERS = [
 ];
 
 export const CollectionScreen = ({ navigation }) => {
-  const user = useAuthStore((s) => s.user);
   const [statusFilter, setStatusFilter] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -111,7 +109,7 @@ export const CollectionScreen = ({ navigation }) => {
       <FlatList
         data={filtered}
         renderItem={renderCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         numColumns={2}
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}

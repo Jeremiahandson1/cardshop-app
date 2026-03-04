@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, ActivityIndicator
+  Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,6 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const [price, setPrice] = useState('');
   const [nfcReady, setNfcReady] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
-  const [nfcRecipientId, setNfcRecipientId] = useState(null);
 
   const { data: card } = useQuery({
     queryKey: ['card', cardId],
@@ -42,7 +41,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const transferMutation = useMutation({
     mutationFn: (data) => transfersApi.initiate(data),
     onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         'Transfer Initiated',
         'The recipient will be notified and needs to accept the transfer.',
@@ -57,7 +56,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const nfcMutation = useMutation({
     mutationFn: (data) => transfersApi.nfc(data),
     onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Transfer Complete!', 'Card ownership transferred via NFC.', [
         { text: 'Done', onPress: () => navigation.goBack() }
       ]);
@@ -278,7 +277,7 @@ export const TransfersScreen = ({ navigation }) => {
       <View style={{ flex: 1 }}>
         <Text style={styles.transferCard}>{t.player_name} {t.year} {t.set_name}</Text>
         <Text style={styles.transferMeta}>
-          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method.replace('_',' ')}
+          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method.replace(/_/g,' ')}
           {t.sale_price ? ` · $${t.sale_price}` : ''}
         </Text>
         <Text style={styles.transferDate}>{new Date(t.initiated_at).toLocaleDateString()}</Text>
@@ -299,7 +298,10 @@ export const TransfersScreen = ({ navigation }) => {
       {t.status === 'pending_delivery' && t.direction === 'received' && (
         <TouchableOpacity
           style={[styles.acceptBtn, { backgroundColor: Colors.accent2 + '22', borderColor: Colors.accent2 }]}
-          onPress={() => navigation.navigate('ConfirmDelivery', { transferId: t.id })}
+          onPress={() => Alert.alert('Confirm Delivery', 'Mark this transfer as delivered?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Confirm', onPress: () => acceptMutation.mutate(t.id) },
+          ])}
         >
           <Text style={[styles.acceptText, { color: Colors.accent2 }]}>Confirm</Text>
         </TouchableOpacity>

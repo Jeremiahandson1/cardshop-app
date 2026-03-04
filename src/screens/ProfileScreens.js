@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { wantListApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { EmptyState, LoadingScreen, SectionHeader, Divider } from '../components/ui';
+import { EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
@@ -29,8 +29,8 @@ export const ProfileScreen = ({ navigation }) => {
     {
       section: 'Account',
       items: [
-        { icon: 'person-outline', label: 'Edit Profile', onPress: () => navigation.navigate('EditProfile') },
-        { icon: 'star-outline', label: 'Feedback & Ratings', onPress: () => navigation.navigate('Feedback', { username: user.username }) },
+        { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+        { icon: 'star-outline', label: 'Feedback & Ratings', onPress: () => {} },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
         { icon: 'swap-horizontal-outline', label: 'Transfer History', onPress: () => navigation.navigate('Transfers') },
       ]
@@ -39,15 +39,15 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Tools',
       items: [
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
-        { icon: 'radio-outline', label: 'Receive via NFC', onPress: () => navigation.navigate('NFCReceive') },
-        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('Messages') },
+        { icon: 'radio-outline', label: 'Receive via NFC', onPress: () => {} },
+        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => {} },
       ]
     },
     ...(user?.role === 'store_owner' ? [{
       section: 'Store',
       items: [
-        { icon: 'storefront-outline', label: 'My Store Dashboard', onPress: () => navigation.navigate('StoreDashboard') },
-        { icon: 'add-circle-outline', label: 'Create Store', onPress: () => navigation.navigate('CreateStore') },
+        { icon: 'storefront-outline', label: 'My Store Dashboard', onPress: () => {} },
+        { icon: 'add-circle-outline', label: 'Create Store', onPress: () => {} },
       ]
     }] : []),
     {
@@ -165,7 +165,7 @@ export const WantListScreen = ({ navigation }) => {
                 )}
                 {item.condition_min && (
                   <Text style={styles.wantMetaText}>
-                    Min: {item.condition_min.replace('_',' ')}
+                    Min: {item.condition_min.replace(/_/g,' ')}
                   </Text>
                 )}
                 {item.graded_only && (

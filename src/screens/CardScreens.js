@@ -42,7 +42,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     try {
       const res = await catalogApi.search({ q, limit: 10 });
       setSearchResults(res.data.cards);
-    } catch {}
+    } catch (err) {
+      console.warn('Catalog search failed:', err.message);
+    }
     setSearching(false);
   };
 
@@ -125,10 +127,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             !searching && catalogSearch.length > 1 && searchResults.length === 0 ? (
               <TouchableOpacity
                 style={styles.createNewBtn}
-                onPress={() => navigation.navigate('AddToCatalog', {
-                  prefill: catalogSearch,
-                  onCreated: (card) => { setSelectedCatalog(card); setStep('details'); }
-                })}
+                onPress={() => {}}
               >
                 <Ionicons name="add-circle" size={18} color={Colors.accent} />
                 <Text style={styles.createNewText}>Card not found — add it to the catalog</Text>
@@ -223,7 +222,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   onPress={() => set('condition')(c)}
                 >
                   <Text style={[styles.condText, form.condition === c && styles.condTextActive]}>
-                    {c.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -377,7 +376,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
           ) : (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Condition</Text>
-              <Text style={styles.infoValue}>{card.condition?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
+              <Text style={styles.infoValue}>{card.condition?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
             </View>
           )}
 
@@ -415,7 +414,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 <View key={t.id} style={styles.historyItem}>
                   <View style={styles.historyDot} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.historyMethod}>{t.method.replace('_', ' ')}</Text>
+                    <Text style={styles.historyMethod}>{t.method.replace(/_/g, ' ')}</Text>
                     <Text style={styles.historyDate}>
                       {new Date(t.completed_at).toLocaleDateString()}
                       {t.sale_price ? ` · $${t.sale_price}` : ''}

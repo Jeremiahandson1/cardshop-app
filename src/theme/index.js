@@ -17,7 +17,7 @@ export const Colors = {
   // Text
   text: '#e8e8f0',
   textMuted: '#8888aa',
-  textDim: '#5555770',
+  textDim: '#555577',
 
   // Status colors
   success: '#4ade80',
