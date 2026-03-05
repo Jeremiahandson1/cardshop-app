@@ -141,6 +141,8 @@ const DiscoverStack = () => (
     <DiscoverStackNav.Screen name="DiscoverMain" component={DiscoverScreen} />
     <DiscoverStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <DiscoverStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <DiscoverStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <DiscoverStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
   </DiscoverStackNav.Navigator>
 );
 
@@ -161,6 +163,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Discover" component={DiscoverScreen} />
     <ProfileStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <ProfileStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <ProfileStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <ProfileStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
   </ProfileStackNav.Navigator>
 );
 
