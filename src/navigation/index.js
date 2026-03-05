@@ -39,7 +39,7 @@ const TabNavigator = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const { data: notifData } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', 'unread'],
     queryFn: () => notificationsApi.get({ unread_only: true, limit: 1 }).then((r) => r.data),
     enabled: isAuthenticated,
     refetchInterval: 30000, // poll every 30s

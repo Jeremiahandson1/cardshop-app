@@ -16,11 +16,26 @@ import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 // ============================================================
 export const RegisterCardScreen = ({ navigation, route }) => {
   const qrCode = route.params?.qrCode;
+  const catalogId = route.params?.catalogId;
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState(qrCode ? 'search' : 'scan_or_search');
+  const [step, setStep] = useState(qrCode || catalogId ? 'search' : 'scan_or_search');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState(null);
+
+  // If a catalogId was passed, fetch and pre-select it
+  const { data: preselectedCatalog } = useQuery({
+    queryKey: ['catalog', catalogId],
+    queryFn: () => catalogApi.get(catalogId).then((r) => r.data),
+    enabled: !!catalogId && !selectedCatalog,
+  });
+
+  React.useEffect(() => {
+    if (preselectedCatalog && !selectedCatalog) {
+      setSelectedCatalog(preselectedCatalog);
+      setStep('details');
+    }
+  }, [preselectedCatalog]);
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
     grading_company: 'raw',

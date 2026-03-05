@@ -42,6 +42,11 @@ export const QRScannerScreen = ({ navigation, route }) => {
         } else if (insert.owned_card_id) {
           // Show the card this QR is tied to
           navigation.replace('CardDetail', { cardId: insert.owned_card_id });
+        } else {
+          Alert.alert('Already Registered', 'This QR insert has already been used but the card is no longer available.');
+          setScanned(false);
+          setScanning(false);
+          scanGuardRef.current = false;
         }
       } else if (mode === 'transfer') {
         if (insert.owned_card_id) {

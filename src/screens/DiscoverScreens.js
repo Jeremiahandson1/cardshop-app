@@ -142,13 +142,13 @@ export const NotificationsScreen = ({ navigation }) => {
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', 'all'],
     queryFn: () => notificationsApi.get({ limit: 50 }).then((r) => r.data),
   });
 
   const markReadMutation = useMutation({
     mutationFn: (ids) => notificationsApi.markRead(ids),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }), // invalidates both 'all' and 'unread' sub-keys
   });
 
   const iconMap = {
