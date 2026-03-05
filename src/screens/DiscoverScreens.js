@@ -150,6 +150,7 @@ export const NotificationsScreen = ({ navigation }) => {
   const markReadMutation = useMutation({
     mutationFn: (ids) => notificationsApi.markRead(ids),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }), // invalidates both 'all' and 'unread' sub-keys
+    onError: (err) => console.warn('Mark read failed:', err.message),
   });
 
   const iconMap = {

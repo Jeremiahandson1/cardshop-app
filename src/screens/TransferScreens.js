@@ -268,16 +268,19 @@ export const TransfersScreen = ({ navigation }) => {
   const acceptMutation = useMutation({
     mutationFn: (id) => transfersApi.accept(id),
     onSuccess: invalidateRelated,
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to accept transfer'),
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id) => transfersApi.cancel(id),
     onSuccess: invalidateRelated,
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to cancel transfer'),
   });
 
   const confirmDeliveryMutation = useMutation({
     mutationFn: (id) => transfersApi.confirmDelivery(id),
     onSuccess: invalidateRelated,
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to confirm delivery'),
   });
 
   if (isLoading) return <LoadingScreen />;
@@ -297,7 +300,7 @@ export const TransfersScreen = ({ navigation }) => {
       <View style={{ flex: 1 }}>
         <Text style={styles.transferCard}>{t.player_name} {t.year} {t.set_name}</Text>
         <Text style={styles.transferMeta}>
-          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method?.replace(/_/g,' ') || t.method}
+          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method?.replace(/_/g,' ') || 'Transfer'}
           {t.sale_price ? ` · $${t.sale_price}` : ''}
         </Text>
         <Text style={styles.transferDate}>{t.initiated_at ? new Date(t.initiated_at).toLocaleDateString() : ''}</Text>
