@@ -122,7 +122,7 @@ export const RegisterScreen = ({ navigation }) => {
     setError('');
     setLoading(true);
     try {
-      await register(form);
+      await register({ ...form, email: form.email.toLowerCase().trim(), username: form.username.trim() });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
