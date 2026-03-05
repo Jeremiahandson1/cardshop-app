@@ -394,7 +394,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
           ) : (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Condition</Text>
-              <Text style={styles.infoValue}>{card.condition?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
+              <Text style={styles.infoValue}>{card.condition?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}</Text>
             </View>
           )}
 

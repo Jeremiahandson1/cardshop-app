@@ -16,6 +16,7 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 export const InitiateTransferScreen = ({ navigation, route }) => {
   const { cardId } = route.params;
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
   const [method, setMethod] = useState('standard'); // 'standard' | 'nfc'
   const [recipientUsername, setRecipientUsername] = useState('');
@@ -41,6 +42,9 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const transferMutation = useMutation({
     mutationFn: (data) => transfersApi.initiate(data),
     onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ['my-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         'Transfer Initiated',
@@ -56,6 +60,9 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const nfcMutation = useMutation({
     mutationFn: (data) => transfersApi.nfc(data),
     onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ['my-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Transfer Complete!', 'Card ownership transferred via NFC.', [
         { text: 'Done', onPress: () => navigation.goBack() }
@@ -293,7 +300,7 @@ export const TransfersScreen = ({ navigation }) => {
           {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method?.replace(/_/g,' ') || t.method}
           {t.sale_price ? ` · $${t.sale_price}` : ''}
         </Text>
-        <Text style={styles.transferDate}>{new Date(t.initiated_at).toLocaleDateString()}</Text>
+        <Text style={styles.transferDate}>{t.initiated_at ? new Date(t.initiated_at).toLocaleDateString() : ''}</Text>
       </View>
       {t.status === 'pending_acceptance' && t.direction === 'received' && (
         <View style={{ gap: Spacing.sm }}>
