@@ -433,7 +433,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 <View key={t.id} style={styles.historyItem}>
                   <View style={styles.historyDot} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.historyMethod}>{t.method?.replace(/_/g, ' ') || t.method}</Text>
+                    <Text style={styles.historyMethod}>{t.method?.replace(/_/g, ' ') || 'Transfer'}</Text>
                     <Text style={styles.historyDate}>
                       {t.completed_at ? new Date(t.completed_at).toLocaleDateString() : 'Pending'}
                       {t.sale_price ? ` · $${t.sale_price}` : ''}
