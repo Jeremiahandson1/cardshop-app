@@ -282,7 +282,7 @@ export const TransfersScreen = ({ navigation }) => {
       <View style={{ flex: 1 }}>
         <Text style={styles.transferCard}>{t.player_name} {t.year} {t.set_name}</Text>
         <Text style={styles.transferMeta}>
-          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method.replace(/_/g,' ')}
+          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method?.replace(/_/g,' ') || t.method}
           {t.sale_price ? ` · $${t.sale_price}` : ''}
         </Text>
         <Text style={styles.transferDate}>{new Date(t.initiated_at).toLocaleDateString()}</Text>

@@ -429,7 +429,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 <View key={t.id} style={styles.historyItem}>
                   <View style={styles.historyDot} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.historyMethod}>{t.method.replace(/_/g, ' ')}</Text>
+                    <Text style={styles.historyMethod}>{t.method?.replace(/_/g, ' ') || t.method}</Text>
                     <Text style={styles.historyDate}>
                       {new Date(t.completed_at).toLocaleDateString()}
                       {t.sale_price ? ` · $${t.sale_price}` : ''}
