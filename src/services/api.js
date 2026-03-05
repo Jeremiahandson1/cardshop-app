@@ -39,7 +39,8 @@ api.interceptors.response.use(
       } catch {
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
-        // Auth store will detect missing token and redirect to login
+        const { useAuthStore } = require('../store/authStore');
+        useAuthStore.getState().logout();
       }
     }
     return Promise.reject(error);

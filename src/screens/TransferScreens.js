@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { transfersApi, cardsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, LoadingScreen } from '../components/ui';
@@ -250,19 +250,26 @@ export const TransfersScreen = ({ navigation }) => {
     queryFn: () => transfersApi.mine({ limit: 50 }).then((r) => r.data),
   });
 
+  const queryClient = useQueryClient();
+
+  const invalidateRelated = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+  };
+
   const acceptMutation = useMutation({
     mutationFn: (id) => transfersApi.accept(id),
-    onSuccess: () => refetch(),
+    onSuccess: invalidateRelated,
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id) => transfersApi.cancel(id),
-    onSuccess: () => refetch(),
+    onSuccess: invalidateRelated,
   });
 
   const confirmDeliveryMutation = useMutation({
     mutationFn: (id) => transfersApi.confirmDelivery(id),
-    onSuccess: () => refetch(),
+    onSuccess: invalidateRelated,
   });
 
   if (isLoading) return <LoadingScreen />;
