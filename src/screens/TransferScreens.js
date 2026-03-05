@@ -268,7 +268,7 @@ export const TransfersScreen = ({ navigation }) => {
   if (isLoading) return <LoadingScreen />;
 
   const pending = (transfers || []).filter((t) => ['pending_acceptance','pending_delivery'].includes(t.status));
-  const history = (transfers || []).filter((t) => t.status === 'completed');
+  const history = (transfers || []).filter((t) => ['completed', 'cancelled', 'disputed'].includes(t.status));
 
   const TransferItem = ({ t }) => (
     <View style={styles.transferItem}>
