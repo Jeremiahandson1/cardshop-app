@@ -203,7 +203,7 @@ export const NotificationsScreen = ({ navigation }) => {
                 <Text style={styles.notifItemTitle}>{item.title}</Text>
                 {item.body && <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>}
                 <Text style={styles.notifTime}>
-                  {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                  {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ''}
                 </Text>
               </View>
               {!item.is_read && <View style={styles.unreadDot} />}

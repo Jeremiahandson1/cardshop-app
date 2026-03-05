@@ -186,7 +186,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 100 }}>
         {/* Selected card preview */}
-        <View style={styles.selectedCard}>
+        {!selectedCatalog ? <LoadingScreen /> : <View style={styles.selectedCard}>
           {selectedCatalog.front_image_url
             ? <Image source={{ uri: selectedCatalog.front_image_url }} style={{ width: 50, height: 70 }} resizeMode="contain" />
             : <Text style={{ fontSize: 28 }}>🃏</Text>
@@ -196,7 +196,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             <Text style={styles.catalogSet}>{selectedCatalog.year} {selectedCatalog.set_name}</Text>
             {selectedCatalog.parallel && <Text style={styles.catalogParallel}>{selectedCatalog.parallel}</Text>}
           </View>
-        </View>
+        </View>}
 
         {/* Graded or raw */}
         <View>

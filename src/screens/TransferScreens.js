@@ -255,6 +255,7 @@ export const TransfersScreen = ({ navigation }) => {
   const invalidateRelated = () => {
     refetch();
     queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   const acceptMutation = useMutation({
