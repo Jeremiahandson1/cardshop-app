@@ -332,6 +332,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
     },
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Update failed'),
   });
 
   if (isLoading || !card) return <LoadingScreen />;
@@ -383,7 +384,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
           <Divider />
 
           {/* Grade or condition */}
-          {card.grading_company !== 'raw' ? (
+          {card.grading_company && card.grading_company !== 'raw' ? (
             <View style={styles.gradeBlock}>
               <View style={styles.gradeBadge}>
                 <Text style={styles.gradeCompany}>{card.grading_company.toUpperCase()}</Text>
@@ -401,7 +402,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
           {/* Transfer count */}
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Ownership History</Text>
-            <Text style={styles.infoValue}>{card.transfer_count} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
+            <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
 
           <Divider />
