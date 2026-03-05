@@ -45,7 +45,7 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
   updateUser: (updates) => {

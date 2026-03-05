@@ -41,6 +41,7 @@ api.interceptors.response.use(
         await SecureStore.deleteItemAsync('refresh_token');
         const { useAuthStore } = require('../store/authStore');
         useAuthStore.getState().logout();
+        return Promise.reject(error);
       }
     }
     return Promise.reject(error);
