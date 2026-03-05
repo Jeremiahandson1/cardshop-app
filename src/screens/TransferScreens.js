@@ -84,7 +84,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       
       // Read user ID from the NFC tag written by the other person's app
       const userId = tag?.ndefMessage?.[0]?.payload
-        ? String.fromCharCode(...tag.ndefMessage[0].payload).replace('\u0000', '').replace('\x02en', '')
+        ? String.fromCharCode(...tag.ndefMessage[0].payload).replace(/\u0000/g, '').replace('\x02en', '')
         : null;
 
       if (!userId) {
