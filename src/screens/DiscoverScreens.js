@@ -97,7 +97,7 @@ export const DiscoverScreen = ({ navigation }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.resultItem}
-              onPress={() => navigation.navigate('CardDetail', { cardId: item.id })}
+              onPress={() => navigation.navigate('RegisterCard', { catalogId: item.id })}
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.resultPlayer}>{item.player_name}</Text>

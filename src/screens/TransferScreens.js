@@ -260,6 +260,11 @@ export const TransfersScreen = ({ navigation }) => {
     onSuccess: () => refetch(),
   });
 
+  const confirmDeliveryMutation = useMutation({
+    mutationFn: (id) => transfersApi.confirmDelivery(id),
+    onSuccess: () => refetch(),
+  });
+
   if (isLoading) return <LoadingScreen />;
 
   const pending = (transfers || []).filter((t) => ['pending_acceptance','pending_delivery'].includes(t.status));
@@ -300,7 +305,7 @@ export const TransfersScreen = ({ navigation }) => {
           style={[styles.acceptBtn, { backgroundColor: Colors.accent2 + '22', borderColor: Colors.accent2 }]}
           onPress={() => Alert.alert('Confirm Delivery', 'Mark this transfer as delivered?', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Confirm', onPress: () => acceptMutation.mutate(t.id) },
+            { text: 'Confirm', onPress: () => confirmDeliveryMutation.mutate(t.id) },
           ])}
         >
           <Text style={[styles.acceptText, { color: Colors.accent2 }]}>Confirm</Text>
