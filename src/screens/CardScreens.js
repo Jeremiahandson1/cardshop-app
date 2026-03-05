@@ -35,7 +35,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       setSelectedCatalog(preselectedCatalog);
       setStep('details');
     }
-  }, [preselectedCatalog]);
+  }, [preselectedCatalog, selectedCatalog]);
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
     grading_company: 'raw',
@@ -328,7 +328,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
   const updateMutation = useMutation({
     mutationFn: (data) => cardsApi.update(cardId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['card', cardId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+    },
   });
 
   if (isLoading || !card) return <LoadingScreen />;
