@@ -134,6 +134,7 @@ export const WantListScreen = ({ navigation }) => {
   const removeMutation = useMutation({
     mutationFn: (id) => wantListApi.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wantlist'] }),
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to remove from want list'),
   });
 
   if (isLoading) return <LoadingScreen />;

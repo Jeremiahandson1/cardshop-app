@@ -35,6 +35,7 @@ export const DiscoverScreen = ({ navigation }) => {
   const wantMutation = useMutation({
     mutationFn: (catalog_id) => wantListApi.add({ catalog_id }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wantlist'] }),
+    onError: (err) => console.warn('Want list error:', err.response?.data?.error || err.message),
   });
 
   const SPORTS = ['Baseball', 'Basketball', 'Football', 'Hockey', 'Pokemon', 'MTG'];

@@ -144,12 +144,14 @@ export const QRScannerScreen = ({ navigation, route }) => {
               <Text style={styles.rescanText}>Tap to Scan Again</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={styles.manualBtn}
-            onPress={() => navigation.navigate('RegisterCard', {})}
-          >
-            <Text style={styles.manualText}>Enter manually instead</Text>
-          </TouchableOpacity>
+          {mode === 'register' && (
+            <TouchableOpacity
+              style={styles.manualBtn}
+              onPress={() => navigation.navigate('RegisterCard', {})}
+            >
+              <Text style={styles.manualText}>Enter manually instead</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
