@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '../store/authStore';
 import { notificationsApi } from '../services/api';
@@ -46,6 +47,7 @@ const screenOptions = {
 // BOTTOM TAB NAVIGATOR
 // ============================================================
 const TabNavigator = () => {
+  const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const { data: notifData } = useQuery({
@@ -66,7 +68,8 @@ const TabNavigator = () => {
           borderTopColor: Colors.border,
           borderTopWidth: 1,
           paddingTop: 6,
-          height: Platform.OS === 'ios' ? 88 : 62,
+          paddingBottom: insets.bottom,
+          height: (Platform.OS === 'ios' ? 88 : 62) + insets.bottom,
         },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textMuted,

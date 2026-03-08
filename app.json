@@ -47,7 +47,9 @@
           "cameraPermission": "Allow Card Shop to scan QR codes"
         }
       ],
-      "react-native-nfc-manager"
+      "react-native-nfc-manager",
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "scheme": "cardshop",
     "extra": {
