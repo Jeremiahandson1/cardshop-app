@@ -25,9 +25,9 @@ export const DiscoverScreen = ({ navigation }) => {
     setSearching(true);
     try {
       const res = await catalogApi.search({ q, limit: 30 });
-      setResults(res.data.cards);
-    } catch (err) {
-      console.warn('Search failed:', err.message);
+      setResults(res.data?.cards || []);
+    } catch {
+      // search failed silently
     }
     setSearching(false);
   };
@@ -35,7 +35,6 @@ export const DiscoverScreen = ({ navigation }) => {
   const wantMutation = useMutation({
     mutationFn: (catalog_id) => wantListApi.add({ catalog_id }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wantlist'] }),
-    onError: (err) => console.warn('Want list error:', err.response?.data?.error || err.message),
   });
 
   const SPORTS = ['Baseball', 'Basketball', 'Football', 'Hockey', 'Pokemon', 'MTG'];
@@ -149,8 +148,7 @@ export const NotificationsScreen = ({ navigation }) => {
 
   const markReadMutation = useMutation({
     mutationFn: (ids) => notificationsApi.markRead(ids),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }), // invalidates both 'all' and 'unread' sub-keys
-    onError: (err) => console.warn('Mark read failed:', err.message),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
   const iconMap = {

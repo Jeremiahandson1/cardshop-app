@@ -29,7 +29,7 @@ api.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
-        const { accessToken, refreshToken: newRefresh } = res.data;
+        const { accessToken, refreshToken: newRefresh } = res.data || {};
 
         await SecureStore.setItemAsync('access_token', accessToken);
         await SecureStore.setItemAsync('refresh_token', newRefresh);

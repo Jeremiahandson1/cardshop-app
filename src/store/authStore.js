@@ -26,7 +26,7 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     const res = await authApi.login({ email, password });
-    const { user, accessToken, refreshToken } = res.data;
+    const { user, accessToken, refreshToken } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);
     set({ user, isAuthenticated: true });
@@ -35,7 +35,7 @@ export const useAuthStore = create((set, get) => ({
 
   register: async (data) => {
     const res = await authApi.register(data);
-    const { user, accessToken, refreshToken } = res.data;
+    const { user, accessToken, refreshToken } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);
     set({ user, isAuthenticated: true });

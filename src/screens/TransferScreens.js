@@ -35,7 +35,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       if (supported) {
         NfcManager.start().then(() => setNfcReady(true)).catch(() => {});
       }
-    });
+    }).catch(() => {});
     return () => { NfcManager.cancelTechnologyRequest().catch(() => {}); };
   }, []);
 

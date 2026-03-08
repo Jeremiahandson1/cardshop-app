@@ -35,7 +35,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       setSelectedCatalog(preselectedCatalog);
       setStep('details');
     }
-  }, [preselectedCatalog, selectedCatalog]);
+  }, [preselectedCatalog, selectedCatalog, setSelectedCatalog, setStep]);
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
     grading_company: 'raw',
@@ -56,9 +56,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     setSearching(true);
     try {
       const res = await catalogApi.search({ q, limit: 10 });
-      setSearchResults(res.data.cards);
-    } catch (err) {
-      console.warn('Catalog search failed:', err.message);
+      setSearchResults(res.data?.cards || []);
+    } catch {
+      // search failed silently
     }
     setSearching(false);
   };
@@ -69,7 +69,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       quality: 0.8,
       allowsMultipleSelection: true,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.length) {
       setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
     }
   };
@@ -88,7 +88,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
-      navigation.replace('CardDetail', { cardId: res.data.id });
+      navigation.replace('CardDetail', { cardId: res.data?.id });
     },
     onError: (err) => {
       Alert.alert('Error', err.response?.data?.error || 'Failed to register card');
