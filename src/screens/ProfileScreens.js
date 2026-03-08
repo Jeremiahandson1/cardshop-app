@@ -30,9 +30,19 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Account',
       items: [
         { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+        { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
         { icon: 'star-outline', label: 'Feedback & Ratings', onPress: () => {} },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
         { icon: 'swap-horizontal-outline', label: 'Transfer History', onPress: () => navigation.navigate('Transfers') },
+      ]
+    },
+    {
+      section: 'Binders & Offers',
+      items: [
+        { icon: 'book-outline', label: 'My Binders', onPress: () => navigation.navigate('BinderList') },
+        { icon: 'chatbox-ellipses-outline', label: 'Offers', onPress: () => navigation.navigate('OffersList') },
+        { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
+        { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
       ]
     },
     {

@@ -145,3 +145,68 @@ export const feedbackApi = {
   leave: (data) => api.post('/feedback', data),
   forUser: (username) => api.get(`/feedback/user/${username}`),
 };
+
+// ============================================================
+// BINDERS
+// ============================================================
+export const bindersApi = {
+  list: () => api.get('/binders'),
+  create: (data) => api.post('/binders', data),
+  get: (id) => api.get(`/binders/${id}`),
+  update: (id, data) => api.patch(`/binders/${id}`, data),
+  archive: (id) => api.delete(`/binders/${id}`),
+  addSection: (id, data) => api.post(`/binders/${id}/sections`, data),
+  updateSection: (id, sectionId, data) => api.patch(`/binders/${id}/sections/${sectionId}`, data),
+  deleteSection: (id, sectionId) => api.delete(`/binders/${id}/sections/${sectionId}`),
+  addCards: (id, data) => api.post(`/binders/${id}/cards`, data),
+  updateCard: (id, cardId, data) => api.patch(`/binders/${id}/cards/${cardId}`, data),
+  removeCard: (id, cardId) => api.delete(`/binders/${id}/cards/${cardId}`),
+  activateShowFloor: (id, data) => api.post(`/binders/${id}/show-floor`, data),
+  endShowFloor: (id) => api.post(`/binders/${id}/show-floor/end`),
+  getPublic: (linkToken) => api.get(`/b/binder/${linkToken}`),
+  getPublicSection: (linkToken) => api.get(`/b/binder/section/${linkToken}`),
+  analytics: (id) => api.get(`/analytics/binders/${id}/analytics`),
+};
+
+// ============================================================
+// OFFERS
+// ============================================================
+export const offersApi = {
+  create: (data) => api.post('/offers', data),
+  mine: (params) => api.get('/offers/mine', { params }),
+  get: (id) => api.get(`/offers/${id}`),
+  counter: (id, data) => api.post(`/offers/${id}/counter`, data),
+  accept: (id) => api.post(`/offers/${id}/accept`),
+  decline: (id) => api.post(`/offers/${id}/decline`),
+  message: (id, data) => api.post(`/offers/${id}/message`, data),
+};
+
+// ============================================================
+// TRANSACTIONS (CSTX)
+// ============================================================
+export const cstxApi = {
+  mine: (params) => api.get('/transactions/mine', { params }),
+  get: (id) => api.get(`/transactions/${id}`),
+  submitPayment: (id, data) => api.post(`/transactions/${id}/submit-payment`, data),
+  confirmPayment: (id) => api.post(`/transactions/${id}/confirm-payment`),
+  addTracking: (id, data) => api.post(`/transactions/${id}/add-tracking`, data),
+  confirmDelivery: (id) => api.post(`/transactions/${id}/confirm-delivery`),
+  dispute: (id, data) => api.post(`/transactions/${id}/dispute`, data),
+};
+
+// ============================================================
+// FOLLOWS
+// ============================================================
+export const followsApi = {
+  follow: (userId) => api.post(`/follows/${userId}/follow`),
+  unfollow: (userId) => api.delete(`/follows/${userId}/follow`),
+  count: () => api.get('/follows/followers/count'),
+  following: () => api.get('/follows/following'),
+};
+
+// ============================================================
+// SEARCH
+// ============================================================
+export const searchApi = {
+  search: (params) => api.get('/search', { params }),
+};

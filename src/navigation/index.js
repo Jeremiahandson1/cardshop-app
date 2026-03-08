@@ -18,9 +18,19 @@ import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
 import { ProfileScreen, WantListScreen } from '../screens/ProfileScreens';
+import { SearchScreen } from '../screens/SearchScreen';
+import {
+  BinderListScreen, BinderEditorScreen, BinderCardPickerScreen,
+  PublicBinderScreen, BinderCardDetailScreen, MakeOfferScreen,
+  OffersListScreen, OfferDetailScreen, TransactionScreen,
+  BinderAnalyticsScreen,
+} from '../screens/BinderScreens';
+import { DisputeListScreen, DisputeDetailScreen } from '../screens/DisputeScreens';
+import { TrustProfileScreen } from '../screens/TrustProfileScreen';
 
 const CollectionStackNav = createNativeStackNavigator();
-const DiscoverStackNav = createNativeStackNavigator();
+const BinderStackNav = createNativeStackNavigator();
+const SearchStackNav = createNativeStackNavigator();
 const TransferStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const AuthStackNav = createNativeStackNavigator();
@@ -75,10 +85,10 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Discover"
-        component={DiscoverStack}
+        name="Binders"
+        component={BinderStack}
         options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -104,12 +114,10 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Transfers"
-        component={TransferStack}
+        name="Search"
+        component={SearchStack}
         options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal" size={size} color={color} />,
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.accent3, fontSize: 10 },
+          tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -117,6 +125,8 @@ const TabNavigator = () => {
         component={ProfileStack}
         options={{
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: Colors.accent3, fontSize: 10 },
         }}
       />
     </Tab.Navigator>
@@ -133,17 +143,38 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <CollectionStackNav.Screen name="QRScanner" component={QRScannerScreen} />
+    <CollectionStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
+    <CollectionStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
+    <CollectionStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <CollectionStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
   </CollectionStackNav.Navigator>
 );
 
-const DiscoverStack = () => (
-  <DiscoverStackNav.Navigator screenOptions={screenOptions}>
-    <DiscoverStackNav.Screen name="DiscoverMain" component={DiscoverScreen} />
-    <DiscoverStackNav.Screen name="QRScanner" component={QRScannerScreen} />
-    <DiscoverStackNav.Screen name="CardDetail" component={CardDetailScreen} />
-    <DiscoverStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
-    <DiscoverStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
-  </DiscoverStackNav.Navigator>
+const BinderStack = () => (
+  <BinderStackNav.Navigator screenOptions={screenOptions}>
+    <BinderStackNav.Screen name="BinderList" component={BinderListScreen} />
+    <BinderStackNav.Screen name="BinderEditor" component={BinderEditorScreen} />
+    <BinderStackNav.Screen name="BinderCardPicker" component={BinderCardPickerScreen} />
+    <BinderStackNav.Screen name="BinderAnalytics" component={BinderAnalyticsScreen} />
+    <BinderStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
+    <BinderStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
+    <BinderStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <BinderStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <BinderStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
+  </BinderStackNav.Navigator>
+);
+
+const SearchStack = () => (
+  <SearchStackNav.Navigator screenOptions={screenOptions}>
+    <SearchStackNav.Screen name="SearchMain" component={SearchScreen} />
+    <SearchStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
+    <SearchStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <SearchStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
+    <SearchStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <SearchStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
+    <SearchStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <SearchStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+  </SearchStackNav.Navigator>
 );
 
 const TransferStack = () => (
@@ -165,6 +196,19 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="CardDetail" component={CardDetailScreen} />
     <ProfileStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <ProfileStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <ProfileStackNav.Screen name="OffersList" component={OffersListScreen} />
+    <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
+    <ProfileStackNav.Screen name="Transaction" component={TransactionScreen} />
+    <ProfileStackNav.Screen name="DisputeList" component={DisputeListScreen} />
+    <ProfileStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
+    <ProfileStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
+    <ProfileStackNav.Screen name="BinderList" component={BinderListScreen} />
+    <ProfileStackNav.Screen name="BinderEditor" component={BinderEditorScreen} />
+    <ProfileStackNav.Screen name="BinderCardPicker" component={BinderCardPickerScreen} />
+    <ProfileStackNav.Screen name="BinderAnalytics" component={BinderAnalyticsScreen} />
+    <ProfileStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
+    <ProfileStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
+    <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
   </ProfileStackNav.Navigator>
 );
 
