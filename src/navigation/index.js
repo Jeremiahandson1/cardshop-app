@@ -1,11 +1,15 @@
 import React from 'react';
 import { View, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const LCS_ENABLED = Constants.expoConfig?.extra?.LCS_ENABLED === true
+  || Constants.expoConfig?.extra?.LCS_ENABLED === 'true';
 
 import { useAuthStore } from '../store/authStore';
 import { notificationsApi } from '../services/api';
@@ -28,12 +32,30 @@ import {
 } from '../screens/BinderScreens';
 import { DisputeListScreen, DisputeDetailScreen } from '../screens/DisputeScreens';
 import { TrustProfileScreen } from '../screens/TrustProfileScreen';
+import {
+  LCSHomeScreen, LCSShopListScreen, LCSShopDetailScreen,
+  LCSPostPriceScreen, LCSProductPickerScreen, LCSSubmitShopScreen,
+  LCSPriceTrendScreen,
+} from '../screens/LCSScreens';
+import {
+  TradeBoardScreen, TradeListingDetailScreen, CreateTradeListingScreen,
+  TradeCardPickerScreen, MakeTradeOfferScreen, TradeOfferDetailScreen,
+  TradeOffersListScreen,
+} from '../screens/TradeBoardScreens';
+import {
+  TradeGroupsListScreen, CreateTradeGroupScreen, TradeGroupDetailScreen,
+  TradeGroupManageScreen, JoinTradeGroupScreen,
+} from '../screens/TradeGroupsScreens';
+import { TradeCameraScreen } from '../screens/TradeCameraScreen';
+import { SetsListScreen, SetCompletionScreen } from '../screens/SetCompletionScreens';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
 const SearchStackNav = createNativeStackNavigator();
 const TransferStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
+const LCSStackNav = createNativeStackNavigator();
+const TradeStackNav = createNativeStackNavigator();
 const AuthStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -123,6 +145,23 @@ const TabNavigator = () => {
           tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
         }}
       />
+      <Tab.Screen
+        name="Trade"
+        component={TradeStack}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal" size={size} color={color} />,
+        }}
+      />
+      {LCS_ENABLED && (
+        <Tab.Screen
+          name="LCS"
+          component={LCSStack}
+          options={{
+            tabBarLabel: 'Prices',
+            tabBarIcon: ({ color, size }) => <Ionicons name="pricetag" size={size} color={color} />,
+          }}
+        />
+      )}
       <Tab.Screen
         name="Profile"
         component={ProfileStack}
@@ -215,6 +254,38 @@ const ProfileStack = () => (
   </ProfileStackNav.Navigator>
 );
 
+const LCSStack = () => (
+  <LCSStackNav.Navigator screenOptions={screenOptions}>
+    <LCSStackNav.Screen name="LCSHome" component={LCSHomeScreen} />
+    <LCSStackNav.Screen name="LCSShopList" component={LCSShopListScreen} />
+    <LCSStackNav.Screen name="LCSShopDetail" component={LCSShopDetailScreen} />
+    <LCSStackNav.Screen name="LCSPostPrice" component={LCSPostPriceScreen} />
+    <LCSStackNav.Screen name="LCSProductPicker" component={LCSProductPickerScreen} />
+    <LCSStackNav.Screen name="LCSSubmitShop" component={LCSSubmitShopScreen} />
+    <LCSStackNav.Screen name="LCSPriceTrend" component={LCSPriceTrendScreen} />
+  </LCSStackNav.Navigator>
+);
+
+const TradeStack = () => (
+  <TradeStackNav.Navigator screenOptions={screenOptions}>
+    <TradeStackNav.Screen name="TradeBoardMain" component={TradeBoardScreen} />
+    <TradeStackNav.Screen name="TradeListingDetail" component={TradeListingDetailScreen} />
+    <TradeStackNav.Screen name="CreateTradeListing" component={CreateTradeListingScreen} />
+    <TradeStackNav.Screen name="TradeCardPicker" component={TradeCardPickerScreen} />
+    <TradeStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
+    <TradeStackNav.Screen name="TradeOfferDetail" component={TradeOfferDetailScreen} />
+    <TradeStackNav.Screen name="TradeOffersList" component={TradeOffersListScreen} />
+    <TradeStackNav.Screen name="TradeGroupsList" component={TradeGroupsListScreen} />
+    <TradeStackNav.Screen name="CreateTradeGroup" component={CreateTradeGroupScreen} />
+    <TradeStackNav.Screen name="TradeGroupDetail" component={TradeGroupDetailScreen} />
+    <TradeStackNav.Screen name="TradeGroupManage" component={TradeGroupManageScreen} />
+    <TradeStackNav.Screen name="JoinTradeGroup" component={JoinTradeGroupScreen} />
+    <TradeStackNav.Screen name="TradeCameraCapture" component={TradeCameraScreen} />
+    <TradeStackNav.Screen name="SetsList" component={SetsListScreen} />
+    <TradeStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
+  </TradeStackNav.Navigator>
+);
+
 // ============================================================
 // AUTH STACK
 // ============================================================
@@ -226,13 +297,33 @@ const AuthStack = () => (
 );
 
 // ============================================================
+// DEEP LINKING CONFIG
+// cardshop://join?token=XXX   → TradeGroups › JoinTradeGroup with token param
+// cardshop://trade/<id>       → TradeListingDetail
+// ============================================================
+const linkingConfig = {
+  prefixes: ['cardshop://', 'https://admin.twomiah.com'],
+  config: {
+    screens: {
+      Trade: {
+        screens: {
+          JoinTradeGroup: 'join',
+          TradeListingDetail: 'trade/:listingId',
+          TradeBoardMain: 'trade',
+        },
+      },
+    },
+  },
+};
+
+// ============================================================
 // ROOT NAVIGATOR
 // ============================================================
 export const RootNavigator = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={isAuthenticated ? linkingConfig : undefined}>
       {isAuthenticated ? <TabNavigator /> : <AuthStack />}
     </NavigationContainer>
   );

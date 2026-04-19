@@ -22,6 +22,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [step, setStep] = useState(qrCode || catalogId ? 'search' : 'scan_or_search');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState(null);
+  const [parallels, setParallels] = useState([]);
 
   // If a catalogId was passed, fetch and pre-select it
   const { data: preselectedCatalog } = useQuery({
@@ -33,7 +34,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   React.useEffect(() => {
     if (preselectedCatalog && !selectedCatalog) {
       setSelectedCatalog(preselectedCatalog);
-      setStep('details');
+      setStep('parallel');
     }
   }, [preselectedCatalog, selectedCatalog, setSelectedCatalog, setStep]);
   const [photos, setPhotos] = useState([]);
@@ -45,6 +46,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     status: 'nfs',
     asking_price: '',
     condition_notes: '',
+    serial_number: '',
+    purchase_price: '',
+    personal_valuation: '',
+    notes: '',
   });
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -74,6 +79,16 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     }
   };
 
+  // Fetch parallels when a base card is selected
+  const fetchParallels = async (catalogId) => {
+    try {
+      const res = await catalogApi.parallels(catalogId);
+      setParallels(res.data || []);
+    } catch {
+      setParallels([]);
+    }
+  };
+
   const registerMutation = useMutation({
     mutationFn: () => cardsApi.register({
       catalog_id: selectedCatalog.id,
@@ -84,6 +99,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       grade: form.grade ? parseFloat(form.grade) : undefined,
       status: form.status,
       asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
+      serial_number: form.serial_number ? parseInt(form.serial_number) : undefined,
+      purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
+      personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
+      notes: form.notes || undefined,
       photo_urls: photos,
     }),
     onSuccess: (res) => {
@@ -152,7 +171,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.catalogResult}
-              onPress={() => { setSelectedCatalog(item); setStep('details'); }}
+              onPress={() => { setSelectedCatalog(item); fetchParallels(item.id); setStep('parallel'); }}
             >
               <View style={styles.catalogResultImg}>
                 {item.front_image_url
@@ -173,11 +192,136 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     );
   }
 
-  // Step 2: Details
+  // Step 2: Select Parallel
+  if (step === 'parallel') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep('search')}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Select Parallel</Text>
+          <View style={{ width: 22 }} />
+        </View>
+
+        <View style={{ paddingHorizontal: Spacing.base, marginBottom: Spacing.md }}>
+          <Text style={styles.catalogPlayer}>{selectedCatalog?.player_name}</Text>
+          <Text style={styles.catalogSet}>{selectedCatalog?.year} {selectedCatalog?.set_name}</Text>
+        </View>
+
+        <FlatList
+          data={parallels.length > 0 ? parallels : (selectedCatalog ? [selectedCatalog] : [])}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl }}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.catalogResult, selectedCatalog?.id === item.id && styles.statusBtnActive]}
+              onPress={() => {
+                setSelectedCatalog(item);
+                // If card has print_run, go to serial number step
+                if (item.print_run) {
+                  setStep('serial');
+                } else {
+                  setStep('details');
+                }
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                  <Text style={styles.catalogPlayer}>
+                    {item.parallel || 'Base'}
+                  </Text>
+                  {item.is_one_of_one && (
+                    <View style={[styles.rookieTag, { backgroundColor: '#FFD700' + '22', borderColor: '#FFD700' }]}>
+                      <Text style={[styles.rookieTagText, { color: '#FFD700' }]}>1/1</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.catalogSet}>
+                  {item.print_run ? `/${item.print_run}` : 'Unlimited'}
+                  {item.is_autograph ? ' - Auto' : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+          ListFooterComponent={
+            <TouchableOpacity
+              style={styles.createNewBtn}
+              onPress={() => {
+                // TODO: navigate to add custom parallel
+              }}
+            >
+              <Ionicons name="add-circle" size={18} color={Colors.accent} />
+              <Text style={styles.createNewText}>Add a parallel not listed here</Text>
+            </TouchableOpacity>
+          }
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // Step 3: Serial Number (if card has print_run)
+  if (step === 'serial') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep('parallel')}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Serial Number</Text>
+          <View style={{ width: 22 }} />
+        </View>
+
+        <View style={{ padding: Spacing.base, gap: Spacing.md }}>
+          <View style={styles.selectedCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.catalogPlayer}>{selectedCatalog?.player_name}</Text>
+              <Text style={styles.catalogSet}>
+                {selectedCatalog?.parallel || 'Base'} /{selectedCatalog?.print_run}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+            Which copy do you have? (e.g. 14 of {selectedCatalog?.print_run})
+          </Text>
+
+          <Input
+            label="Serial Number"
+            value={form.serial_number}
+            onChangeText={set('serial_number')}
+            placeholder={`1-${selectedCatalog?.print_run || '?'}`}
+            keyboardType="number-pad"
+          />
+
+          {form.serial_number && selectedCatalog?.print_run && (
+            <View style={[styles.rookieTag, { alignSelf: 'flex-start' }]}>
+              <Text style={styles.rookieTagText}>#{form.serial_number}/{selectedCatalog.print_run}</Text>
+            </View>
+          )}
+
+          <Button
+            title="Continue"
+            onPress={() => setStep('details')}
+            style={{ marginTop: Spacing.lg }}
+          />
+
+          <TouchableOpacity onPress={() => setStep('details')}>
+            <Text style={{ color: Colors.textMuted, textAlign: 'center', fontSize: Typography.sm }}>
+              Skip — I don't know the serial number
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Step 4: Grade/Condition + Personal Details
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setStep('search')}>
+        <TouchableOpacity onPress={() => selectedCatalog?.print_run ? setStep('serial') : setStep('parallel')}>
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Card Details</Text>
@@ -195,6 +339,14 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             <Text style={styles.catalogPlayer}>{selectedCatalog.player_name}</Text>
             <Text style={styles.catalogSet}>{selectedCatalog.year} {selectedCatalog.set_name}</Text>
             {selectedCatalog.parallel && <Text style={styles.catalogParallel}>{selectedCatalog.parallel}</Text>}
+            {form.serial_number && selectedCatalog.print_run && (
+              <Text style={styles.catalogParallel}>#{form.serial_number}/{selectedCatalog.print_run}</Text>
+            )}
+            {selectedCatalog.is_one_of_one && (
+              <View style={[styles.rookieTag, { backgroundColor: '#FFD700' + '22', borderColor: '#FFD700', marginTop: 4 }]}>
+                <Text style={[styles.rookieTagText, { color: '#FFD700' }]}>1/1</Text>
+              </View>
+            )}
           </View>
         </View>}
 
@@ -272,6 +424,41 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             keyboardType="decimal-pad"
           />
         )}
+
+        {/* Personal Details (private) */}
+        <View>
+          <SectionHeader title="Personal Details (Private)" />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            These are never shown to other users.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Purchase Price"
+                value={form.purchase_price}
+                onChangeText={set('purchase_price')}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Your Valuation"
+                value={form.personal_valuation}
+                onChangeText={set('personal_valuation')}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+          <Input
+            label="Notes"
+            value={form.notes}
+            onChangeText={set('notes')}
+            placeholder="Personal notes about this card..."
+            multiline
+          />
+        </View>
 
         {/* Photos */}
         <View>
@@ -375,27 +562,78 @@ export const CardDetailScreen = ({ navigation, route }) => {
           <Text style={styles.detailPlayer}>{card.player_name}</Text>
           <Text style={styles.detailSet}>{card.year} {card.manufacturer} {card.set_name}</Text>
           {card.parallel && <Text style={styles.detailParallel}>{card.parallel}</Text>}
-          {card.is_rookie && (
-            <View style={styles.rookieTag}>
-              <Text style={styles.rookieTagText}>Rookie Card</Text>
-            </View>
-          )}
+
+          {/* Badges row */}
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm, flexWrap: 'wrap' }}>
+            {card.is_one_of_one && (
+              <View style={[styles.rookieTag, { backgroundColor: '#FFD700' + '22', borderColor: '#FFD700' }]}>
+                <Text style={[styles.rookieTagText, { color: '#FFD700' }]}>1/1</Text>
+              </View>
+            )}
+            {card.serial_number && card.print_run && (
+              <View style={styles.rookieTag}>
+                <Text style={styles.rookieTagText}>#{card.serial_number}/{card.print_run}</Text>
+              </View>
+            )}
+            {card.is_rookie && (
+              <View style={styles.rookieTag}>
+                <Text style={styles.rookieTagText}>Rookie Card</Text>
+              </View>
+            )}
+            {card.is_autograph && (
+              <View style={[styles.rookieTag, { backgroundColor: '#9B59B6' + '22', borderColor: '#9B59B6' }]}>
+                <Text style={[styles.rookieTagText, { color: '#9B59B6' }]}>Auto</Text>
+              </View>
+            )}
+          </View>
 
           <Divider />
 
-          {/* Grade or condition */}
+          {/* Grade or condition with cert link */}
           {card.grading_company && card.grading_company !== 'raw' ? (
             <View style={styles.gradeBlock}>
               <View style={styles.gradeBadge}>
                 <Text style={styles.gradeCompany}>{card.grading_company.toUpperCase()}</Text>
                 <Text style={styles.gradeNum}>{card.grade}</Text>
               </View>
-              <Text style={styles.certNum}>Cert #{card.cert_number}</Text>
+              <View>
+                <Text style={styles.certNum}>Cert #{card.cert_number}</Text>
+                {card.cert_number && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      const certUrls = {
+                        psa: `https://www.psacard.com/cert/${card.cert_number}`,
+                        bgs: `https://www.beckett.com/grading/cert/${card.cert_number}`,
+                        sgc: 'https://www.sgccard.com/certification-lookup',
+                      };
+                      const url = certUrls[card.grading_company];
+                      if (url) {
+                        // Open in-app browser
+                        navigation.navigate('WebView', { url, title: `Verify on ${card.grading_company.toUpperCase()}` });
+                      }
+                    }}
+                  >
+                    <Text style={{ color: Colors.accent, fontSize: Typography.xs, marginTop: 2 }}>
+                      Verify on {card.grading_company.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ) : (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Condition</Text>
               <Text style={styles.infoValue}>{card.condition?.replace(/_/g, ' ')?.replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}</Text>
+            </View>
+          )}
+
+          {/* Serial number */}
+          {card.serial_number && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Serial Number</Text>
+              <Text style={styles.infoValue}>
+                #{card.serial_number}{card.print_run ? `/${card.print_run}` : ''}
+              </Text>
             </View>
           )}
 

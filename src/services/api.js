@@ -2,7 +2,13 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.API_URL || 'http://localhost:5000';
+// Prefer EXPO_PUBLIC_API_URL (injected at build time by EAS profiles) so
+// each build target (development/preview/production) can point at its own
+// API. Falls back to the value in app.json, then localhost for dev.
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.API_URL ||
+  'http://localhost:5000';
 
 export const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -66,7 +72,8 @@ export const catalogApi = {
   search: (params) => api.get('/catalog/search', { params }),
   get: (id) => api.get(`/catalog/${id}`),
   create: (data) => api.post('/catalog', data),
-  priceHistory: (id) => api.get(`/catalog/${id}/price-history`),
+  priceHistory: (id, params) => api.get(`/catalog/${id}/price-history`, { params }),
+  parallels: (id) => api.get(`/catalog/${id}/parallels`),
 };
 
 // ============================================================
@@ -75,6 +82,7 @@ export const catalogApi = {
 export const cardsApi = {
   mine: (params) => api.get('/cards/mine', { params }),
   get: (id) => api.get(`/cards/${id}`),
+  getPrivate: (id) => api.get(`/cards/${id}/private`),
   register: (data) => api.post('/cards', data),
   update: (id, data) => api.patch(`/cards/${id}`, data),
   history: (id) => api.get(`/cards/${id}/history`),
@@ -166,6 +174,9 @@ export const bindersApi = {
   getPublic: (linkToken) => api.get(`/b/binder/${linkToken}`),
   getPublicSection: (linkToken) => api.get(`/b/binder/section/${linkToken}`),
   analytics: (id) => api.get(`/analytics/binders/${id}/analytics`),
+  comparison: () => api.get('/analytics/binders/comparison'),
+  cardDetail: (linkToken, cardId) => api.get(`/b/binder/${linkToken}/card/${cardId}`),
+  myCardPriceHistory: (params) => api.get('/analytics/my-cards/price-history', { params }),
 };
 
 // ============================================================
@@ -209,4 +220,91 @@ export const followsApi = {
 // ============================================================
 export const searchApi = {
   search: (params) => api.get('/search', { params }),
+};
+
+// ============================================================
+// TRADE GROUPS
+// ============================================================
+export const tradeGroupsApi = {
+  create: (data) => api.post('/trade-groups', data),
+  mine: () => api.get('/trade-groups/mine'),
+  get: (id) => api.get(`/trade-groups/${id}`),
+  update: (id, data) => api.patch(`/trade-groups/${id}`, data),
+  remove: (id) => api.delete(`/trade-groups/${id}`),
+  listInvites: (id) => api.get(`/trade-groups/${id}/invites`),
+  createInvite: (id, data) => api.post(`/trade-groups/${id}/invites`, data),
+  revokeInvite: (id, token) => api.delete(`/trade-groups/${id}/invites/${token}`),
+  joinByToken: (token) => api.post('/trade-groups/join', { token }),
+  removeMember: (id, userId) => api.delete(`/trade-groups/${id}/members/${userId}`),
+};
+
+// ============================================================
+// TRADE LISTINGS
+// ============================================================
+// ============================================================
+// PRICING (eBay sold comps)
+// ============================================================
+export const pricingApi = {
+  ebay: (catalogId) => api.get('/pricing/ebay', { params: { catalog_id: catalogId } }),
+};
+
+// ============================================================
+// SETS (catalog + set completion)
+// ============================================================
+export const setsApi = {
+  list: () => api.get('/sets'),
+  completion: (setCode) => api.get(`/sets/${setCode}/completion`),
+  // Admin-only — returns 403 otherwise
+  adminImport: (data) => api.post('/sets/admin/import', data),
+  adminPending: (params) => api.get('/sets/admin/pending', { params }),
+  adminApprove: (ids) => api.post('/sets/admin/approve', { ids }),
+  adminReject: (ids) => api.post('/sets/admin/reject', { ids }),
+};
+
+export const tradeListingsApi = {
+  create: (data) => api.post('/trade-listings', data),
+  feed: (params) => api.get('/trade-listings', { params }),
+  get: (id) => api.get(`/trade-listings/${id}`),
+  update: (id, data) => api.patch(`/trade-listings/${id}`, data),
+  bump: (id) => api.post(`/trade-listings/${id}/bump`),
+  remove: (id) => api.delete(`/trade-listings/${id}`),
+  // photo_front_base64 and photo_back_base64 are optional — if omitted, the
+  // server re-runs verification against the photos already stored on the listing.
+  verify: (id, data) => api.post(`/trade-listings/${id}/verify`, data),
+};
+
+// ============================================================
+// TRADE OFFERS (uses the shared /offers endpoint with target_type='trade_listing')
+// ============================================================
+export const tradeOffersApi = {
+  create: (data) => api.post('/offers', { target_type: 'trade_listing', ...data }),
+  withdraw: (id) => api.delete(`/offers/${id}`),
+};
+
+// ============================================================
+// MY LOCAL LCS
+// ============================================================
+export const lcsApi = {
+  // shops
+  shopsNearZip: (zip, radius = 100) =>
+    api.get('/lcs/shops', { params: { zip, radius } }),
+  getShop: (id) => api.get(`/lcs/shops/${id}`),
+  submitShop: (data) => api.post('/lcs/shops', data),
+  flagShop: (id) => api.post(`/lcs/shops/${id}/flag`),
+
+  // products
+  searchProducts: (params) => api.get('/lcs/products', { params }),
+  getProduct: (id) => api.get(`/lcs/products/${id}`),
+  submitProduct: (data) => api.post('/lcs/products', data),
+
+  // prices
+  shopPrices: (shopId) => api.get(`/lcs/shops/${shopId}/prices`),
+  productPrices: (productId, params) =>
+    api.get(`/lcs/products/${productId}/prices`, { params }),
+  productTrend: (productId, params) =>
+    api.get(`/lcs/products/${productId}/trend`, { params }),
+  postPrice: (data) => api.post('/lcs/prices', data),
+  removePrice: (id) => api.delete(`/lcs/prices/${id}`),
+  verifyPrice: (id) => api.post(`/lcs/prices/${id}/verify`),
+  unverifyPrice: (id) => api.delete(`/lcs/prices/${id}/verify`),
 };

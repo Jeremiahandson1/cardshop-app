@@ -18,8 +18,9 @@
       "bundleIdentifier": "com.twomiah.cardshop",
       "infoPlist": {
         "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
-        "NSCameraUsageDescription": "Used to scan QR codes on card inserts",
-        "NSPhotoLibraryUsageDescription": "Used to upload card photos"
+        "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
+        "NSPhotoLibraryUsageDescription": "Used to upload card photos",
+        "NSLocationWhenInUseUsageDescription": "Used to show nearby trade listings and snapshot your city on your own listings"
       },
       "entitlements": {
         "com.apple.developer.nfc.readersession.formats": [
@@ -37,16 +38,26 @@
         "android.permission.NFC",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.RECORD_AUDIO"
-      ]
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "versionCode": 2
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Card Shop to scan QR codes"
+          "cameraPermission": "Allow Card Shop to scan QR codes and capture card photos for trade listings"
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Card Shop to use your location to find nearby trades."
+        }
+      ],
+      "expo-notifications",
       "react-native-nfc-manager",
       "expo-secure-store",
       "expo-sharing"
@@ -54,6 +65,7 @@
     "scheme": "cardshop",
     "extra": {
       "API_URL": "https://cardshop-api-pc6b.onrender.com",
+      "LCS_ENABLED": true,
       "eas": {
         "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
       }

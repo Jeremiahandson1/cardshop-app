@@ -9,6 +9,7 @@ import { RootNavigator } from './src/navigation';
 import { useAuthStore } from './src/store/authStore';
 import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
+import { registerForPushNotificationsAsync } from './src/services/pushRegistration';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,10 +24,18 @@ export const queryClient = new QueryClient({
 const AppInner = () => {
   const initialize = useAuthStore((s) => s.initialize);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Once authenticated, register for push notifications. Safe to call repeatedly.
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerForPushNotificationsAsync();
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) return <LoadingScreen message="Card Shop by Twomiah" />;
 
