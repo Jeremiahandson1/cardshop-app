@@ -242,6 +242,17 @@ export const tradeGroupsApi = {
 // TRADE LISTINGS
 // ============================================================
 // ============================================================
+// SAFETY — block, report stolen, support tickets
+// ============================================================
+export const safetyApi = {
+  blockUser: (user_id, reason) => api.post('/safety/blocks', { user_id, reason }),
+  unblockUser: (userId) => api.delete(`/safety/blocks/${userId}`),
+  listBlocks: () => api.get('/safety/blocks'),
+  reportStolen: (data) => api.post('/safety/stolen-reports', data),
+  submitSupportTicket: (data) => api.post('/safety/support', data),
+};
+
+// ============================================================
 // PRICING (eBay sold comps)
 // ============================================================
 export const pricingApi = {

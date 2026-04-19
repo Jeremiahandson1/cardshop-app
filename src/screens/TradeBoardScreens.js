@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   tradeListingsApi, tradeGroupsApi, tradeOffersApi,
-  cardsApi, offersApi, pricingApi,
+  cardsApi, offersApi, pricingApi, safetyApi,
 } from '../services/api';
 import { getDeviceLocation, getZipFromCoords } from '../services/deviceLocation';
 import { Linking } from 'react-native';
@@ -456,6 +456,21 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
         {/* Recent sold comps from eBay */}
         {listing.catalog_id ? <EbayCompsSection catalogId={listing.catalog_id} /> : null}
 
+        {/* Non-owner actions: report stolen */}
+        {!isOwner ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ReportStolen', {
+              tradeListingId: listingId,
+              cardName: formatCardTitle(listing),
+            })}
+            style={{ marginTop: Spacing.md, alignSelf: 'center', padding: Spacing.sm }}
+          >
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+              🚩 Report stolen card
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* Offer button or owner actions */}
         {!isOwner ? (
           <Button
@@ -578,6 +593,7 @@ const EbayCompsSection = ({ catalogId }) => {
       </View>
       <Text style={styles.compsFooter}>
         Data from eBay completed listings. Tap a row to view on eBay.
+        Card Shop may earn a commission from eBay purchases made through these links.
       </Text>
     </View>
   );
@@ -1130,6 +1146,41 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
             loading={withdraw.isPending}
             style={{ marginTop: Spacing.lg }}
           />
+        ) : null}
+
+        {/* Block user — always available (can't block yourself) */}
+        {offer.sender_user_id !== user?.id || offer.recipient_user_id !== user?.id ? (
+          <TouchableOpacity
+            onPress={() => {
+              const otherId = amIRecipient ? offer.sender_user_id : offer.recipient_user_id;
+              const otherName = amIRecipient ? offer.sender_name : offer.recipient_name;
+              Alert.alert(
+                'Block this user?',
+                `${otherName} won't be able to see your listings or send you offers. You won't see theirs either. You can unblock later in Profile → Help & Safety.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Block',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await safetyApi.blockUser(otherId, 'Blocked from offer thread');
+                        Alert.alert('Blocked', `${otherName} has been blocked.`);
+                        navigation.goBack();
+                      } catch (err) {
+                        Alert.alert('Could not block', err?.response?.data?.error || 'Try again.');
+                      }
+                    },
+                  },
+                ],
+              );
+            }}
+            style={{ marginTop: Spacing.lg, alignSelf: 'center', padding: Spacing.sm }}
+          >
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+              🚫 Block this user
+            </Text>
+          </TouchableOpacity>
         ) : null}
       </ScrollView>
 

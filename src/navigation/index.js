@@ -48,6 +48,7 @@ import {
 } from '../screens/TradeGroupsScreens';
 import { TradeCameraScreen } from '../screens/TradeCameraScreen';
 import { SetsListScreen, SetCompletionScreen } from '../screens/SetCompletionScreens';
+import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -251,6 +252,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <ProfileStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <ProfileStackNav.Screen name="Help" component={HelpScreen} />
   </ProfileStackNav.Navigator>
 );
 
@@ -283,6 +285,9 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="TradeCameraCapture" component={TradeCameraScreen} />
     <TradeStackNav.Screen name="SetsList" component={SetsListScreen} />
     <TradeStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
+    <TradeStackNav.Screen name="Help" component={HelpScreen} />
+    <TradeStackNav.Screen name="ReportStolen" component={ReportStolenScreen} />
+    <TradeStackNav.Screen name="FirstTradeSafety" component={FirstTradeSafetyScreen} />
   </TradeStackNav.Navigator>
 );
 

@@ -102,13 +102,22 @@ export const LoginScreen = ({ navigation }) => {
 // ============================================================
 export const RegisterScreen = ({ navigation }) => {
   const [form, setForm] = useState({
-    email: '', username: '', password: '', display_name: '', role: 'collector'
+    email: '', username: '', password: '', display_name: '', role: 'collector',
+    date_of_birth: '', guardian_email: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const register = useAuthStore((s) => s.register);
 
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
+
+  const ageYearsFromDob = (dob) => {
+    if (!dob) return null;
+    const d = new Date(dob);
+    if (isNaN(d.getTime())) return null;
+    const ms = Date.now() - d.getTime();
+    return ms / (1000 * 60 * 60 * 24 * 365.25);
+  };
 
   const handleRegister = async () => {
     if (!form.email || !form.username || !form.password) {
@@ -119,16 +128,41 @@ export const RegisterScreen = ({ navigation }) => {
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!form.date_of_birth) {
+      setError('Date of birth is required');
+      return;
+    }
+    const age = ageYearsFromDob(form.date_of_birth);
+    if (age == null) {
+      setError('Enter your date of birth as YYYY-MM-DD');
+      return;
+    }
+    if (age < 13) {
+      setError('You must be at least 13 years old to use Card Shop.');
+      return;
+    }
+    if (age < 18 && !form.guardian_email) {
+      setError('Users under 18 must provide a parent or guardian email.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await register({ ...form, email: form.email.toLowerCase().trim(), username: form.username.trim() });
+      await register({
+        ...form,
+        email: form.email.toLowerCase().trim(),
+        username: form.username.trim(),
+        guardian_email: form.guardian_email ? form.guardian_email.toLowerCase().trim() : undefined,
+      });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
+
+  const age = ageYearsFromDob(form.date_of_birth);
+  const isMinor = age != null && age < 18;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -155,6 +189,16 @@ export const RegisterScreen = ({ navigation }) => {
             <Input label="Username" value={form.username} onChangeText={set('username')} placeholder="cardkng99" />
             <Input label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" autoComplete="email" />
             <Input label="Password" value={form.password} onChangeText={set('password')} placeholder="8+ characters" secureTextEntry />
+            <Input label="Date of birth" value={form.date_of_birth} onChangeText={set('date_of_birth')} placeholder="YYYY-MM-DD" />
+            {isMinor ? (
+              <Input
+                label="Parent or guardian email (required under 18)"
+                value={form.guardian_email}
+                onChangeText={set('guardian_email')}
+                placeholder="parent@example.com"
+                keyboardType="email-address"
+              />
+            ) : null}
 
             {/* Role selector */}
             <Text style={styles.roleLabel}>I AM A</Text>
