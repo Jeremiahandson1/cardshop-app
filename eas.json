@@ -30,7 +30,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cardshop-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://cardshop-api-ow4q.onrender.com"
       },
       "channel": "preview"
     },
@@ -43,7 +43,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cardshop-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://cardshop-api-ow4q.onrender.com"
       },
       "channel": "production"
     }
