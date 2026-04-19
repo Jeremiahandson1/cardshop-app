@@ -142,10 +142,6 @@ export const RegisterScreen = ({ navigation }) => {
       setError('You must be at least 13 years old to use Card Shop.');
       return;
     }
-    if (age < 18 && !form.guardian_email) {
-      setError('Users under 18 must provide a parent or guardian email.');
-      return;
-    }
     if (!agreed) {
       setError('You must agree to the Terms of Service and Privacy Policy.');
       return;
@@ -157,7 +153,6 @@ export const RegisterScreen = ({ navigation }) => {
         ...form,
         email: form.email.toLowerCase().trim(),
         username: form.username.trim(),
-        guardian_email: form.guardian_email ? form.guardian_email.toLowerCase().trim() : undefined,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
@@ -167,7 +162,6 @@ export const RegisterScreen = ({ navigation }) => {
   };
 
   const age = ageYearsFromDob(form.date_of_birth);
-  const isMinor = age != null && age < 18;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -195,15 +189,6 @@ export const RegisterScreen = ({ navigation }) => {
             <Input label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" autoComplete="email" />
             <Input label="Password" value={form.password} onChangeText={set('password')} placeholder="8+ characters" secureTextEntry />
             <Input label="Date of birth" value={form.date_of_birth} onChangeText={set('date_of_birth')} placeholder="YYYY-MM-DD" />
-            {isMinor ? (
-              <Input
-                label="Parent or guardian email (required under 18)"
-                value={form.guardian_email}
-                onChangeText={set('guardian_email')}
-                placeholder="parent@example.com"
-                keyboardType="email-address"
-              />
-            ) : null}
 
             {/* Role selector */}
             <Text style={styles.roleLabel}>I AM A</Text>
