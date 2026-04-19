@@ -288,6 +288,7 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="Help" component={HelpScreen} />
     <TradeStackNav.Screen name="ReportStolen" component={ReportStolenScreen} />
     <TradeStackNav.Screen name="FirstTradeSafety" component={FirstTradeSafetyScreen} />
+    <TradeStackNav.Screen name="FirstTradeSafetyScreen" component={FirstTradeSafetyScreen} />
   </TradeStackNav.Navigator>
 );
 

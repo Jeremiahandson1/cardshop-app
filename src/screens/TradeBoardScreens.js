@@ -13,6 +13,10 @@ import {
 } from '../services/api';
 import { getDeviceLocation, getZipFromCoords } from '../services/deviceLocation';
 import { Linking } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { analytics, Events } from '../services/analytics';
+
+const SAFETY_CHECKLIST_SEEN_KEY = 'seen_first_trade_safety_checklist';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, EmptyState, LoadingScreen,
@@ -620,7 +624,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
   const [acceptsBundles, setAcceptsBundles] = useState(false);
   const [lookingFor, setLookingFor] = useState('');
   const [timeLimitHours, setTimeLimitHours] = useState(null);
-  const [photos, setPhotos] = useState({ front: null, back: null }); // data URLs
+  const [photos, setPhotos] = useState({ front: null, back: null, video: null }); // data URLs
 
   const { data: groupsData } = useQuery({
     queryKey: ['my-trade-groups'],
@@ -648,6 +652,11 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
       const newId = r?.data?.id;
+      analytics.track(Events.LISTING_CREATED, {
+        has_video: !!photos.video,
+        has_photos: !!(photos.front && photos.back),
+        visibility_scopes: visibility.map((v) => v.scope_type),
+      });
       if (newId && (photos.front || photos.back)) {
         runVerification(newId);
       }
@@ -676,6 +685,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
       offer_time_limit_hours: timeLimitHours,
       photo_front_url: photos.front,
       photo_back_url: photos.back,
+      video_url: photos.video || null,
       location_lat: loc?.latitude || null,
       location_lng: loc?.longitude || null,
       location_zip: zip || null,
@@ -775,7 +785,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
             <TouchableOpacity
               style={[styles.photoThumb, !photos.front && styles.photoThumbEmpty]}
               onPress={() => navigation.navigate('TradeCameraCapture', {
-                onComplete: (p) => setPhotos({ front: p.front, back: p.back }),
+                onComplete: (p) => setPhotos({ front: p.front, back: p.back, video: p.video || null }),
               })}
               activeOpacity={0.85}
             >
@@ -791,7 +801,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
             <TouchableOpacity
               style={[styles.photoThumb, !photos.back && styles.photoThumbEmpty]}
               onPress={() => navigation.navigate('TradeCameraCapture', {
-                onComplete: (p) => setPhotos({ front: p.front, back: p.back }),
+                onComplete: (p) => setPhotos({ front: p.front, back: p.back, video: p.video || null }),
               })}
               activeOpacity={0.85}
             >
@@ -808,7 +818,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
           {photos.front && photos.back ? (
             <TouchableOpacity
               onPress={() => navigation.navigate('TradeCameraCapture', {
-                onComplete: (p) => setPhotos({ front: p.front, back: p.back }),
+                onComplete: (p) => setPhotos({ front: p.front, back: p.back, video: p.video || null }),
               })}
               style={{ alignSelf: 'flex-start', marginTop: Spacing.sm }}
             >
@@ -922,6 +932,10 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
       qc.invalidateQueries({ queryKey: ['trade-offers-mine'] });
+      analytics.track(Events.OFFER_SENT, {
+        cards_offered: selectedCardIds.length,
+        has_message: !!message.trim(),
+      });
       Alert.alert('Offer sent', 'You will be notified if it is accepted, declined, or countered.');
       navigation.goBack();
     },
@@ -1029,14 +1043,40 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
   const accept = useMutation({
     mutationFn: () => offersApi.accept(offerId),
     onSuccess: () => {
+      analytics.track(Events.OFFER_ACCEPTED, { offer_id: offerId });
       refetchAll();
       Alert.alert('Accepted', 'Trade accepted. Arrange the meetup or shipping off-platform.');
     },
   });
 
+  // On first-ever Accept, show the safety checklist first. After user
+  // acknowledges it, mark the flag set and run the actual accept.
+  const handleAccept = async () => {
+    try {
+      const seen = await SecureStore.getItemAsync(SAFETY_CHECKLIST_SEEN_KEY);
+      if (seen === 'true') {
+        accept.mutate();
+        return;
+      }
+    } catch {
+      // SecureStore unavailable → proceed without gating, safety is best-effort
+      accept.mutate();
+      return;
+    }
+    navigation.navigate('FirstTradeSafetyScreen', {
+      onAcknowledge: async () => {
+        try {
+          await SecureStore.setItemAsync(SAFETY_CHECKLIST_SEEN_KEY, 'true');
+        } catch {}
+        accept.mutate();
+      },
+    });
+  };
+
   const decline = useMutation({
     mutationFn: () => offersApi.decline(offerId),
     onSuccess: () => {
+      analytics.track(Events.OFFER_DECLINED, { offer_id: offerId });
       refetchAll();
       navigation.goBack();
     },
@@ -1056,6 +1096,10 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
       value_gap_usd: valueGap ? parseFloat(valueGap) : null,
     }),
     onSuccess: () => {
+      analytics.track(Events.OFFER_COUNTERED, {
+        offer_id: offerId,
+        has_value_gap: !!valueGap,
+      });
       setCounterOpen(false);
       setCounterNote('');
       setValueGap('');
@@ -1123,7 +1167,7 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
         {/* Actions */}
         {canRespond && amIRecipient ? (
           <View style={{ gap: Spacing.sm, marginTop: Spacing.lg }}>
-            <Button title="Accept" onPress={() => accept.mutate()} loading={accept.isPending} />
+            <Button title="Accept" onPress={handleAccept} loading={accept.isPending} />
             <Button
               title="Counter"
               variant="secondary"
