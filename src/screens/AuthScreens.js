@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Platform, TouchableOpacity
+  Platform, TouchableOpacity, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
@@ -105,6 +105,7 @@ export const RegisterScreen = ({ navigation }) => {
     email: '', username: '', password: '', display_name: '', role: 'collector',
     date_of_birth: '', guardian_email: '',
   });
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const register = useAuthStore((s) => s.register);
@@ -143,6 +144,10 @@ export const RegisterScreen = ({ navigation }) => {
     }
     if (age < 18 && !form.guardian_email) {
       setError('Users under 18 must provide a parent or guardian email.');
+      return;
+    }
+    if (!agreed) {
+      setError('You must agree to the Terms of Service and Privacy Policy.');
       return;
     }
     setError('');
@@ -216,7 +221,35 @@ export const RegisterScreen = ({ navigation }) => {
               ))}
             </View>
 
-            <Button title="Create Account" onPress={handleRegister} loading={loading} style={{ marginTop: Spacing.md }} />
+            {/* ToS + Privacy agreement — required */}
+            <TouchableOpacity
+              style={styles.tosRow}
+              onPress={() => setAgreed(!agreed)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.tosCheckbox, agreed && styles.tosCheckboxOn]}>
+                {agreed ? <Text style={styles.tosCheckboxMark}>✓</Text> : null}
+              </View>
+              <Text style={styles.tosText}>
+                I agree to the{' '}
+                <Text
+                  style={styles.tosLink}
+                  onPress={() => Linking.openURL('https://cardshop.twomiah.com/terms')}
+                >
+                  Terms of Service
+                </Text>
+                {' '}and{' '}
+                <Text
+                  style={styles.tosLink}
+                  onPress={() => Linking.openURL('https://cardshop.twomiah.com/privacy')}
+                >
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            </TouchableOpacity>
+
+            <Button title="Create Account" onPress={handleRegister} loading={loading} disabled={!agreed} style={{ marginTop: Spacing.md }} />
 
             <TouchableOpacity style={styles.switchLink} onPress={() => navigation.goBack()}>
               <Text style={styles.switchText}>
@@ -267,4 +300,43 @@ const styles = StyleSheet.create({
   roleBtnActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + '22' },
   roleBtnText: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.medium },
   roleBtnTextActive: { color: Colors.accent, fontWeight: Typography.semibold },
+  tosRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  tosCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  tosCheckboxOn: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  tosCheckboxMark: {
+    color: Colors.bg,
+    fontSize: 14,
+    fontWeight: Typography.bold,
+    lineHeight: 16,
+  },
+  tosText: {
+    flex: 1,
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+    lineHeight: 20,
+  },
+  tosLink: {
+    color: Colors.accent,
+    fontWeight: Typography.semibold,
+    textDecorationLine: 'underline',
+  },
 });
