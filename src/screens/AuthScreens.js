@@ -103,7 +103,7 @@ export const LoginScreen = ({ navigation }) => {
 export const RegisterScreen = ({ navigation }) => {
   const [form, setForm] = useState({
     email: '', username: '', password: '', display_name: '', role: 'collector',
-    date_of_birth: '', guardian_email: '',
+    date_of_birth: '',
   });
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
