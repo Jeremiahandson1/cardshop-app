@@ -18,6 +18,7 @@ import { Colors, Typography } from '../theme';
 // Screens
 import { LoginScreen, RegisterScreen } from '../screens/AuthScreens';
 import { CollectionScreen } from '../screens/CollectionScreen';
+import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen } from '../screens/CardScreens';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
@@ -182,6 +183,7 @@ const TabNavigator = () => {
 const CollectionStack = () => (
   <CollectionStackNav.Navigator screenOptions={screenOptions}>
     <CollectionStackNav.Screen name="CollectionMain" component={CollectionScreen} />
+    <CollectionStackNav.Screen name="CollectionImportExport" component={CollectionImportExportScreen} />
     <CollectionStackNav.Screen name="CardDetail" component={CardDetailScreen} />
     <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />

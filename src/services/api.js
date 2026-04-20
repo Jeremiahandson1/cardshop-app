@@ -293,6 +293,37 @@ export const tradeOffersApi = {
 };
 
 // ============================================================
+// COLLECTIONS (CSV import / export)
+// ============================================================
+// All three endpoints live under /collections — template is a plain GET,
+// export streams back a CSV, import takes multipart/form-data with a single
+// `file` field (.csv, max 10 MB / 10k rows). Auth headers are injected by
+// the interceptor; for multipart we drop the default JSON Content-Type so
+// axios/RN set the boundary for us.
+export const collectionsApi = {
+  template: () =>
+    api.get('/collections/import/template', { responseType: 'text' }),
+  export: ({ includePrices = false } = {}) =>
+    api.get('/collections/export', {
+      params: includePrices ? { include: 'prices' } : {},
+      responseType: 'text',
+    }),
+  import: (file) => {
+    // file: { uri, name, mimeType }
+    const form = new FormData();
+    form.append('file', {
+      uri: file.uri,
+      name: file.name || 'collection.csv',
+      type: file.mimeType || 'text/csv',
+    });
+    return api.post('/collections/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data, // prevent axios from JSON-encoding FormData
+    });
+  },
+};
+
+// ============================================================
 // MY LOCAL LCS
 // ============================================================
 export const lcsApi = {

@@ -60,12 +60,23 @@ export const CollectionScreen = ({ navigation }) => {
         title="My Collection"
         subtitle={`${cards.length} card${cards.length !== 1 ? 's' : ''}`}
         right={
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('RegisterCard')}
-          >
-            <Ionicons name="add" size={22} color={Colors.bg} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation.navigate('CollectionImportExport')}
+              accessibilityLabel="Import / Export CSV"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="swap-vertical" size={18} color={Colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => navigation.navigate('RegisterCard')}
+              accessibilityLabel="Register a card"
+            >
+              <Ionicons name="add" size={22} color={Colors.bg} />
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -134,6 +145,12 @@ const styles = StyleSheet.create({
   addBtn: {
     width: 36, height: 36, borderRadius: Radius.full,
     backgroundColor: Colors.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: Radius.full,
+    backgroundColor: Colors.surface2,
+    borderWidth: 1, borderColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
   searchContainer: {
