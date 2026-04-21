@@ -22,6 +22,7 @@ import {
   Button, Input, EmptyState, LoadingScreen,
   ScreenHeader, SectionHeader, Divider, CardTile,
 } from '../components/ui';
+import { FairnessPanel } from '../components/FairnessPanel';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -1163,6 +1164,21 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
           </View>
         ))}
         {!offer.thread?.length && <Text style={styles.threadEmpty}>No messages.</Text>}
+
+        {/* Trade Fairness Scoring — rendered for any active party. Hides
+            itself on 409/403. Rate-limited (429) shows a compact notice but
+            still lets the user act. */}
+        {canRespond && (amIRecipient || amISender) ? (
+          <View style={{ marginTop: Spacing.base }}>
+            <FairnessPanel
+              offerId={offerId}
+              onSeedCounterNote={(text) => {
+                setCounterNote(text);
+                setCounterOpen(true);
+              }}
+            />
+          </View>
+        ) : null}
 
         {/* Actions */}
         {canRespond && amIRecipient ? (
