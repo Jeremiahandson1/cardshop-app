@@ -324,6 +324,25 @@ export const collectionsApi = {
 };
 
 // ============================================================
+// PORTFOLIO INTELLIGENCE
+// ============================================================
+// Read-only blended-value + trend/liquidity/pop summaries for the
+// authed user's owned cards. Backend owns the math and narration — the
+// client just renders what it returns. See
+// cardshop-api GET /api/collection/intelligence.
+export const intelligenceApi = {
+  list: ({ limit = 40, offset = 0, filter = 'all', grade } = {}) =>
+    api.get('/collection/intelligence', {
+      params: {
+        limit,
+        offset,
+        filter,
+        ...(grade != null && grade !== '' ? { grade } : {}),
+      },
+    }),
+};
+
+// ============================================================
 // MY LOCAL LCS
 // ============================================================
 export const lcsApi = {

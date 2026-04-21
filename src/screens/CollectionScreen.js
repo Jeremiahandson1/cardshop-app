@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { cardsApi } from '../services/api';
 import { CardTile, EmptyState, LoadingScreen, ScreenHeader, Button } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { CollectionIntelligenceView } from './CollectionIntelligenceView';
 
 const { width } = Dimensions.get('window'); // Note: static at module load, use useWindowDimensions for responsive
 const COLUMN_GAP = Spacing.sm;
@@ -22,13 +23,24 @@ const STATUS_FILTERS = [
   { key: 'nfs', label: 'NFS' },
 ];
 
+// Top-of-screen view selector. 'cards' keeps the existing grid; 'intel' swaps in
+// the read-only portfolio intelligence feed sourced from the backend.
+const VIEW_MODES = [
+  { key: 'cards', label: 'Cards' },
+  { key: 'intel', label: 'Intelligence' },
+];
+
 export const CollectionScreen = ({ navigation }) => {
+  const [viewMode, setViewMode] = useState('cards');
   const [statusFilter, setStatusFilter] = useState(null);
   const [search, setSearch] = useState('');
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['my-cards', statusFilter],
     queryFn: () => cardsApi.mine({ status: statusFilter, limit: 100 }).then((r) => r.data),
+    // Only fetch owned-cards when the Cards view is visible — avoids a pointless
+    // request when the user is on the Intelligence tab.
+    enabled: viewMode === 'cards',
   });
 
   const cards = data?.cards || [];
@@ -52,13 +64,20 @@ export const CollectionScreen = ({ navigation }) => {
     />
   ), [navigation]);
 
-  if (isLoading) return <LoadingScreen message="Loading your collection..." />;
+  // Only show the initial loading screen for the Cards view — the Intelligence
+  // view manages its own loading state and shouldn't be blocked by the owned-
+  // cards query (which is disabled while on that tab anyway).
+  if (viewMode === 'cards' && isLoading) return <LoadingScreen message="Loading your collection..." />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader
         title="My Collection"
-        subtitle={`${cards.length} card${cards.length !== 1 ? 's' : ''}`}
+        subtitle={
+          viewMode === 'cards'
+            ? `${cards.length} card${cards.length !== 1 ? 's' : ''}`
+            : 'Portfolio intelligence'
+        }
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <TouchableOpacity
@@ -80,6 +99,30 @@ export const CollectionScreen = ({ navigation }) => {
         }
       />
 
+      {/* View toggle — Cards vs Intelligence */}
+      <View style={styles.viewToggle}>
+        {VIEW_MODES.map((m) => {
+          const active = viewMode === m.key;
+          return (
+            <TouchableOpacity
+              key={m.key}
+              style={[styles.viewToggleBtn, active && styles.viewToggleBtnActive]}
+              onPress={() => setViewMode(m.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.viewToggleText, active && styles.viewToggleTextActive]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {viewMode === 'intel' ? (
+        <CollectionIntelligenceView />
+      ) : (
+        <>
       {/* Search */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={16} color={Colors.textMuted} style={styles.searchIcon} />
@@ -136,6 +179,8 @@ export const CollectionScreen = ({ navigation }) => {
           />
         }
       />
+        </>
+      )}
     </SafeAreaView>
   );
 };
@@ -183,4 +228,32 @@ const styles = StyleSheet.create({
   filterText: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.medium },
   filterTextActive: { color: Colors.accent, fontWeight: Typography.semibold },
   grid: { padding: Spacing.base, flexGrow: 1 },
+  viewToggle: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 3,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: Radius.full,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: Colors.accent,
+  },
+  viewToggleText: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+    letterSpacing: 0.3,
+  },
+  viewToggleTextActive: {
+    color: Colors.bg,
+  },
 });
