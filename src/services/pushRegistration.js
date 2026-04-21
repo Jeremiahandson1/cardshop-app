@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -49,4 +49,37 @@ export async function registerForPushNotificationsAsync() {
     console.warn('push registration failed', err.message);
     return null;
   }
+}
+
+/**
+ * Wires up a listener so tapping a notification can deep-link into the app.
+ * Returns an unsubscribe function.
+ *
+ * Expected payload shapes (set by the server-side dispatcher):
+ *   - { type: 'deal_radar_match', listing_url, listing_id }  → open feed, then listing_url
+ *
+ * `navigationRef` is optional — when provided, we navigate in-app to the
+ * Deal Radar feed before handing the user off to the external listing.
+ */
+export function registerNotificationResponseHandler(navigationRef) {
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    try {
+      const data = response?.notification?.request?.content?.data || {};
+      if (data?.type === 'deal_radar_match') {
+        // Navigate to the Deal Radar feed inside the app.
+        if (navigationRef?.current?.isReady?.()) {
+          navigationRef.current.navigate('Profile', { screen: 'DealRadarFeed' });
+        }
+        // Open the external listing URL if supplied.
+        if (data.listing_url) {
+          Linking.openURL(String(data.listing_url)).catch((err) => {
+            console.warn('Failed to open listing_url from push', err?.message);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('notification response handler error', err?.message);
+    }
+  });
+  return () => sub.remove();
 }

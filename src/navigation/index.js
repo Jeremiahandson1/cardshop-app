@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer } from '@react-navigation/native';
+import { registerNotificationResponseHandler } from '../services/pushRegistration';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +51,8 @@ import {
 import { TradeCameraScreen } from '../screens/TradeCameraScreen';
 import { SetsListScreen, SetCompletionScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
+import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
+import { DealRadarFeedScreen } from '../screens/DealRadarFeedScreen';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -255,6 +258,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <ProfileStackNav.Screen name="Help" component={HelpScreen} />
+    <ProfileStackNav.Screen name="DealRadarSettings" component={DealRadarSettingsScreen} />
+    <ProfileStackNav.Screen name="DealRadarFeed" component={DealRadarFeedScreen} />
   </ProfileStackNav.Navigator>
 );
 
@@ -320,6 +325,12 @@ const linkingConfig = {
           TradeBoardMain: 'trade',
         },
       },
+      Profile: {
+        screens: {
+          DealRadarFeed: 'deal-radar',
+          DealRadarSettings: 'deal-radar/settings',
+        },
+      },
     },
   },
 };
@@ -329,9 +340,21 @@ const linkingConfig = {
 // ============================================================
 export const RootNavigator = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const navigationRef = useRef(null);
+
+  // Wire the notification-response handler once we have a nav container.
+  // Handles deal_radar_match pushes → deep link to DealRadarFeed + open listing.
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const unsubscribe = registerNotificationResponseHandler(navigationRef);
+    return unsubscribe;
+  }, [isAuthenticated]);
 
   return (
-    <NavigationContainer linking={isAuthenticated ? linkingConfig : undefined}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={isAuthenticated ? linkingConfig : undefined}
+    >
       {isAuthenticated ? <TabNavigator /> : <AuthStack />}
     </NavigationContainer>
   );

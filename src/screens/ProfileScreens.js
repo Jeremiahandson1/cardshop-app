@@ -51,6 +51,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
         { icon: 'radio-outline', label: 'Receive via NFC', onPress: () => {} },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => {} },
+        { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
       ]
     },
     ...(user?.role === 'store_owner' ? [{

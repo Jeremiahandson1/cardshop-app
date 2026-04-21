@@ -343,6 +343,18 @@ export const intelligenceApi = {
 };
 
 // ============================================================
+// DEAL RADAR
+// ============================================================
+export const dealRadarApi = {
+  getPreferences: () => api.get('/deal-radar/preferences'),
+  updatePreferences: (partial) => api.patch('/deal-radar/preferences', partial),
+  getFeed: ({ limit = 50 } = {}) =>
+    api.get('/deal-radar/feed', { params: { limit } }),
+  setStatus: (id, status) =>
+    api.post(`/deal-radar/feed/${id}/action`, { status }),
+};
+
+// ============================================================
 // MY LOCAL LCS
 // ============================================================
 export const lcsApi = {
