@@ -7,9 +7,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi } from '../services/api';
+import { cardsApi, catalogApi, ebayApi } from '../services/api';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
+
+// Shared hook for eBay feature-flag + connection state. Cached in
+// react-query so IntegrationsScreen and CardDetail share a single fetch.
+// Returns undefined while loading — callers should gate on that.
+const useEbayStatus = () => {
+  const { data } = useQuery({
+    queryKey: ['ebay', 'status'],
+    queryFn: () => ebayApi.getStatus().then((r) => r.data),
+    staleTime: 60_000,
+  });
+  return data;
+};
 
 // ============================================================
 // REGISTER CARD
@@ -502,6 +514,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 export const CardDetailScreen = ({ navigation, route }) => {
   const { cardId } = route.params;
   const queryClient = useQueryClient();
+  const ebayStatus = useEbayStatus();
+  const ebayEnabled = !!ebayStatus?.feature_enabled;
+  const ebayConnected = !!ebayStatus?.connected;
 
   const { data: card, isLoading } = useQuery({
     queryKey: ['card', cardId],
@@ -688,6 +703,40 @@ export const CardDetailScreen = ({ navigation, route }) => {
             onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
             style={{ marginTop: Spacing.lg }}
           />
+
+          {/* List on eBay — gated until the feature flag flips on.
+              Integrations lives only in the Profile stack; if this screen
+              is reached from another stack we surface a hint Alert. */}
+          <View style={{ marginTop: Spacing.md }}>
+            {!ebayEnabled ? (
+              <View style={styles.ebayDisabled}>
+                <Ionicons name="pricetags-outline" size={16} color={Colors.textMuted} />
+                <Text style={styles.ebayDisabledText}>List on eBay</Text>
+                <View style={styles.ebayComingSoon}>
+                  <Text style={styles.ebayComingSoonText}>Coming Soon</Text>
+                </View>
+              </View>
+            ) : (
+              <Button
+                title="List on eBay"
+                variant="teal"
+                onPress={() => {
+                  if (!ebayConnected) {
+                    try {
+                      navigation.navigate('Integrations');
+                    } catch (_e) {
+                      Alert.alert(
+                        'Connect eBay',
+                        'Open Profile › Integrations to connect your eBay account first.'
+                      );
+                    }
+                    return;
+                  }
+                  Alert.alert('Coming Soon', 'Listing flow coming soon.');
+                }}
+              />
+            )}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -800,4 +849,16 @@ const styles = StyleSheet.create({
   historyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent, marginTop: 5 },
   historyMethod: { color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.medium, textTransform: 'capitalize' },
   historyDate: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 },
+  ebayDisabled: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: Spacing.sm, height: 48, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2,
+    paddingHorizontal: Spacing.lg, opacity: 0.8,
+  },
+  ebayDisabledText: { color: Colors.textMuted, fontSize: Typography.base, fontWeight: Typography.semibold },
+  ebayComingSoon: {
+    backgroundColor: Colors.accent4 + '22', borderWidth: 1, borderColor: Colors.accent4 + '66',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full,
+  },
+  ebayComingSoonText: { color: Colors.accent4, fontSize: Typography.xs, fontWeight: Typography.semibold },
 });

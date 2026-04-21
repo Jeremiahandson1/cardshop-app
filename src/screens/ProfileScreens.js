@@ -62,6 +62,12 @@ export const ProfileScreen = ({ navigation }) => {
       ]
     }] : []),
     {
+      section: 'Connections',
+      items: [
+        { icon: 'link-outline', label: 'Integrations', onPress: () => navigation.navigate('Integrations') },
+      ]
+    },
+    {
       section: 'Support',
       items: [
         { icon: 'help-circle-outline', label: 'Help & FAQ', onPress: () => {} },

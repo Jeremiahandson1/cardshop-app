@@ -383,6 +383,22 @@ export const lcsApi = {
 };
 
 // ============================================================
+// EBAY INTEGRATION (OAuth connect — gated behind feature flag)
+// ============================================================
+// GET /status returns { feature_enabled, connected, ebay_username,
+// connected_at, env, on_waitlist }. POST /authorize returns the hosted
+// eBay OAuth URL the client hands to a web-auth session; redirects land
+// back on cardshop://ebay-connect?status=... — parse + refetch /status.
+// POST /waitlist (flag off) and POST /disconnect (when connected) are
+// simple no-body endpoints returning { ok: true }.
+export const ebayApi = {
+  getStatus: () => api.get('/connect/ebay/status'),
+  joinWaitlist: () => api.post('/connect/ebay/waitlist'),
+  authorize: () => api.post('/connect/ebay/authorize'),
+  disconnect: () => api.post('/connect/ebay/disconnect'),
+};
+
+// ============================================================
 // LCS ARBITRAGE
 // ============================================================
 // Returns { rows, zip_prefix, disclaimer } — backend already sorts rows

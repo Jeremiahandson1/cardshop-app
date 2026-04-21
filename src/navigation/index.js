@@ -54,6 +54,7 @@ import { SetsListScreen, SetCompletionScreen } from '../screens/SetCompletionScr
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
 import { DealRadarFeedScreen } from '../screens/DealRadarFeedScreen';
+import { IntegrationsScreen } from '../screens/IntegrationsScreen';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -261,6 +262,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Help" component={HelpScreen} />
     <ProfileStackNav.Screen name="DealRadarSettings" component={DealRadarSettingsScreen} />
     <ProfileStackNav.Screen name="DealRadarFeed" component={DealRadarFeedScreen} />
+    <ProfileStackNav.Screen name="Integrations" component={IntegrationsScreen} />
   </ProfileStackNav.Navigator>
 );
 
