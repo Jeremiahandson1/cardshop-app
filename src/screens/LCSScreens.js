@@ -63,9 +63,28 @@ export const LCSHomeScreen = ({ navigation }) => {
     navigation.navigate('LCSShopList');
   };
 
+  const openArbitrage = () => {
+    const clean = input.trim();
+    // Pass whatever the user typed — the arbitrage screen validates it too.
+    if (clean) setZip(clean);
+    navigation.navigate('LCSArbitrage', { zip: clean });
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScreenHeader title="My Local LCS" subtitle="Box prices near you" />
+      <ScreenHeader
+        title="My Local LCS"
+        subtitle="Box prices near you"
+        right={(
+          <TouchableOpacity
+            onPress={openArbitrage}
+            hitSlop={8}
+            accessibilityLabel="LCS Arbitrage"
+          >
+            <Ionicons name="flash" size={22} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
+      />
       <View style={styles.homeBody}>
         <Text style={styles.homeHint}>
           Enter your ZIP to see card shops within 100 miles and compare box prices.
@@ -79,6 +98,13 @@ export const LCSHomeScreen = ({ navigation }) => {
           style={{ marginBottom: Spacing.base }}
         />
         <Button title="Find shops" onPress={go} />
+        <Button
+          title="Arbitrage"
+          variant="ghost"
+          onPress={openArbitrage}
+          icon={<Ionicons name="flash" size={16} color={Colors.accent} />}
+          style={{ marginTop: Spacing.md }}
+        />
       </View>
     </SafeAreaView>
   );

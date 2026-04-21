@@ -39,6 +39,7 @@ import {
   LCSPostPriceScreen, LCSProductPickerScreen, LCSSubmitShopScreen,
   LCSPriceTrendScreen,
 } from '../screens/LCSScreens';
+import { LCSArbitrageScreen } from '../screens/LCSArbitrageScreen';
 import {
   TradeBoardScreen, TradeListingDetailScreen, CreateTradeListingScreen,
   TradeCardPickerScreen, MakeTradeOfferScreen, TradeOfferDetailScreen,
@@ -272,6 +273,7 @@ const LCSStack = () => (
     <LCSStackNav.Screen name="LCSProductPicker" component={LCSProductPickerScreen} />
     <LCSStackNav.Screen name="LCSSubmitShop" component={LCSSubmitShopScreen} />
     <LCSStackNav.Screen name="LCSPriceTrend" component={LCSPriceTrendScreen} />
+    <LCSStackNav.Screen name="LCSArbitrage" component={LCSArbitrageScreen} />
   </LCSStackNav.Navigator>
 );
 

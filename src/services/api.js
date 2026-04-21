@@ -381,3 +381,14 @@ export const lcsApi = {
   verifyPrice: (id) => api.post(`/lcs/prices/${id}/verify`),
   unverifyPrice: (id) => api.delete(`/lcs/prices/${id}/verify`),
 };
+
+// ============================================================
+// LCS ARBITRAGE
+// ============================================================
+// Returns { rows, zip_prefix, disclaimer } — backend already sorts rows
+// by estimated_net_usd DESC. 403 with code: 'participation_required'
+// means the user has not yet posted or verified a local price.
+export const lcsArbitrageApi = {
+  list: ({ zip }) =>
+    api.get('/lcs-arbitrage', { params: { zip } }).then((r) => r.data),
+};
