@@ -46,6 +46,7 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Binders & Offers',
       items: [
         { icon: 'book-outline', label: 'My Binders', onPress: () => navigation.navigate('BinderList') },
+        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
         { icon: 'chatbox-ellipses-outline', label: 'Offers', onPress: () => navigation.navigate('OffersList') },
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },

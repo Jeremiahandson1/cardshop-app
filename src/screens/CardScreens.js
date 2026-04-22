@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 
@@ -1474,6 +1475,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
   const ebayStatus = useEbayStatus();
   const ebayEnabled = !!ebayStatus?.feature_enabled;
   const ebayConnected = !!ebayStatus?.connected;
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   const { data: card, isLoading } = useQuery({
     queryKey: ['card', cardId],
@@ -1788,6 +1790,35 @@ export const CardDetailScreen = ({ navigation, route }) => {
               ))}
             </View>
           )}
+
+          {/* Message Owner — only when a non-owner is viewing
+              this card. Opens (or resumes) the card-scoped chat
+              thread. Owners see the Transfer button below instead. */}
+          {card.owner_id && currentUserId && card.owner_id !== currentUserId ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Conversation', {
+                startWith: {
+                  to_user_id: card.owner_id,
+                  to_username: card.owner_username,
+                  owned_card_id: card.id,
+                },
+                otherName: card.owner_display_name || card.owner_username,
+                otherUsername: card.owner_username,
+                ownedCardId: card.id,
+                cardTitle: `${card.year} ${card.set_name}`,
+              })}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontWeight: '600' }}>
+                Message {card.owner_display_name || card.owner_username}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           {/* Transfer button */}
           <Button
