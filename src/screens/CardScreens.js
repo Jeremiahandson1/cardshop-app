@@ -50,19 +50,42 @@ const CascadePicker = ({
     staleTime: 10_000,
   });
 
-  // Auto-advance when there's exactly one option (no typeahead
-  // filter active, so it's a real singleton) — saves a tap on
-  // degenerate cascades.
+  const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
+
+  // Auto-advance behavior:
+  //  - Exactly one option (and no active typeahead) → pick it.
+  //  - Zero options on an optional dim (subset / parallel) →
+  //    skip silently. Lots of catalog rows have null subset or
+  //    null parallel and the user shouldn't land on a dead-end
+  //    empty list.
+  //  - Zero options on a required dim → stay; user sees the
+  //    "enter manually" fallback.
   React.useEffect(() => {
-    if (!cascadeQuery && options && options.length === 1) {
+    if (cascadeQuery) return;
+    if (!options) return;
+
+    if (options.length === 1) {
       const only = options[0];
       if (cascade[cascadeDim] === only) return;
-      setCascade((prev) => ({ ...prev, [cascadeDim]: only }));
+      const next = { ...cascade, [cascadeDim]: only };
+      setCascade(next);
       const nextIdx = currentIdx + 1;
       if (nextIdx < cascadeOrder.length) {
         setCascadeDim(cascadeOrder[nextIdx]);
-        setCascadeQuery('');
+      } else {
+        onComplete(next);
       }
+      return;
+    }
+
+    if (options.length === 0 && OPTIONAL_DIMS.has(cascadeDim)) {
+      const nextIdx = currentIdx + 1;
+      if (nextIdx >= cascadeOrder.length) {
+        onComplete(cascade);
+        return;
+      }
+      setCascadeDim(cascadeOrder[nextIdx]);
+      return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, cascadeQuery, cascadeDim]);
@@ -105,7 +128,6 @@ const CascadePicker = ({
     setCascadeQuery('');
   };
 
-  const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
   const isOptional = OPTIONAL_DIMS.has(cascadeDim);
   const picked = cascadeOrder.filter((d) => cascade[d] !== undefined);
 
