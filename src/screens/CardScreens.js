@@ -66,6 +66,19 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
+  // Manual-entry form — used when the card isn't in the catalog.
+  // Required server-side: sport, player_name, year, manufacturer, set_name.
+  const [manualForm, setManualForm] = useState({
+    sport: 'baseball',
+    player_name: '',
+    year: '',
+    manufacturer: '',
+    set_name: '',
+    card_number: '',
+    parallel: '',
+  });
+  const setManual = (key) => (val) => setManualForm((f) => ({ ...f, [key]: val }));
+
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
   const searchCatalog = async (q) => {
@@ -99,6 +112,36 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     } catch {
       setParallels([]);
     }
+  };
+
+  // Creates a new catalog entry from the manual-entry form, then
+  // advances into the existing photo/details flow.
+  const createCatalogMutation = useMutation({
+    mutationFn: () => catalogApi.create({
+      sport: manualForm.sport,
+      player_name: manualForm.player_name.trim(),
+      year: parseInt(manualForm.year, 10),
+      manufacturer: manualForm.manufacturer.trim(),
+      set_name: manualForm.set_name.trim(),
+      card_number: manualForm.card_number.trim() || undefined,
+      parallel: manualForm.parallel.trim() || undefined,
+    }),
+    onSuccess: (res) => {
+      setSelectedCatalog(res.data);
+      setParallels([]); // skip the "pick parallel" step for manual entries
+      setStep('details');
+    },
+    onError: (err) => {
+      Alert.alert('Could not create card', err.response?.data?.error || 'Please check all fields.');
+    },
+  });
+
+  const goManualEntry = () => {
+    // Pre-populate player_name from whatever the user typed in search.
+    if (catalogSearch && !manualForm.player_name) {
+      setManualForm((f) => ({ ...f, player_name: catalogSearch.trim() }));
+    }
+    setStep('manual_entry');
   };
 
   const registerMutation = useMutation({
@@ -154,7 +197,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 
         <View style={{ paddingHorizontal: Spacing.base }}>
           <Input
-            label="Search for this card"
+            label="Search the catalog (optional)"
             value={catalogSearch}
             onChangeText={(v) => {
               setCatalogSearch(v);
@@ -163,6 +206,15 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             placeholder="Player name, set, year..."
             returnKeyType="search"
           />
+          {/* Primary-path manual entry — always visible so users who
+              know their card don't have to go through the search fake-out. */}
+          <TouchableOpacity
+            style={styles.createNewBtn}
+            onPress={goManualEntry}
+          >
+            <Ionicons name="create-outline" size={18} color={Colors.accent} />
+            <Text style={styles.createNewText}>Enter card details manually →</Text>
+          </TouchableOpacity>
         </View>
 
         <FlatList
@@ -173,10 +225,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             !searching && catalogSearch.length > 1 && searchResults.length === 0 ? (
               <TouchableOpacity
                 style={styles.createNewBtn}
-                onPress={() => {}}
+                onPress={goManualEntry}
               >
                 <Ionicons name="add-circle" size={18} color={Colors.accent} />
-                <Text style={styles.createNewText}>Card not found — add it to the catalog</Text>
+                <Text style={styles.createNewText}>Card not found — enter it manually</Text>
               </TouchableOpacity>
             ) : null
           }
@@ -200,6 +252,69 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
         />
+      </SafeAreaView>
+    );
+  }
+
+  // Step 1.5: Manual catalog entry — used when the card isn't in the
+  // catalog, or when the user skips search entirely.
+  if (step === 'manual_entry') {
+    const canSubmit =
+      manualForm.player_name.trim() &&
+      manualForm.year &&
+      manualForm.manufacturer.trim() &&
+      manualForm.set_name.trim();
+    const SPORTS = ['baseball', 'basketball', 'football', 'hockey', 'pokemon', 'mtg', 'yugioh', 'other'];
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep('search')}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Card Details</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }}>
+          <Text style={[styles.catalogSet, { marginBottom: Spacing.md }]}>
+            Enter the card's info. You'll take photos on the next screen.
+          </Text>
+
+          <Text style={styles.catalogSet}>Sport / hobby</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.md }}>
+            {SPORTS.map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => setManual('sport')(s)}
+                style={{
+                  paddingHorizontal: Spacing.md,
+                  paddingVertical: Spacing.xs,
+                  borderRadius: Radius.sm,
+                  borderWidth: 1,
+                  borderColor: manualForm.sport === s ? Colors.accent : Colors.border,
+                  backgroundColor: manualForm.sport === s ? Colors.accent + '22' : 'transparent',
+                }}
+              >
+                <Text style={{ color: manualForm.sport === s ? Colors.accent : Colors.textMuted, fontSize: 13, textTransform: 'capitalize' }}>
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Input label="Player / subject *" value={manualForm.player_name} onChangeText={setManual('player_name')} placeholder="Mike Trout" />
+          <Input label="Year *" value={manualForm.year} onChangeText={setManual('year')} placeholder="2024" keyboardType="number-pad" />
+          <Input label="Manufacturer *" value={manualForm.manufacturer} onChangeText={setManual('manufacturer')} placeholder="Topps, Panini, Bowman..." />
+          <Input label="Set name *" value={manualForm.set_name} onChangeText={setManual('set_name')} placeholder="Chrome, Series 1, Prizm..." />
+          <Input label="Card number" value={manualForm.card_number} onChangeText={setManual('card_number')} placeholder="#150 (optional)" />
+          <Input label="Parallel / variant" value={manualForm.parallel} onChangeText={setManual('parallel')} placeholder="Gold Refractor (optional)" />
+
+          <Button
+            title={createCatalogMutation.isPending ? 'Creating…' : 'Continue to photos →'}
+            onPress={() => createCatalogMutation.mutate()}
+            disabled={!canSubmit || createCatalogMutation.isPending}
+            style={{ marginTop: Spacing.lg }}
+          />
+        </ScrollView>
       </SafeAreaView>
     );
   }
