@@ -7,20 +7,42 @@ export const useAuthStore = create((set, get) => ({
   isLoading: true,
   isAuthenticated: false,
 
-  // Called on app launch to restore session
+  // Called on app launch to restore session.
+  // Only wipe tokens on a DEFINITIVE unauthenticated response (401).
+  // Transient errors (cold-start timeout, 5xx, offline) must not log
+  // the user out — that causes the "I was just signed in, why is the
+  // app back at the login screen after I restart it" bug.
   initialize: async () => {
+    let token;
     try {
-      const token = await SecureStore.getItemAsync('access_token');
-      if (!token) {
-        set({ isLoading: false, isAuthenticated: false });
-        return;
-      }
+      token = await SecureStore.getItemAsync('access_token');
+    } catch {
+      // Keystore read failure — assume not logged in this boot but
+      // don't clobber any stored creds; next boot can retry.
+      set({ isLoading: false, isAuthenticated: false });
+      return;
+    }
+    if (!token) {
+      set({ isLoading: false, isAuthenticated: false });
+      return;
+    }
+    try {
       const res = await authApi.me();
       set({ user: res.data, isAuthenticated: true, isLoading: false });
-    } catch {
-      await SecureStore.deleteItemAsync('access_token');
-      await SecureStore.deleteItemAsync('refresh_token');
-      set({ user: null, isAuthenticated: false, isLoading: false });
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401) {
+        // Server says the token is invalid — legitimately logged out.
+        await SecureStore.deleteItemAsync('access_token').catch(() => {});
+        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      } else {
+        // Transient (network, 5xx, timeout). Keep tokens. Optimistically
+        // treat the user as authenticated so they don't bounce to login
+        // on every cold-start flake; subsequent requests will either
+        // succeed or hit a real 401 and the interceptor will log out.
+        set({ isAuthenticated: true, isLoading: false });
+      }
     }
   },
 
