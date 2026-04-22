@@ -58,6 +58,35 @@ const CascadePicker = ({
     keepPreviousData: true,
   });
 
+  // Enriched rows for the parallel step — includes print_run so
+  // the picker can show "Gold /10" instead of just "Gold". Only
+  // fires when the user actually reaches the parallel step.
+  const { data: parallelRows } = useQuery({
+    queryKey: ['catalog-parallel-rows', cascade, cascadeQuery],
+    enabled: cascadeDim === 'parallel',
+    queryFn: () =>
+      catalogApi.search({
+        sport: cascade.sport,
+        year: cascade.year,
+        manufacturer: cascade.manufacturer,
+        set_name: cascade.set_name,
+        player_name: cascade.player_name,
+        q: cascadeQuery || undefined,
+        limit: 50,
+      }).then((r) => {
+        const rows = r.data?.cards || [];
+        // Keep only rows matching the user's subset + card_number
+        // picks so we don't list unrelated parallels of the same
+        // player from other inserts. Both fields are optional in
+        // the cascade so null === "don't filter".
+        return rows.filter((c) =>
+          (!cascade.subset_name || c.subset_name === cascade.subset_name) &&
+          (!cascade.card_number || (c.card_number || '') === cascade.card_number)
+        );
+      }),
+    staleTime: 10_000,
+  });
+
   const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
 
   // Auto-advance behavior:
@@ -212,26 +241,49 @@ const CascadePicker = ({
             </View>
           )
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => pick(item)}
-            style={{
-              paddingVertical: Spacing.md,
-              paddingHorizontal: Spacing.md,
-              borderRadius: Radius.md,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              backgroundColor: Colors.surface2,
-              marginBottom: Spacing.xs,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Text style={{ color: Colors.text, fontSize: 15, flexShrink: 1 }}>{String(item)}</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          // On the parallel step, look up the enriched catalog row
+          // for this parallel name so we can surface the print run
+          // inline ("Gold /10" reads very differently from "Gold").
+          const enriched = cascadeDim === 'parallel' && parallelRows
+            ? parallelRows.find((r) => (r.parallel || '') === String(item))
+            : null;
+          const printRunLabel = enriched
+            ? (enriched.is_one_of_one ? '1/1'
+               : enriched.print_run ? `/${enriched.print_run}`
+               : 'Unlimited')
+            : null;
+          return (
+            <TouchableOpacity
+              onPress={() => pick(item)}
+              style={{
+                paddingVertical: Spacing.md,
+                paddingHorizontal: Spacing.md,
+                borderRadius: Radius.md,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.surface2,
+                marginBottom: Spacing.xs,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <Text style={{ color: Colors.text, fontSize: 15 }}>{String(item)}</Text>
+                {printRunLabel ? (
+                  <Text style={{ color: Colors.textMuted, fontSize: 13, fontWeight: '500' }}>
+                    {printRunLabel}
+                  </Text>
+                ) : null}
+                {enriched?.is_autograph ? (
+                  <Text style={{ color: '#9B59B6', fontSize: 11, fontWeight: '700' }}>AUTO</Text>
+                ) : null}
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          );
+        }}
       />
 
       {/* Skip button for optional dimensions (subset / parallel)
@@ -325,6 +377,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     purchase_price: '',
     personal_valuation: '',
     notes: '',
+    public_notes: '',
   });
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -501,6 +554,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
         notes: form.notes || undefined,
+        public_notes: form.public_notes || undefined,
         photo_urls: base64Photos.filter(Boolean),
       });
     },
@@ -513,7 +567,30 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     },
   });
 
-  const CONDITIONS = ['poor','fair','good','very_good','excellent','near_mint','mint','gem_mint'];
+  // Condition definitions mirror eBay's Trading Card grading
+  // language so listings here and listings there read the same —
+  // collectors comparing a /lets_talk card on Card Shop to a BIN
+  // on eBay shouldn't have to translate between scales. Tapping a
+  // condition chip opens the long-form description below.
+  const CONDITIONS = [
+    { key: 'gem_mint',  label: 'Gem Mint',   ebay: 'Graded — Gem Mint',
+      desc: 'PSA/BGS/SGC 10 equivalent. Perfect centering, sharp corners, no printing defects visible under magnification. Raw Gem Mint is rare and should normally be graded.' },
+    { key: 'mint',      label: 'Mint',       ebay: 'Mint or Mint 9',
+      desc: 'PSA 9 equivalent. Near-perfect centering (55/45 or better), sharp corners, clean surface. One very minor flaw acceptable (e.g. a pinpoint print speck).' },
+    { key: 'near_mint', label: 'Near Mint',  ebay: 'Near Mint–Mint or NM 8',
+      desc: 'PSA 7-8 equivalent. Slight off-centering (60/40), minor corner wear, light surface scratches visible at an angle. No creases.' },
+    { key: 'excellent', label: 'Excellent',  ebay: 'Excellent',
+      desc: 'PSA 5-6. Mild rounding on one or two corners, minor edge wear, fuzz visible. Image still sharp, no creases or major surface flaws.' },
+    { key: 'very_good', label: 'Very Good',  ebay: 'Very Good',
+      desc: 'PSA 3-4. Noticeable corner wear and edge fuzz, small surface scratches or light gloss loss. May have a single very light crease.' },
+    { key: 'good',      label: 'Good',       ebay: 'Good',
+      desc: 'PSA 2. Rounded corners, frayed edges, visible creases, surface scratches or minor stains. Image intact and clearly identifiable.' },
+    { key: 'fair',      label: 'Fair',       ebay: 'Fair',
+      desc: 'PSA 1.5. Heavy wear on all edges/corners, multiple creases, possible minor tears at the edge. Image recognizable.' },
+    { key: 'poor',      label: 'Poor',       ebay: 'Poor',
+      desc: 'PSA 1. Major damage — tears, water damage, heavy staining, missing paper, writing, or pin-holes. Still the correct card but barely presentable.' },
+  ];
+  const [conditionDescFor, setConditionDescFor] = useState(null);
   const STATUSES = [
     { key: 'nfs', label: 'NFS', desc: 'Not For Sale' },
     { key: 'nft', label: 'NFT', desc: 'Not For Trade' },
@@ -640,7 +717,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             const picked = exact || hits[0];
             if (picked) {
               setSelectedCatalog(picked);
-              setStep('details');
+              // Route into the serial-number step when the resolved
+              // card is numbered (/10, /25, …). Chain-of-custody
+              // wants the specific copy recorded on the owned_card.
+              setStep(picked.print_run ? 'serial' : 'details');
               return;
             }
           } catch { /* fall through to manual entry if lookup fails */ }
@@ -965,20 +1045,52 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           </View>
         ) : (
           <View>
-            <SectionHeader title="Condition" />
+            <SectionHeader title="Condition (eBay scale)" />
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+              Tap a condition to see what it means. Matching eBay's
+              grading keeps listings comparable across platforms.
+            </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
               {CONDITIONS.map((c) => (
                 <TouchableOpacity
-                  key={c}
-                  style={[styles.condBtn, form.condition === c && styles.condBtnActive]}
-                  onPress={() => set('condition')(c)}
+                  key={c.key}
+                  style={[styles.condBtn, form.condition === c.key && styles.condBtnActive]}
+                  onPress={() => {
+                    set('condition')(c.key);
+                    setConditionDescFor(c.key);
+                  }}
+                  onLongPress={() => setConditionDescFor(c.key)}
                 >
-                  <Text style={[styles.condText, form.condition === c && styles.condTextActive]}>
-                    {c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  <Text style={[styles.condText, form.condition === c.key && styles.condTextActive]}>
+                    {c.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            {conditionDescFor ? (() => {
+              const picked = CONDITIONS.find((c) => c.key === conditionDescFor);
+              if (!picked) return null;
+              return (
+                <View style={{
+                  marginTop: Spacing.sm,
+                  padding: Spacing.md,
+                  borderRadius: Radius.md,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: Colors.surface2,
+                }}>
+                  <Text style={{ color: Colors.text, fontWeight: '700', marginBottom: 2 }}>
+                    {picked.label}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 6 }}>
+                    eBay equivalent: {picked.ebay}
+                  </Text>
+                  <Text style={{ color: Colors.text, fontSize: 13, lineHeight: 18 }}>
+                    {picked.desc}
+                  </Text>
+                </View>
+              );
+            })() : null}
           </View>
         )}
 
@@ -1010,6 +1122,21 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           />
         )}
 
+        {/* Public notes — visible on the listing and trade board */}
+        <View>
+          <SectionHeader title="Public Notes" />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            Shown to anyone viewing this card. Good for context like
+            "part of my Flux rainbow, willing to trade toward the Pink".
+          </Text>
+          <Input
+            value={form.public_notes}
+            onChangeText={set('public_notes')}
+            placeholder="Notes visible to everyone..."
+            multiline
+          />
+        </View>
+
         {/* Personal Details (private) */}
         <View>
           <SectionHeader title="Personal Details (Private)" />
@@ -1037,7 +1164,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             </View>
           </View>
           <Input
-            label="Notes"
+            label="Private Notes"
             value={form.notes}
             onChangeText={set('notes')}
             placeholder="Personal notes about this card..."
@@ -1325,6 +1452,18 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Text style={styles.infoLabel}>Ownership History</Text>
             <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
+
+          {/* Public notes — owner's description, visible to everyone */}
+          {card.public_notes ? (
+            <View style={{ marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase' }}>
+                From the owner
+              </Text>
+              <Text style={{ color: Colors.text, fontSize: 14, lineHeight: 20 }}>
+                {card.public_notes}
+              </Text>
+            </View>
+          ) : null}
 
           <Divider />
 
