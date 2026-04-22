@@ -6,7 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+// Expo SDK 55 moved the classic readAsStringAsync API to
+// expo-file-system/legacy; the default export is now a
+// File/Directory class API with no readAsStringAsync. Importing
+// from /legacy keeps the base64-conversion flow working without
+// pulling in the new class-based surface.
+import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi } from '../services/api';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider } from '../components/ui';
