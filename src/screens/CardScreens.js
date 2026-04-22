@@ -652,6 +652,33 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Update failed'),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => cardsApi.delete(cardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      navigation.goBack();
+    },
+    onError: (err) => Alert.alert(
+      err.response?.data?.code === 'chain_of_custody_locked'
+        ? 'Locked in chain of custody'
+        : err.response?.data?.code === 'active_listing'
+          ? 'Withdraw the trade listing first'
+          : 'Could not delete',
+      err.response?.data?.error || 'Please try again.'
+    ),
+  });
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete this card?',
+      'Removes it from your collection. You can re-register it anytime. Cards that have transferred to another owner cannot be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
+      ]
+    );
+  };
+
   if (isLoading || !card) return <LoadingScreen />;
 
   const STATUSES = [
@@ -669,9 +696,14 @@ export const CardDetailScreen = ({ navigation, route }) => {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {card.player_name}
         </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('InitiateTransfer', { cardId })}>
-          <Ionicons name="swap-horizontal" size={22} color={Colors.accent} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          <TouchableOpacity onPress={confirmDelete}>
+            <Ionicons name="trash-outline" size={20} color={Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('InitiateTransfer', { cardId })}>
+            <Ionicons name="swap-horizontal" size={22} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>

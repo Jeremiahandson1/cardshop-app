@@ -123,6 +123,7 @@ export const cardsApi = {
   getPrivate: (id) => api.get(`/cards/${id}/private`),
   register: (data) => api.post('/cards', data),
   update: (id, data) => api.patch(`/cards/${id}`, data),
+  delete: (id) => api.delete(`/cards/${id}`),
   history: (id) => api.get(`/cards/${id}/history`),
 };
 
