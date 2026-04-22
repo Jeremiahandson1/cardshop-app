@@ -337,6 +337,9 @@ export const setsApi = {
 export const tradeListingsApi = {
   create: (data) => api.post('/trade-listings', data),
   feed: (params) => api.get('/trade-listings', { params }),
+  // Returns the viewer's own listings (active + withdrawn). The
+  // public feed intentionally hides these.
+  mine: () => api.get('/trade-listings/mine'),
   get: (id) => api.get(`/trade-listings/${id}`),
   update: (id, data) => api.patch(`/trade-listings/${id}`, data),
   bump: (id) => api.post(`/trade-listings/${id}/bump`),

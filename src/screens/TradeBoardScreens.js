@@ -130,11 +130,19 @@ export const TradeBoardScreen = ({ navigation }) => {
     setGroupId(null);
   };
 
+  // The public feed deliberately hides the viewer's own listings
+  // (you don't need to "discover" your own card). The "Mine" tab
+  // hits a separate /mine endpoint so users can verify their
+  // lets_talk cards are actually on the board.
+  const isMine = scope === 'mine';
   const {
     data, isLoading, refetch, isFetching,
   } = useQuery({
-    queryKey: ['trade-listings', 'feed', queryParams],
-    queryFn: () => tradeListingsApi.feed(queryParams).then((r) => r.data),
+    queryKey: isMine ? ['trade-listings', 'mine'] : ['trade-listings', 'feed', queryParams],
+    queryFn: () => (isMine
+      ? tradeListingsApi.mine().then((r) => r.data)
+      : tradeListingsApi.feed(queryParams).then((r) => r.data)
+    ),
   });
 
   const listings = data?.listings || [];
@@ -230,6 +238,7 @@ export const TradeBoardScreen = ({ navigation }) => {
         <ScopeTab label="All" active={scope === 'all'} onPress={() => { setScope('all'); setGroupId(null); }} />
         <ScopeTab label="Global" active={scope === 'global'} onPress={() => { setScope('global'); setGroupId(null); }} />
         <ScopeTab label="Nearby" active={scope === 'nearby'} onPress={enableNearby} />
+        <ScopeTab label="Mine" active={scope === 'mine'} onPress={() => { setScope('mine'); setGroupId(null); }} />
         <ScopeTab
           label={`Groups${myGroups.length ? ` (${myGroups.length})` : ''}`}
           active={scope === 'group'}
