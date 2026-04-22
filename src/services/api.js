@@ -23,34 +23,47 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401 — but ONLY for endpoints that actually require a
+// valid session. A 401 from /auth/login means "wrong password", not
+// "token expired"; trying to refresh there throws away the server's
+// error message. Same for /auth/refresh itself.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
+    const original = error.config || {};
+    const is401 = error.response?.status === 401;
+    if (!is401 || original._retry) return Promise.reject(error);
+
+    const url = String(original.url || '');
+    if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
+      return Promise.reject(error);
+    }
+
+    original._retry = true;
+    try {
+      const refreshToken = await SecureStore.getItemAsync('refresh_token');
+      if (!refreshToken) return Promise.reject(error);
+
+      const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
+      const { accessToken, refreshToken: newRefresh } = res.data || {};
+      await SecureStore.setItemAsync('access_token', accessToken);
+      await SecureStore.setItemAsync('refresh_token', newRefresh);
+
+      original.headers = original.headers || {};
+      original.headers.Authorization = `Bearer ${accessToken}`;
+      return api(original);
+    } catch {
+      // Cleanup must never steal the original error. Wrap it so a
+      // SecureStore/logout failure doesn't turn a "session expired"
+      // 401 into a generic "Login failed".
       try {
-        const refreshToken = await SecureStore.getItemAsync('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
-        const { accessToken, refreshToken: newRefresh } = res.data || {};
-
-        await SecureStore.setItemAsync('access_token', accessToken);
-        await SecureStore.setItemAsync('refresh_token', newRefresh);
-
-        original.headers.Authorization = `Bearer ${accessToken}`;
-        return api(original);
-      } catch {
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
         const { useAuthStore } = require('../store/authStore');
         useAuthStore.getState().logout();
-        return Promise.reject(error);
-      }
+      } catch { /* cleanup best-effort */ }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
   }
 );
 
