@@ -66,16 +66,25 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
-  // Manual-entry form — used when the card isn't in the catalog.
-  // Required server-side: sport, player_name, year, manufacturer, set_name.
+  // Manual-entry form — catalog fields (shared across all owners
+  // of this card). The owned-card fields (condition, grade, cert,
+  // photos, price) come on the next screen. Required server-side:
+  // sport, player_name, year, manufacturer, set_name.
   const [manualForm, setManualForm] = useState({
     sport: 'baseball',
     player_name: '',
     year: '',
     manufacturer: '',
     set_name: '',
+    subset_name: '',
     card_number: '',
     parallel: '',
+    team: '',
+    print_run: '',
+    is_rookie: false,
+    is_autograph: false,
+    is_relic: false,
+    is_one_of_one: false,
   });
   const setManual = (key) => (val) => setManualForm((f) => ({ ...f, [key]: val }));
 
@@ -123,8 +132,15 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       year: parseInt(manualForm.year, 10),
       manufacturer: manualForm.manufacturer.trim(),
       set_name: manualForm.set_name.trim(),
+      subset_name: manualForm.subset_name.trim() || undefined,
       card_number: manualForm.card_number.trim() || undefined,
       parallel: manualForm.parallel.trim() || undefined,
+      team: manualForm.team.trim() || undefined,
+      print_run: manualForm.print_run ? parseInt(manualForm.print_run, 10) : undefined,
+      is_rookie: manualForm.is_rookie,
+      is_autograph: manualForm.is_autograph,
+      is_relic: manualForm.is_relic,
+      is_one_of_one: manualForm.is_one_of_one,
     }),
     onSuccess: (res) => {
       setSelectedCatalog(res.data);
@@ -304,9 +320,56 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <Input label="Player / subject *" value={manualForm.player_name} onChangeText={setManual('player_name')} placeholder="Mike Trout" />
           <Input label="Year *" value={manualForm.year} onChangeText={setManual('year')} placeholder="2024" keyboardType="number-pad" />
           <Input label="Manufacturer *" value={manualForm.manufacturer} onChangeText={setManual('manufacturer')} placeholder="Topps, Panini, Bowman..." />
-          <Input label="Set name *" value={manualForm.set_name} onChangeText={setManual('set_name')} placeholder="Chrome, Series 1, Prizm..." />
-          <Input label="Card number" value={manualForm.card_number} onChangeText={setManual('card_number')} placeholder="#150 (optional)" />
-          <Input label="Parallel / variant" value={manualForm.parallel} onChangeText={setManual('parallel')} placeholder="Gold Refractor (optional)" />
+          <Input label="Set name *" value={manualForm.set_name} onChangeText={setManual('set_name')} placeholder="Chrome, Mosaic, Prizm..." />
+          <Input label="Subset / insert set" value={manualForm.subset_name} onChangeText={setManual('subset_name')} placeholder="Showtime Signatures, Silver Slugger..." />
+          <Input label="Card number" value={manualForm.card_number} onChangeText={setManual('card_number')} placeholder="#150 / SOS-DBR" />
+          <Input label="Parallel / variant" value={manualForm.parallel} onChangeText={setManual('parallel')} placeholder="Gold Refractor, Mosaic Blue..." />
+          <Input label="Team" value={manualForm.team} onChangeText={setManual('team')} placeholder="New Orleans Saints (optional)" />
+          <Input label="Print run" value={manualForm.print_run} onChangeText={setManual('print_run')} placeholder="25 (total cards in run — leave blank if unnumbered)" keyboardType="number-pad" />
+
+          <Text style={[styles.catalogSet, { marginTop: Spacing.md, marginBottom: Spacing.xs }]}>Card features</Text>
+          {[
+            { key: 'is_rookie',      label: 'Rookie card' },
+            { key: 'is_autograph',   label: 'On-card or sticker autograph' },
+            { key: 'is_relic',       label: 'Memorabilia / relic (patch, jersey, bat)' },
+            { key: 'is_one_of_one',  label: '1 of 1 (true one-off)' },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setManual(opt.key)(!manualForm[opt.key])}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: Spacing.sm,
+                paddingVertical: Spacing.xs,
+              }}
+            >
+              <View style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                borderWidth: 1,
+                borderColor: manualForm[opt.key] ? Colors.accent : Colors.border,
+                backgroundColor: manualForm[opt.key] ? Colors.accent : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {manualForm[opt.key] ? (
+                  <Ionicons name="checkmark" size={14} color={Colors.bg || '#fff'} />
+                ) : null}
+              </View>
+              <Text style={{ color: Colors.text, fontSize: 14 }}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <Text style={{
+            marginTop: Spacing.md,
+            fontSize: 12,
+            color: Colors.textMuted,
+            lineHeight: 18,
+          }}>
+            Next: grading, condition, serial number, photos, and your price.
+          </Text>
 
           <Button
             title={createCatalogMutation.isPending ? 'Creating…' : 'Continue to photos →'}
