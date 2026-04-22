@@ -131,8 +131,12 @@ export const cardsApi = {
   mine: (params) => api.get('/cards/mine', { params }),
   get: (id) => api.get(`/cards/${id}`),
   getPrivate: (id) => api.get(`/cards/${id}/private`),
-  register: (data) => api.post('/cards', data),
-  update: (id, data) => api.patch(`/cards/${id}`, data),
+  // Register/update may include base64 photos — each image is
+  // 200-500 KB, then uploaded to Cloudinary server-side. Give the
+  // request a generous timeout so Cloudinary has time to ingest on
+  // slow connections instead of failing fast.
+  register: (data) => api.post('/cards', data, { timeout: 90_000 }),
+  update: (id, data) => api.patch(`/cards/${id}`, data, { timeout: 90_000 }),
   delete: (id) => api.delete(`/cards/${id}`),
   history: (id) => api.get(`/cards/${id}/history`),
 };

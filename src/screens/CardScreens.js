@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi } from '../services/api';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider } from '../components/ui';
@@ -467,21 +468,42 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   };
 
   const registerMutation = useMutation({
-    mutationFn: () => cardsApi.register({
-      catalog_id: selectedCatalog.id,
-      qr_insert_code: qrCode || undefined,
-      grading_company: form.grading_company,
-      condition: form.grading_company === 'raw' ? form.condition : undefined,
-      cert_number: form.cert_number || undefined,
-      grade: form.grade ? parseFloat(form.grade) : undefined,
-      status: form.status,
-      asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
-      serial_number: form.serial_number ? parseInt(form.serial_number) : undefined,
-      purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
-      personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
-      notes: form.notes || undefined,
-      photo_urls: photos,
-    }),
+    mutationFn: async () => {
+      // Convert each local file:// photo into a base64 data URL so
+      // the API can upload it to Cloudinary. file:// URIs never
+      // leave the device otherwise — they'd render on this phone
+      // briefly (until cache clears) and be invisible everywhere
+      // else. Kept in order so the first photo stays the primary.
+      const base64Photos = await Promise.all(
+        photos.map(async (uri) => {
+          if (!uri) return null;
+          if (/^https?:\/\//i.test(uri)) return uri; // already hosted
+          try {
+            const b64 = await FileSystem.readAsStringAsync(uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            return `data:image/jpeg;base64,${b64}`;
+          } catch {
+            return null;
+          }
+        })
+      );
+      return cardsApi.register({
+        catalog_id: selectedCatalog.id,
+        qr_insert_code: qrCode || undefined,
+        grading_company: form.grading_company,
+        condition: form.grading_company === 'raw' ? form.condition : undefined,
+        cert_number: form.cert_number || undefined,
+        grade: form.grade ? parseFloat(form.grade) : undefined,
+        status: form.status,
+        asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
+        serial_number: form.serial_number ? parseInt(form.serial_number) : undefined,
+        purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
+        personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
+        notes: form.notes || undefined,
+        photo_urls: base64Photos.filter(Boolean),
+      });
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
       navigation.replace('CardDetail', { cardId: res.data?.id });
