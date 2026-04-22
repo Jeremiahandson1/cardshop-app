@@ -31,7 +31,14 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const catalogId = route.params?.catalogId;
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState(qrCode || catalogId ? 'search' : 'scan_or_search');
+  // Default to manual entry. Search-first was forcing collectors
+  // through a catalog lookup even when they knew exactly what card
+  // they had; and the catalog is sparsely populated so searches
+  // mostly dead-ended. Search is still reachable as a helper via
+  // the "Search existing catalog" link on the manual-entry screen.
+  const [step, setStep] = useState(
+    qrCode || catalogId ? 'search' : 'manual_entry'
+  );
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [parallels, setParallels] = useState([]);
@@ -102,7 +109,34 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     setSearching(false);
   };
 
-  const pickPhoto = async () => {
+  // Photos captured in-app go into state with source='camera' — the
+  // server can then mark the owned_card as camera-captured for
+  // verification purposes. Gallery uploads are source='gallery'.
+  // We track source per photo in a parallel array so order stays
+  // aligned with photos[].
+  const [photoSources, setPhotoSources] = useState([]);
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        'Camera permission needed',
+        'Open Settings → Card Shop → Permissions and enable Camera.'
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+      cameraType: ImagePicker.CameraType.back,
+    });
+    if (!result.canceled && result.assets?.length) {
+      setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+      setPhotoSources((s) => [...s, ...result.assets.map(() => 'camera')]);
+    }
+  };
+
+  const pickFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
@@ -110,7 +144,24 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     });
     if (!result.canceled && result.assets?.length) {
       setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+      setPhotoSources((s) => [...s, ...result.assets.map(() => 'gallery')]);
     }
+  };
+
+  // Primary entry point for the "Add" buttons. Puts camera first —
+  // in-app captures are the verified path; gallery is a backup for
+  // when the user only has existing photos (e.g. graded slab photos
+  // from a grading service).
+  const pickPhoto = () => {
+    Alert.alert(
+      'Add a photo',
+      "In-app camera captures count as verified. Gallery uploads are allowed but can't be verified.",
+      [
+        { text: 'Take photo (recommended)', onPress: takePhoto },
+        { text: 'Choose from gallery', onPress: pickFromGallery },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   // Fetch parallels when a base card is selected
@@ -284,16 +335,21 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setStep('search')}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Card Details</Text>
           <View style={{ width: 22 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }}>
-          <Text style={[styles.catalogSet, { marginBottom: Spacing.md }]}>
+          <Text style={[styles.catalogSet, { marginBottom: Spacing.xs }]}>
             Enter the card's info. You'll take photos on the next screen.
           </Text>
+          <TouchableOpacity onPress={() => setStep('search')} style={{ marginBottom: Spacing.md }}>
+            <Text style={{ fontSize: 13, color: Colors.accent }}>
+              Search existing catalog instead →
+            </Text>
+          </TouchableOpacity>
 
           <Text style={styles.catalogSet}>Sport / hobby</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.md }}>
@@ -661,9 +717,31 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             {photos.map((uri, i) => (
               <View key={i} style={styles.photoThumb}>
                 <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                {photoSources[i] === 'camera' ? (
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 4,
+                    left: 4,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}>
+                    <Ionicons name="camera" size={10} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>
+                      Verified
+                    </Text>
+                  </View>
+                ) : null}
                 <TouchableOpacity
                   style={styles.photoRemove}
-                  onPress={() => setPhotos((p) => p.filter((_, idx) => idx !== i))}
+                  onPress={() => {
+                    setPhotos((p) => p.filter((_, idx) => idx !== i));
+                    setPhotoSources((s) => s.filter((_, idx) => idx !== i));
+                  }}
                 >
                   <Ionicons name="close-circle" size={18} color={Colors.error} />
                 </TouchableOpacity>
