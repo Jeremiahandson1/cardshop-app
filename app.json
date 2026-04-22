@@ -65,7 +65,7 @@
     ],
     "scheme": "cardshop",
     "extra": {
-      "API_URL": "https://cardshop-api-pc6b.onrender.com",
+      "API_URL": "https://cardshop-api-ow4q.onrender.com",
       "LCS_ENABLED": true,
       "eas": {
         "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
