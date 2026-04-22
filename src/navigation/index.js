@@ -17,14 +17,17 @@ import { notificationsApi } from '../services/api';
 import { Colors, Typography } from '../theme';
 
 // Screens
-import { LoginScreen, RegisterScreen } from '../screens/AuthScreens';
+import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen } from '../screens/CardScreens';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
-import { ProfileScreen, WantListScreen } from '../screens/ProfileScreens';
+import {
+  ProfileScreen, WantListScreen,
+  ChangeEmailScreen, DownloadDataScreen, DeleteAccountScreen,
+} from '../screens/ProfileScreens';
 import { SearchScreen } from '../screens/SearchScreen';
 import {
   BinderListScreen, BinderEditorScreen, BinderCardPickerScreen,
@@ -263,6 +266,9 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="DealRadarSettings" component={DealRadarSettingsScreen} />
     <ProfileStackNav.Screen name="DealRadarFeed" component={DealRadarFeedScreen} />
     <ProfileStackNav.Screen name="Integrations" component={IntegrationsScreen} />
+    <ProfileStackNav.Screen name="ChangeEmail" component={ChangeEmailScreen} />
+    <ProfileStackNav.Screen name="DownloadData" component={DownloadDataScreen} />
+    <ProfileStackNav.Screen name="DeleteAccount" component={DeleteAccountScreen} />
   </ProfileStackNav.Navigator>
 );
 
@@ -310,6 +316,7 @@ const AuthStack = () => (
   <AuthStackNav.Navigator screenOptions={{ ...screenOptions, animation: 'fade' }}>
     <AuthStackNav.Screen name="Login" component={LoginScreen} />
     <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+    <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
   </AuthStackNav.Navigator>
 );
 

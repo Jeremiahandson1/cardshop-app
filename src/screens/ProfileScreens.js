@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, Alert
+  FlatList, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { wantListApi } from '../services/api';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { showMessage } from 'react-native-flash-message';
+import { wantListApi, authApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { EmptyState, LoadingScreen } from '../components/ui';
+import { Button, Input, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
@@ -30,6 +33,9 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Account',
       items: [
         { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+        { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
+        { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
+        { icon: 'trash-outline', label: 'Delete Account', onPress: () => navigation.navigate('DeleteAccount'), danger: true },
         { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
         { icon: 'star-outline', label: 'Feedback & Ratings', onPress: () => {} },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
@@ -214,6 +220,322 @@ export const WantListScreen = ({ navigation }) => {
   );
 };
 
+// ============================================================
+// CHANGE EMAIL
+// ============================================================
+// POSTs /auth/change-email with the new address + the user's current
+// password. On success we refresh the local user (email_verified resets
+// to false on the server, so the verify-nag banner will re-appear).
+export const ChangeEmailScreen = ({ navigation }) => {
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    const email = newEmail.toLowerCase().trim();
+    if (!email) return setError('Enter the new email address');
+    if (!currentPassword) return setError('Enter your current password');
+    setError('');
+    setLoading(true);
+    try {
+      const res = await authApi.changeEmail({ new_email: email, current_password: currentPassword });
+      showMessage({
+        message: res?.data?.message || 'Email updated — check your inbox to verify.',
+        type: 'success',
+      });
+      updateUser({ email, email_verified: false });
+      navigation.goBack();
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg =
+        err?.response?.data?.error ||
+        (status === 401 ? 'Incorrect current password.' :
+         status === 409 ? 'That email is already in use.' :
+         'Could not change your email. Try again.');
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={styles.simpleHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.simpleHeaderTitle}>Change Email</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }} keyboardShouldPersistTaps="handled">
+          <Text style={styles.accountBlurb}>
+            Current email: <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>{user?.email || '—'}</Text>
+          </Text>
+          <Text style={[styles.accountBlurb, { marginBottom: Spacing.md }]}>
+            We'll send a verification link to the new address. You'll stay signed in.
+          </Text>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorBoxText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <Input
+            label="New Email"
+            value={newEmail}
+            onChangeText={setNewEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+          <Input
+            label="Current Password"
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+            placeholder="••••••••"
+            secureTextEntry
+            autoComplete="password"
+          />
+
+          <Button title="Update Email" onPress={handleSubmit} loading={loading} style={{ marginTop: Spacing.sm }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// DOWNLOAD MY DATA
+// ============================================================
+// GETs /auth/my-data (JSON) and writes it to cache via expo-file-system,
+// then opens the native share sheet (pattern lifted from the CSV import/
+// export screen). We intentionally don't use Linking.openURL — the axios
+// client handles auth headers for us.
+export const DownloadDataScreen = ({ navigation }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleDownload = async () => {
+    setLoading(true);
+    try {
+      const res = await authApi.downloadMyData();
+      // axios returns the body as a string because we asked for responseType:'text'.
+      // Re-pretty-print so the file is human-readable in the share target.
+      let jsonText;
+      if (typeof res.data === 'string') {
+        try {
+          jsonText = JSON.stringify(JSON.parse(res.data), null, 2);
+        } catch {
+          jsonText = res.data;
+        }
+      } else {
+        jsonText = JSON.stringify(res.data, null, 2);
+      }
+
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+      const filename = `cardshop-my-data-${stamp}.json`;
+      const uri = `${FileSystem.cacheDirectory}${filename}`;
+
+      await FileSystem.writeAsStringAsync(uri, jsonText, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Saved', `Your data was saved to:\n${uri}`);
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/json',
+        dialogTitle: filename,
+        UTI: 'public.json',
+      });
+    } catch (err) {
+      Alert.alert(
+        'Download failed',
+        err?.response?.data?.error || err?.message || 'Could not download your data. Try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.simpleHeader}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.simpleHeaderTitle}>Download My Data</Text>
+        <View style={{ width: 22 }} />
+      </View>
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }}>
+        <View style={styles.infoCard}>
+          <Ionicons name="document-text-outline" size={22} color={Colors.accent} />
+          <Text style={styles.infoText}>
+            Get a JSON export of your account, collection, trade activity, and feedback.
+            We'll save it to your device and open the share sheet so you can email or
+            store it wherever you like.
+          </Text>
+        </View>
+        <Button
+          title={loading ? 'Preparing...' : 'Download JSON'}
+          onPress={handleDownload}
+          loading={loading}
+          icon={<Ionicons name="download-outline" size={18} color={Colors.bg} />}
+        />
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// DELETE ACCOUNT (30-day grace)
+// ============================================================
+// Asks for the current password, POSTs /auth/request-delete, and on
+// success updates the local user with scheduled_deletion_at so the
+// persistent banner immediately appears on the main tab. Signing in
+// during the grace window cancels the deletion server-side.
+export const DeleteAccountScreen = ({ navigation }) => {
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [canceling, setCanceling] = useState(false);
+
+  const scheduled = user?.scheduled_deletion_at;
+
+  const handleDelete = async () => {
+    if (!currentPassword) return setError('Enter your current password to continue.');
+    setError('');
+    Alert.alert(
+      'Delete account?',
+      "Your account will be scheduled for deletion in 30 days. Sign in anytime before then to cancel.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const res = await authApi.requestDelete(currentPassword);
+              updateUser({ scheduled_deletion_at: res?.data?.scheduled_deletion_at });
+              showMessage({
+                message: 'Account scheduled for deletion. Sign in anytime to cancel.',
+                type: 'success',
+                duration: 4000,
+              });
+              navigation.goBack();
+            } catch (err) {
+              const status = err?.response?.status;
+              setError(
+                err?.response?.data?.error ||
+                (status === 401 ? 'Incorrect current password.' : 'Could not schedule deletion. Try again.'),
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancel = async () => {
+    setCanceling(true);
+    try {
+      await authApi.cancelDelete();
+      updateUser({ scheduled_deletion_at: null });
+      showMessage({ message: 'Pending deletion cancelled.', type: 'success' });
+    } catch (err) {
+      showMessage({
+        message: err?.response?.data?.error || 'Could not cancel. Try again.',
+        type: 'danger',
+      });
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={styles.simpleHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.simpleHeaderTitle}>Delete Account</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }} keyboardShouldPersistTaps="handled">
+          {scheduled ? (
+            <View style={styles.dangerCard}>
+              <Ionicons name="warning-outline" size={22} color={Colors.accent3} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={styles.dangerTitle}>Deletion pending</Text>
+                <Text style={styles.dangerText}>
+                  Your account will be deleted on{' '}
+                  {new Date(scheduled).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.
+                  Sign in anytime before then — or tap below — to cancel.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle-outline" size={22} color={Colors.warning} />
+              <Text style={styles.infoText}>
+                We hold your data for 30 days before permanent deletion. Sign in any
+                time during that window to cancel. After 30 days, your account,
+                collection, and trade history are erased and can't be recovered.
+              </Text>
+            </View>
+          )}
+
+          {scheduled ? (
+            <Button
+              title={canceling ? 'Cancelling...' : 'Cancel pending deletion'}
+              onPress={handleCancel}
+              loading={canceling}
+              variant="secondary"
+            />
+          ) : (
+            <>
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorBoxText}>{error}</Text>
+                </View>
+              ) : null}
+              <Input
+                label="Current Password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder="••••••••"
+                secureTextEntry
+                autoComplete="password"
+              />
+              <Button
+                title="Schedule deletion"
+                onPress={handleDelete}
+                loading={loading}
+                variant="danger"
+                style={{ marginTop: Spacing.sm }}
+              />
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   profileHeader: {
@@ -280,4 +602,39 @@ const styles = StyleSheet.create({
   },
   gradedBadgeText: { color: Colors.accent, fontSize: Typography.xs, fontWeight: Typography.medium },
   removeBtn: { padding: Spacing.sm },
+  accountBlurb: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 19, marginBottom: Spacing.sm },
+  errorBox: {
+    backgroundColor: Colors.accent3 + '22',
+    borderWidth: 1,
+    borderColor: Colors.accent3,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  errorBoxText: { color: Colors.accent3, fontSize: Typography.sm },
+  infoCard: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: Spacing.base,
+    marginBottom: Spacing.lg,
+    alignItems: 'flex-start',
+  },
+  infoText: { flex: 1, color: Colors.text, fontSize: Typography.sm, lineHeight: 20 },
+  dangerCard: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    backgroundColor: Colors.accent3 + '18',
+    borderWidth: 1,
+    borderColor: Colors.accent3 + '66',
+    borderRadius: Radius.md,
+    padding: Spacing.base,
+    marginBottom: Spacing.lg,
+    alignItems: 'flex-start',
+  },
+  dangerTitle: { color: Colors.accent3, fontSize: Typography.base, fontWeight: Typography.bold },
+  dangerText: { color: Colors.text, fontSize: Typography.sm, lineHeight: 19 },
 });

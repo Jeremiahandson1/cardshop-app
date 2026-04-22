@@ -4,7 +4,9 @@ import {
   Platform, TouchableOpacity, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { showMessage } from 'react-native-flash-message';
 import { useAuthStore } from '../store/authStore';
+import { authApi } from '../services/api';
 import { Button, Input } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -27,7 +29,16 @@ export const LoginScreen = ({ navigation }) => {
     setError('');
     setLoading(true);
     try {
-      await login(email.toLowerCase().trim(), password);
+      const result = await login(email.toLowerCase().trim(), password);
+      // Signing in during the 30-day grace window cancels a pending deletion;
+      // the server signals that via `deletion_cancelled` on the login response.
+      if (result?.deletion_cancelled) {
+        showMessage({
+          message: 'Welcome back — we cancelled the pending deletion of your account.',
+          type: 'success',
+          duration: 4500,
+        });
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
@@ -84,6 +95,13 @@ export const LoginScreen = ({ navigation }) => {
               loading={loading}
               style={{ marginTop: Spacing.sm }}
             />
+
+            <TouchableOpacity
+              style={styles.forgotLink}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.switchLink} onPress={() => navigation.navigate('Register')}>
               <Text style={styles.switchText}>
@@ -248,6 +266,97 @@ export const RegisterScreen = ({ navigation }) => {
   );
 };
 
+// ============================================================
+// FORGOT PASSWORD
+// ============================================================
+// The backend always returns 200 (no email enumeration). We just show a
+// neutral "check your email" toast and pop back to Login. The emailed link
+// points at the landing site — we don't implement a reset-receive flow in
+// the app; the user signs in with the new password after they reset.
+export const ForgotPasswordScreen = ({ navigation }) => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    const trimmed = email.toLowerCase().trim();
+    if (!trimmed) {
+      setError('Enter the email on your account');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await authApi.forgotPassword(trimmed);
+      showMessage({
+        message: 'Check your email for a reset link.',
+        type: 'success',
+        duration: 4000,
+      });
+      navigation.goBack();
+    } catch (err) {
+      // Backend is designed to always return 200, so a failure here is a
+      // network/server issue — surface it without leaking account existence.
+      setError(err.response?.data?.error || 'Could not send the reset email. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.logoArea}>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoIcon}>🔑</Text>
+            </View>
+            <Text style={styles.logoTitle}>Reset password</Text>
+            <Text style={styles.logoSub}>We'll email you a link</Text>
+          </View>
+
+          <View style={styles.form}>
+            <Text style={styles.formTitle}>Forgot password</Text>
+            <Text style={[styles.switchText, { marginBottom: Spacing.md }]}>
+              Enter your account email. If it matches an account, we'll send a link to reset your password.
+            </Text>
+
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoComplete="email"
+              returnKeyType="send"
+              onSubmitEditing={handleSubmit}
+            />
+
+            <Button
+              title="Send reset link"
+              onPress={handleSubmit}
+              loading={loading}
+              style={{ marginTop: Spacing.sm }}
+            />
+
+            <TouchableOpacity style={styles.switchLink} onPress={() => navigation.goBack()}>
+              <Text style={styles.switchText}>
+                Remembered it? <Text style={styles.switchAction}>Back to sign in</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   scroll: { flexGrow: 1, padding: Spacing.base },
@@ -275,6 +384,8 @@ const styles = StyleSheet.create({
   switchLink: { alignItems: 'center', marginTop: Spacing.lg },
   switchText: { color: Colors.textMuted, fontSize: Typography.sm },
   switchAction: { color: Colors.accent, fontWeight: Typography.semibold },
+  forgotLink: { alignItems: 'center', marginTop: Spacing.md },
+  forgotText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
   roleLabel: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.sm },
   roleRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   roleBtn: {

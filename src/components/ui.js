@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
   StyleSheet, TextInput, Image
 } from 'react-native';
+import { showMessage } from 'react-native-flash-message';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
+import { useAuthStore } from '../store/authStore';
+import { authApi } from '../services/api';
 
 // ============================================================
 // BUTTON
@@ -386,3 +390,154 @@ export const SectionHeader = ({ title, action }) => (
 export const Divider = ({ style }) => (
   <View style={[{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.md }, style]} />
 );
+
+// ============================================================
+// ACCOUNT BANNERS — email verification nag + scheduled-deletion banner
+// ============================================================
+// Renders two stacked banners based on the current user from the auth store:
+//   1. email-verify nag (dismissible in-session) when email_verified is false
+//   2. persistent deletion-pending banner when scheduled_deletion_at is set
+// Mount this at the top of the main tab (e.g. Collection) so it's always
+// visible to the user after login.
+const formatDeletionDate = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+};
+
+export const AccountBanners = () => {
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const [verifyDismissed, setVerifyDismissed] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  if (!user) return null;
+
+  const showVerifyBanner = user.email_verified === false && !verifyDismissed;
+  const showDeletionBanner = !!user.scheduled_deletion_at;
+
+  const handleResend = async () => {
+    if (resending) return;
+    setResending(true);
+    try {
+      const res = await authApi.resendVerify();
+      if (res?.data?.already_verified) {
+        showMessage({ message: 'Your email is already verified.', type: 'success' });
+        updateUser({ email_verified: true });
+      } else {
+        showMessage({ message: 'Verification email sent.', type: 'success' });
+      }
+    } catch (err) {
+      showMessage({
+        message: err?.response?.data?.error || 'Could not resend. Try again.',
+        type: 'danger',
+      });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  if (!showVerifyBanner && !showDeletionBanner) return null;
+
+  return (
+    <View>
+      {showVerifyBanner && (
+        <View style={bannerStyles.verifyBanner}>
+          <Ionicons name="mail-unread-outline" size={18} color={Colors.warning} style={{ marginTop: 1 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={bannerStyles.verifyText}>
+              Confirm your email — we sent you a link.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={handleResend}
+            disabled={resending}
+            style={bannerStyles.verifyAction}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            {resending ? (
+              <ActivityIndicator size="small" color={Colors.warning} />
+            ) : (
+              <Text style={bannerStyles.verifyActionText}>Resend</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setVerifyDismissed(true)}
+            style={bannerStyles.verifyClose}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="close" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {showDeletionBanner && (
+        <View style={bannerStyles.deletionBanner}>
+          <Ionicons name="warning-outline" size={18} color={Colors.accent3} style={{ marginTop: 1 }} />
+          <Text style={bannerStyles.deletionText}>
+            Account scheduled for deletion on {formatDeletionDate(user.scheduled_deletion_at)}.
+            Sign in anytime to cancel.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const bannerStyles = StyleSheet.create({
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Colors.warning + '18',
+    borderWidth: 1,
+    borderColor: Colors.warning + '66',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.sm,
+  },
+  verifyText: {
+    color: Colors.text,
+    fontSize: Typography.sm,
+    lineHeight: 18,
+  },
+  verifyAction: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+  },
+  verifyActionText: {
+    color: Colors.warning,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+  },
+  verifyClose: {
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+  deletionBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Colors.accent3 + '18',
+    borderWidth: 1,
+    borderColor: Colors.accent3 + '66',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.sm,
+  },
+  deletionText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: Typography.sm,
+    lineHeight: 18,
+  },
+});

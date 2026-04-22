@@ -26,11 +26,13 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (email, password) => {
     const res = await authApi.login({ email, password });
-    const { user, accessToken, refreshToken } = res.data || {};
+    const { user, accessToken, refreshToken, deletion_cancelled } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);
     set({ user, isAuthenticated: true });
-    return user;
+    // Return the full login payload so the caller can surface welcome-back
+    // messaging when the server cancelled a pending deletion.
+    return { user, deletion_cancelled: !!deletion_cancelled };
   },
 
   register: async (data) => {

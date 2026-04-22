@@ -63,6 +63,20 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   updateProfile: (data) => api.patch('/auth/me', data),
   changePassword: (data) => api.post('/auth/change-password', data),
+
+  // Self-serve auth flows (reset, verify, change-email, delete / cancel-delete).
+  // /forgot-password always returns 200 (no enumeration). The emailed link lands
+  // on the landing site — we intentionally don't build a receive-reset flow here.
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resendVerify: () => api.post('/auth/resend-verify'),
+  changeEmail: ({ new_email, current_password }) =>
+    api.post('/auth/change-email', { new_email, current_password }),
+  requestDelete: (current_password) =>
+    api.post('/auth/request-delete', { current_password }),
+  cancelDelete: () => api.post('/auth/cancel-delete'),
+  // Returns the user's data as a JSON attachment — caller writes it to disk
+  // via expo-file-system and opens the share sheet (see ProfileScreens).
+  downloadMyData: () => api.get('/auth/my-data', { responseType: 'text' }),
 };
 
 // ============================================================

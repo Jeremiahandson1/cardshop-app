@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsApi } from '../services/api';
-import { CardTile, EmptyState, LoadingScreen, ScreenHeader, Button } from '../components/ui';
+import { CardTile, EmptyState, LoadingScreen, ScreenHeader, Button, AccountBanners } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { CollectionIntelligenceView } from './CollectionIntelligenceView';
 
@@ -98,6 +98,9 @@ export const CollectionScreen = ({ navigation }) => {
           </View>
         }
       />
+
+      {/* Account-level nags (email-verify / scheduled-deletion) */}
+      <AccountBanners />
 
       {/* View toggle — Cards vs Intelligence */}
       <View style={styles.viewToggle}>

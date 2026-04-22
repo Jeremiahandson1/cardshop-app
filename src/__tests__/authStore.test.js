@@ -64,11 +64,27 @@ describe('useAuthStore', () => {
           refreshToken: 'rt',
         },
       });
-      const user = await useAuthStore.getState().login('test@test.com', 'pass');
-      expect(user).toEqual({ id: '1', username: 'test' });
+      const result = await useAuthStore.getState().login('test@test.com', 'pass');
+      // login() now returns { user, deletion_cancelled } so the caller can
+      // show a "welcome back — we cancelled deletion" toast when applicable.
+      expect(result.user).toEqual({ id: '1', username: 'test' });
+      expect(result.deletion_cancelled).toBe(false);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith('access_token', 'at');
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith('refresh_token', 'rt');
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    });
+
+    it('flags deletion_cancelled when the server cancelled a pending deletion', async () => {
+      authApi.login.mockResolvedValue({
+        data: {
+          user: { id: '1', username: 'test' },
+          accessToken: 'at',
+          refreshToken: 'rt',
+          deletion_cancelled: true,
+        },
+      });
+      const result = await useAuthStore.getState().login('test@test.com', 'pass');
+      expect(result.deletion_cancelled).toBe(true);
     });
 
     it('propagates errors', async () => {
