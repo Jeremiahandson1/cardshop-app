@@ -527,8 +527,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       // leave the device otherwise — they'd render on this phone
       // briefly (until cache clears) and be invisible everywhere
       // else. Kept in order so the first photo stays the primary.
+      // Track per-photo failures so we can surface a visible error
+      // instead of silently dropping them to filter(Boolean).
+      const photoFailures = [];
       const base64Photos = await Promise.all(
-        photos.map(async (uri) => {
+        photos.map(async (uri, i) => {
           if (!uri) return null;
           if (/^https?:\/\//i.test(uri)) return uri; // already hosted
           try {
@@ -536,11 +539,19 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               encoding: FileSystem.EncodingType.Base64,
             });
             return `data:image/jpeg;base64,${b64}`;
-          } catch {
+          } catch (err) {
+            photoFailures.push(`#${i + 1}: ${err?.message || 'read failed'}`);
             return null;
           }
         })
       );
+      const uploaded = base64Photos.filter(Boolean);
+      if (photoFailures.length) {
+        Alert.alert(
+          `${photoFailures.length} photo(s) failed to read`,
+          `${uploaded.length} of ${photos.length} will be uploaded.\n\n${photoFailures.join('\n')}`,
+        );
+      }
       return cardsApi.register({
         catalog_id: selectedCatalog.id,
         qr_insert_code: qrCode || undefined,
@@ -555,7 +566,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
-        photo_urls: base64Photos.filter(Boolean),
+        photo_urls: uploaded,
       });
     },
     onSuccess: (res) => {
@@ -1220,7 +1231,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       {/* Submit */}
       <View style={styles.submitBar}>
         <Button
-          title="Register Card"
+          title={photos.length > 0 ? `Register Card · ${photos.length} photo${photos.length === 1 ? '' : 's'}` : 'Register Card'}
           onPress={() => registerMutation.mutate()}
           loading={registerMutation.isPending}
           style={{ flex: 1 }}
@@ -1304,6 +1315,9 @@ export const CardDetailScreen = ({ navigation, route }) => {
           {card.player_name}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          <TouchableOpacity onPress={() => navigation.navigate('EditCard', { cardId })}>
+            <Ionicons name="create-outline" size={22} color={Colors.accent} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={confirmDelete}>
             <Ionicons name="trash-outline" size={20} color={Colors.textMuted} />
           </TouchableOpacity>
@@ -1546,6 +1560,310 @@ export const CardDetailScreen = ({ navigation, route }) => {
           </View>
         </View>
       </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// EDIT CARD
+// ============================================================
+// Post-registration editor for the fields the owner can change
+// without invalidating chain of custody: condition, status,
+// prices, public/private notes, serial number, and photos.
+// Catalog fields (player, set, parallel, card #) are intentionally
+// not editable — fixing those happens via delete + re-register,
+// so the transfer log stays coherent.
+export const EditCardScreen = ({ navigation, route }) => {
+  const { cardId } = route.params;
+  const queryClient = useQueryClient();
+
+  const { data: card, isLoading } = useQuery({
+    queryKey: ['card-private', cardId],
+    queryFn: () => cardsApi.getPrivate(cardId).then((r) => r.data),
+  });
+
+  const [form, setForm] = useState(null);
+  const [newPhotos, setNewPhotos] = useState([]); // newly-added file:// URIs
+  const [conditionDescFor, setConditionDescFor] = useState(null);
+
+  React.useEffect(() => {
+    if (!card || form) return;
+    setForm({
+      status: card.status || 'nfs',
+      condition: card.condition || 'near_mint',
+      condition_notes: card.condition_notes || '',
+      asking_price: card.asking_price != null ? String(card.asking_price) : '',
+      serial_number: card.serial_number != null ? String(card.serial_number) : '',
+      purchase_price: card.purchase_price != null ? String(card.purchase_price) : '',
+      personal_valuation: card.personal_valuation != null ? String(card.personal_valuation) : '',
+      notes: card.notes || '',
+      public_notes: card.public_notes || '',
+    });
+  }, [card, form]);
+
+  // Reuse the same eBay condition table the register screen uses
+  // so the definitions stay in one place. Duplicated structurally
+  // to avoid splitting the component file further; if a third
+  // copy shows up this should move to a module-level constant.
+  const CONDITIONS = [
+    { key: 'gem_mint',  label: 'Gem Mint',   ebay: 'Graded — Gem Mint',
+      desc: 'PSA/BGS/SGC 10 equivalent. Perfect centering, sharp corners, no printing defects visible under magnification.' },
+    { key: 'mint',      label: 'Mint',       ebay: 'Mint or Mint 9',
+      desc: 'PSA 9. Near-perfect centering (55/45+), sharp corners, clean surface. One very minor flaw acceptable.' },
+    { key: 'near_mint', label: 'Near Mint',  ebay: 'Near Mint–Mint or NM 8',
+      desc: 'PSA 7-8. Slight off-centering, minor corner wear, light surface scratches at an angle. No creases.' },
+    { key: 'excellent', label: 'Excellent',  ebay: 'Excellent',
+      desc: 'PSA 5-6. Mild corner rounding, minor edge wear. Image still sharp, no creases.' },
+    { key: 'very_good', label: 'Very Good',  ebay: 'Very Good',
+      desc: 'PSA 3-4. Noticeable corner wear and edge fuzz. May have a single very light crease.' },
+    { key: 'good',      label: 'Good',       ebay: 'Good',
+      desc: 'PSA 2. Rounded corners, visible creases, surface scratches. Image intact.' },
+    { key: 'fair',      label: 'Fair',       ebay: 'Fair',
+      desc: 'PSA 1.5. Heavy wear, multiple creases, possible minor tears. Image recognizable.' },
+    { key: 'poor',      label: 'Poor',       ebay: 'Poor',
+      desc: 'PSA 1. Major damage — tears, water damage, stains, writing, pin-holes.' },
+  ];
+
+  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera permission needed', 'Enable camera access in Settings → Card Shop → Permissions.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
+    if (!result.canceled && result.assets?.length) {
+      setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+    }
+  };
+  const pickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, allowsMultipleSelection: true });
+    if (!result.canceled && result.assets?.length) {
+      setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+    }
+  };
+  const addPhoto = () => {
+    Alert.alert('Add a photo', null, [
+      { text: 'Take photo', onPress: takePhoto },
+      { text: 'Choose from gallery', onPress: pickFromGallery },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Merge existing hosted photos with any newly captured ones
+      // (converted to base64 for Cloudinary). Kept in order: old
+      // photos first, new appended. User can reorder in a future
+      // pass; for now order matches registration.
+      const existing = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+      const newlyConverted = await Promise.all(
+        newPhotos.map(async (uri) => {
+          if (!uri) return null;
+          if (/^https?:\/\//i.test(uri)) return uri;
+          try {
+            const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+            return `data:image/jpeg;base64,${b64}`;
+          } catch {
+            return null;
+          }
+        })
+      );
+      const merged = [...existing, ...newlyConverted.filter(Boolean)];
+      return cardsApi.update(cardId, {
+        status: form.status,
+        condition: form.condition,
+        condition_notes: form.condition_notes || undefined,
+        asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
+        serial_number: form.serial_number ? parseInt(form.serial_number, 10) : undefined,
+        purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
+        personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
+        notes: form.notes || undefined,
+        public_notes: form.public_notes || undefined,
+        photo_urls: merged,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      navigation.goBack();
+    },
+    onError: (err) => Alert.alert('Could not save', err.response?.data?.error || 'Please try again.'),
+  });
+
+  const removeExistingPhoto = (idx) => {
+    // Strip one URL from the existing list and save immediately so
+    // the deletion can't get lost if the user backs out without
+    // hitting Save. Other edits still require the explicit Save.
+    const existing = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+    const next = existing.filter((_, i) => i !== idx);
+    cardsApi.update(cardId, { photo_urls: next }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
+    }).catch((err) => Alert.alert('Could not remove photo', err.response?.data?.error || 'Please try again.'));
+  };
+
+  if (isLoading || !card || !form) return <LoadingScreen />;
+
+  const existingPhotos = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={24} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Card</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 100 }}>
+        <View style={styles.selectedCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.catalogPlayer}>{card.player_name}</Text>
+            <Text style={styles.catalogSet}>{card.year} {card.manufacturer} {card.set_name}</Text>
+            {card.parallel ? <Text style={styles.catalogParallel}>{card.parallel}{card.print_run ? ` /${card.print_run}` : ''}</Text> : null}
+          </View>
+        </View>
+
+        {/* Condition */}
+        {card.grading_company === 'raw' || !card.grading_company ? (
+          <View>
+            <SectionHeader title="Condition (eBay scale)" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
+              {CONDITIONS.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.condBtn, form.condition === c.key && styles.condBtnActive]}
+                  onPress={() => { set('condition')(c.key); setConditionDescFor(c.key); }}
+                >
+                  <Text style={[styles.condText, form.condition === c.key && styles.condTextActive]}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {conditionDescFor ? (() => {
+              const picked = CONDITIONS.find((c) => c.key === conditionDescFor);
+              if (!picked) return null;
+              return (
+                <View style={{ marginTop: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2 }}>
+                  <Text style={{ color: Colors.text, fontWeight: '700', marginBottom: 2 }}>{picked.label}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 6 }}>eBay equivalent: {picked.ebay}</Text>
+                  <Text style={{ color: Colors.text, fontSize: 13, lineHeight: 18 }}>{picked.desc}</Text>
+                </View>
+              );
+            })() : null}
+          </View>
+        ) : null}
+
+        {/* Status */}
+        <View>
+          <SectionHeader title="Availability" />
+          <View style={styles.statusRow}>
+            {[
+              { key: 'nfs', label: 'NFS', desc: 'Not For Sale' },
+              { key: 'nft', label: 'NFT', desc: 'Not For Trade' },
+              { key: 'lets_talk', label: "Let's Talk", desc: 'Open to offers' },
+            ].map((s) => (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.statusBtn, form.status === s.key && styles.statusBtnActive]}
+                onPress={() => set('status')(s.key)}
+              >
+                <Text style={[styles.statusBtnLabel, form.status === s.key && { color: Colors.accent }]}>{s.label}</Text>
+                <Text style={styles.statusBtnDesc}>{s.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {form.status === 'lets_talk' && (
+          <Input label="Asking Price" value={form.asking_price} onChangeText={set('asking_price')} placeholder="0.00" keyboardType="decimal-pad" />
+        )}
+
+        {/* Serial — only if the card is numbered */}
+        {card.print_run ? (
+          <Input
+            label={`Your copy (1-${card.print_run})`}
+            value={form.serial_number}
+            onChangeText={set('serial_number')}
+            placeholder={`e.g. 7 of ${card.print_run}`}
+            keyboardType="number-pad"
+          />
+        ) : null}
+
+        {/* Public notes */}
+        <View>
+          <SectionHeader title="Public Notes" />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            Shown to anyone viewing the card.
+          </Text>
+          <Input value={form.public_notes} onChangeText={set('public_notes')} placeholder="Notes visible to everyone..." multiline />
+        </View>
+
+        {/* Private details */}
+        <View>
+          <SectionHeader title="Private Details" />
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input label="Purchase Price" value={form.purchase_price} onChangeText={set('purchase_price')} placeholder="0.00" keyboardType="decimal-pad" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input label="Your Valuation" value={form.personal_valuation} onChangeText={set('personal_valuation')} placeholder="0.00" keyboardType="decimal-pad" />
+            </View>
+          </View>
+          <Input label="Private Notes" value={form.notes} onChangeText={set('notes')} placeholder="Only you can see these..." multiline />
+        </View>
+
+        {/* Photos */}
+        <View>
+          <SectionHeader title="Photos" action={{ label: '+ Add', onPress: addPhoto }} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
+            <TouchableOpacity style={styles.photoAdd} onPress={addPhoto}>
+              <Ionicons name="camera" size={24} color={Colors.textMuted} />
+              <Text style={styles.photoAddText}>Add</Text>
+            </TouchableOpacity>
+            {existingPhotos.map((uri, i) => (
+              <View key={`ex-${i}`} style={styles.photoThumb}>
+                <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                <TouchableOpacity
+                  style={styles.photoRemove}
+                  onPress={() => Alert.alert('Remove photo?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => removeExistingPhoto(i) },
+                  ])}
+                >
+                  <Ionicons name="close-circle" size={18} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {newPhotos.map((uri, i) => (
+              <View key={`new-${i}`} style={styles.photoThumb}>
+                <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>NEW</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.photoRemove}
+                  onPress={() => setNewPhotos((p) => p.filter((_, idx) => idx !== i))}
+                >
+                  <Ionicons name="close-circle" size={18} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </ScrollView>
+
+      <View style={styles.submitBar}>
+        <Button
+          title="Save Changes"
+          onPress={() => saveMutation.mutate()}
+          loading={saveMutation.isPending}
+          style={{ flex: 1 }}
+        />
+      </View>
     </SafeAreaView>
   );
 };

@@ -20,7 +20,7 @@ import { Colors, Typography } from '../theme';
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
-import { RegisterCardScreen, CardDetailScreen } from '../screens/CardScreens';
+import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
@@ -193,6 +193,7 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="CollectionMain" component={CollectionScreen} />
     <CollectionStackNav.Screen name="CollectionImportExport" component={CollectionImportExportScreen} />
     <CollectionStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <CollectionStackNav.Screen name="EditCard" component={EditCardScreen} />
     <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <CollectionStackNav.Screen name="QRScanner" component={QRScannerScreen} />
@@ -213,6 +214,7 @@ const BinderStack = () => (
     <BinderStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <BinderStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <BinderStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <BinderStackNav.Screen name="EditCard" component={EditCardScreen} />
     <BinderStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
   </BinderStackNav.Navigator>
 );
@@ -222,6 +224,7 @@ const SearchStack = () => (
     <SearchStackNav.Screen name="SearchMain" component={SearchScreen} />
     <SearchStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <SearchStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <SearchStackNav.Screen name="EditCard" component={EditCardScreen} />
     <SearchStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <SearchStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <SearchStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
@@ -235,6 +238,7 @@ const TransferStack = () => (
     <TransferStackNav.Screen name="TransfersMain" component={TransfersScreen} />
     <TransferStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <TransferStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <TransferStackNav.Screen name="EditCard" component={EditCardScreen} />
   </TransferStackNav.Navigator>
 );
 
@@ -247,6 +251,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Discover" component={DiscoverScreen} />
     <ProfileStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <ProfileStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <ProfileStackNav.Screen name="EditCard" component={EditCardScreen} />
     <ProfileStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <ProfileStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <ProfileStackNav.Screen name="OffersList" component={OffersListScreen} />
