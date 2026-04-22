@@ -117,6 +117,11 @@ export const catalogApi = {
   // card list for a specific set.
   listSets: (params) => api.get('/catalog/sets', { params }),
   setCards: (params) => api.get('/catalog/sets/cards', { params }),
+  // Cascading registration — returns distinct values for one
+  // dimension filtered by any of the others.
+  // Example: filterValues({ dimension: 'set_name', sport: 'football', year: 2025, manufacturer: 'Panini' })
+  //   → { values: ['Prizm', 'Mosaic', ...] }
+  filterValues: (params) => api.get('/catalog/filter-values', { params }),
 };
 
 // ============================================================

@@ -24,6 +24,184 @@ const useEbayStatus = () => {
 };
 
 // ============================================================
+// Cascading catalog picker for registration.
+//
+// Pulls distinct values for the active dimension from
+// /api/catalog/filter-values, narrowed by what's already picked.
+// On a single-option response (e.g. only one manufacturer ships
+// football 2025 inserts) it auto-advances so the user isn't
+// tapping through rubber-stamp screens. An empty response at
+// any step drops the user into manual entry, pre-filled.
+// ============================================================
+const CascadePicker = ({
+  navigation, cascade, setCascade, cascadeDim, setCascadeDim,
+  cascadeQuery, setCascadeQuery, cascadeOrder, cascadeLabel,
+  onComplete, onManualFallback,
+}) => {
+  const currentIdx = cascadeOrder.indexOf(cascadeDim);
+
+  const { data: options, isLoading } = useQuery({
+    queryKey: ['catalog-filter', cascadeDim, cascade, cascadeQuery],
+    queryFn: () =>
+      catalogApi
+        .filterValues({ dimension: cascadeDim, ...cascade, q: cascadeQuery || undefined, limit: 200 })
+        .then((r) => r.data?.values || []),
+    // Keep typeahead snappy but not thrash-y while the user types.
+    staleTime: 10_000,
+  });
+
+  // Auto-advance when there's exactly one option (no typeahead
+  // filter active, so it's a real singleton) — saves a tap on
+  // degenerate cascades.
+  React.useEffect(() => {
+    if (!cascadeQuery && options && options.length === 1) {
+      const only = options[0];
+      if (cascade[cascadeDim] === only) return;
+      setCascade((prev) => ({ ...prev, [cascadeDim]: only }));
+      const nextIdx = currentIdx + 1;
+      if (nextIdx < cascadeOrder.length) {
+        setCascadeDim(cascadeOrder[nextIdx]);
+        setCascadeQuery('');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, cascadeQuery, cascadeDim]);
+
+  const pick = (value) => {
+    const next = { ...cascade, [cascadeDim]: value };
+    setCascade(next);
+    setCascadeQuery('');
+    const nextIdx = currentIdx + 1;
+    if (nextIdx >= cascadeOrder.length) {
+      onComplete(next);
+      return;
+    }
+    setCascadeDim(cascadeOrder[nextIdx]);
+  };
+
+  const skip = () => {
+    // Some cards have no subset or parallel — let the user skip
+    // these optional levels without picking anything.
+    const nextIdx = currentIdx + 1;
+    if (nextIdx >= cascadeOrder.length) {
+      onComplete(cascade);
+      return;
+    }
+    setCascadeDim(cascadeOrder[nextIdx]);
+    setCascadeQuery('');
+  };
+
+  const stepBack = () => {
+    const prevIdx = currentIdx - 1;
+    if (prevIdx < 0) {
+      navigation.goBack();
+      return;
+    }
+    // Drop the current pick and everything after it when stepping back.
+    const cleared = { ...cascade };
+    for (let i = prevIdx; i < cascadeOrder.length; i++) delete cleared[cascadeOrder[i]];
+    setCascade(cleared);
+    setCascadeDim(cascadeOrder[prevIdx]);
+    setCascadeQuery('');
+  };
+
+  const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
+  const isOptional = OPTIONAL_DIMS.has(cascadeDim);
+  const picked = cascadeOrder.filter((d) => cascade[d] !== undefined);
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={stepBack}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Register Card</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      {/* Breadcrumbs of what's been picked so far. */}
+      {picked.length > 0 ? (
+        <View style={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm }}>
+          <Text style={{ fontSize: 11, color: Colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' }}>
+            {picked.map((d) => cascade[d]).join(' · ')}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={{ paddingHorizontal: Spacing.base, marginBottom: Spacing.sm }}>
+        <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 6 }}>
+          Step {currentIdx + 1} of {cascadeOrder.length} — {cascadeLabel[cascadeDim]}
+        </Text>
+        <Input
+          placeholder={`Search ${cascadeLabel[cascadeDim].toLowerCase()}...`}
+          value={cascadeQuery}
+          onChangeText={setCascadeQuery}
+          autoCapitalize="none"
+        />
+      </View>
+
+      <FlatList
+        data={options || []}
+        keyExtractor={(item, i) => String(item) + i}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.xxxl }}
+        ListEmptyComponent={
+          isLoading ? null : (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.md }}>
+              <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>
+                No matches for the filters so far.
+              </Text>
+              <TouchableOpacity onPress={onManualFallback}>
+                <Text style={{ color: Colors.accent, fontWeight: '600' }}>
+                  Enter this card manually →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => pick(item)}
+            style={{
+              paddingVertical: Spacing.md,
+              paddingHorizontal: Spacing.md,
+              borderRadius: Radius.md,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              backgroundColor: Colors.surface2,
+              marginBottom: Spacing.xs,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text style={{ color: Colors.text, fontSize: 15, flexShrink: 1 }}>{String(item)}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      />
+
+      {/* Skip button for optional dimensions (subset / parallel)
+          + a manual-entry escape hatch that's always reachable. */}
+      <View style={{ padding: Spacing.base, gap: Spacing.sm }}>
+        {isOptional ? (
+          <TouchableOpacity onPress={skip} style={{ alignItems: 'center', padding: Spacing.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 14 }}>
+              Skip {cascadeLabel[cascadeDim]} →
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity onPress={onManualFallback}>
+          <Text style={{ textAlign: 'center', color: Colors.textMuted, fontSize: 13 }}>
+            Card not in catalog? Enter manually →
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
 // REGISTER CARD
 // ============================================================
 export const RegisterCardScreen = ({ navigation, route }) => {
@@ -36,9 +214,34 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // they had; and the catalog is sparsely populated so searches
   // mostly dead-ended. Search is still reachable as a helper via
   // the "Search existing catalog" link on the manual-entry screen.
+  // Cascade is the primary register path now that the catalog has
+  // real data. Manual entry stays reachable as a fallback for cards
+  // not yet catalogued; legacy `search` is still used by QR + deep
+  // link entries that already know a catalog_id.
   const [step, setStep] = useState(
-    qrCode || catalogId ? 'search' : 'manual_entry'
+    qrCode || catalogId ? 'search' : 'cascade'
   );
+
+  // Cascade state — each level records the picked value, narrowing
+  // the options for the next level. Order matters: each dimension
+  // depends on the ones above.
+  const CASCADE_ORDER = [
+    'sport', 'year', 'manufacturer', 'set_name',
+    'subset_name', 'player_name', 'card_number', 'parallel',
+  ];
+  const CASCADE_LABEL = {
+    sport:         'Sport',
+    year:          'Year',
+    manufacturer:  'Manufacturer',
+    set_name:      'Set',
+    subset_name:   'Subset / Insert',
+    player_name:   'Player',
+    card_number:   'Card number',
+    parallel:      'Parallel / variant',
+  };
+  const [cascade, setCascade] = useState({});
+  const [cascadeDim, setCascadeDim] = useState('sport');
+  const [cascadeQuery, setCascadeQuery] = useState('');
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [parallels, setParallels] = useState([]);
@@ -325,6 +528,68 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 
   // Step 1.5: Manual catalog entry — used when the card isn't in the
   // catalog, or when the user skips search entirely.
+  // --- Cascade step: sport → year → mfr → set → subset → player → card# → parallel ---
+  if (step === 'cascade') {
+    return (
+      <CascadePicker
+        navigation={navigation}
+        cascade={cascade}
+        setCascade={setCascade}
+        cascadeDim={cascadeDim}
+        setCascadeDim={setCascadeDim}
+        cascadeQuery={cascadeQuery}
+        setCascadeQuery={setCascadeQuery}
+        cascadeOrder={CASCADE_ORDER}
+        cascadeLabel={CASCADE_LABEL}
+        onComplete={async (filters) => {
+          // Resolve to one catalog row and advance. If we find it,
+          // jump straight to owned-card details. If the cascade
+          // didn't uniquely identify a row (rare — a few edge cases
+          // like identical cards in different regional editions),
+          // fall through to catalog search pre-filtered by what we
+          // picked so the user can confirm.
+          try {
+            const res = await catalogApi.search({
+              sport: filters.sport,
+              year: filters.year,
+              manufacturer: filters.manufacturer,
+              set_name: filters.set_name,
+              player_name: filters.player_name,
+              parallel: filters.parallel,
+              limit: 5,
+            });
+            const hits = res.data?.cards || [];
+            const exact = hits.find((c) =>
+              (c.card_number || '') === (filters.card_number || '') &&
+              (c.subset_name || '') === (filters.subset_name || ''),
+            );
+            const picked = exact || hits[0];
+            if (picked) {
+              setSelectedCatalog(picked);
+              setStep('details');
+              return;
+            }
+          } catch { /* fall through to manual entry if lookup fails */ }
+          // No match — let the user finish with manual entry,
+          // pre-populated from the cascade picks.
+          setManualForm((f) => ({
+            ...f,
+            sport: filters.sport || f.sport,
+            year: String(filters.year || ''),
+            manufacturer: filters.manufacturer || '',
+            set_name: filters.set_name || '',
+            subset_name: filters.subset_name || '',
+            player_name: filters.player_name || '',
+            card_number: filters.card_number || '',
+            parallel: filters.parallel || '',
+          }));
+          setStep('manual_entry');
+        }}
+        onManualFallback={() => setStep('manual_entry')}
+      />
+    );
+  }
+
   if (step === 'manual_entry') {
     const canSubmit =
       manualForm.player_name.trim() &&
