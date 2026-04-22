@@ -16,10 +16,21 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Inject access token on every request
+// Inject access token on every request.
+// SecureStore can throw on some Android devices (keystore edge cases).
+// If it does, the request MUST still go out — otherwise a broken
+// keystore means a user can't even log in to fix it. Guard with
+// try/catch so the request proceeds without auth if needed.
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('access_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  try {
+    const token = await SecureStore.getItemAsync('access_token');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (err) {
+    console.warn('SecureStore read failed; request proceeds unauth:', err?.message);
+  }
   return config;
 });
 
