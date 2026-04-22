@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, Image, Alert, ActivityIndicator
+  FlatList, Image, Alert, ActivityIndicator, Modal, Dimensions, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 // Expo SDK 55 moved the classic readAsStringAsync API to
 // expo-file-system/legacy; the default export is now a
@@ -439,10 +441,16 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       );
       return;
     }
+    // allowsEditing surfaces the OS-native crop + rotate UI right
+    // after capture. aspect [3, 4] matches standard trading-card
+    // portrait so the default crop frame fits the card; users can
+    // still resize and rotate. No native-module install needed.
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.85,
       cameraType: ImagePicker.CameraType.back,
+      allowsEditing: true,
+      aspect: [3, 4],
     });
     if (!result.canceled && result.assets?.length) {
       setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
@@ -454,13 +462,39 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      allowsMultipleSelection: true,
+      allowsEditing: true,
+      aspect: [3, 4],
+      // allowsMultipleSelection can't combine with allowsEditing —
+      // the OS only gives a crop UI for single picks. Stick with
+      // single-pick here so the edit UI is available; power users
+      // who want bulk can add via camera or repeat the picker.
     });
     if (!result.canceled && result.assets?.length) {
       setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
       setPhotoSources((s) => [...s, ...result.assets.map(() => 'gallery')]);
     }
   };
+
+  const recordVideo = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera permission needed', 'Enable camera access in Settings → Card Shop.');
+      return;
+    }
+    // Short-video path for card inspection. 15s cap keeps the
+    // base64 payload and Cloudinary storage reasonable; most spins
+    // take 5-8s. allowsEditing surfaces the OS trim UI.
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      videoMaxDuration: 15,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets?.length) {
+      setVideoUri(result.assets[0].uri);
+    }
+  };
+  const [videoUri, setVideoUri] = useState(null);
 
   // Primary entry point for the "Add" buttons. Puts camera first —
   // in-app captures are the verified path; gallery is a backup for
@@ -557,6 +591,20 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           `${uploaded.length} of ${photos.length} will be uploaded.\n\n${photoFailures.join('\n')}`,
         );
       }
+      // Encode the optional video the same way. Videos are bigger
+      // (typically 2-6 MB) so this can take a second on slower
+      // devices — the 90s axios timeout set on register covers it.
+      let videoDataUrl;
+      if (videoUri) {
+        try {
+          const b64 = await FileSystem.readAsStringAsync(videoUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          videoDataUrl = `data:video/mp4;base64,${b64}`;
+        } catch (err) {
+          Alert.alert('Video read failed', err?.message || 'Could not read the recorded video.');
+        }
+      }
       return cardsApi.register({
         catalog_id: selectedCatalog.id,
         qr_insert_code: qrCode || undefined,
@@ -572,6 +620,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
         photo_urls: uploaded,
+        video_url: videoDataUrl || undefined,
       });
     },
     onSuccess: (res) => {
@@ -1231,12 +1280,47 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             ))}
           </ScrollView>
         </View>
+
+        {/* Short video — optional. Captured in-camera so the device
+            does the encoding, then base64-shipped to the API where
+            Cloudinary handles streaming transcode. 15s cap keeps
+            payload sizes sane; most corner/edge spins take 5-8s. */}
+        <View>
+          <SectionHeader title="Short Video (optional)" action={videoUri ? { label: 'Replace', onPress: recordVideo } : null} />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            Up to 15 seconds. Great for showing corners, edges, or surface in motion.
+          </Text>
+          {videoUri ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2 }}>
+              <Ionicons name="videocam" size={24} color={Colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: Colors.text, fontWeight: '600' }}>Video ready to upload</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 11 }} numberOfLines={1}>
+                  {videoUri.split('/').pop()}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setVideoUri(null)}>
+                <Ionicons name="close-circle" size={22} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={recordVideo} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.border }}>
+              <Ionicons name="videocam-outline" size={20} color={Colors.textMuted} />
+              <Text style={{ color: Colors.textMuted, fontWeight: '500' }}>Record a short video</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
 
       {/* Submit */}
       <View style={styles.submitBar}>
         <Button
-          title={photos.length > 0 ? `Register Card · ${photos.length} photo${photos.length === 1 ? '' : 's'}` : 'Register Card'}
+          title={(() => {
+            const parts = [];
+            if (photos.length) parts.push(`${photos.length} photo${photos.length === 1 ? '' : 's'}`);
+            if (videoUri) parts.push('1 video');
+            return parts.length ? `Register Card · ${parts.join(' + ')}` : 'Register Card';
+          })()}
           onPress={() => registerMutation.mutate()}
           loading={registerMutation.isPending}
           style={{ flex: 1 }}
@@ -1245,6 +1329,141 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
+
+// ============================================================
+// ZOOMABLE IMAGE VIEWER
+// ============================================================
+// Fullscreen modal for inspecting card photos. Pinch to zoom,
+// pan when zoomed, double-tap to toggle 1x/2.5x, swipe to switch
+// images. Pure gesture-handler + reanimated (both already native
+// in the APK) so no rebuild is required.
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+function ZoomableImage({ uri }) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const resetToOneX = () => {
+    scale.value = withTiming(1);
+    savedScale.value = 1;
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.max(1, Math.min(savedScale.value * e.scale, 6));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value <= 1.05) {
+        // Snap back to 1x when close — pan stays centered.
+        scale.value = withTiming(1);
+        savedScale.value = 1;
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      }
+    });
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      // Pan only when zoomed, otherwise the parent swipe-between-
+      // images gesture handles horizontal motion.
+      if (savedScale.value > 1) {
+        translateX.value = savedTranslateX.value + e.translationX;
+        translateY.value = savedTranslateY.value + e.translationY;
+      }
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (savedScale.value > 1) {
+        runOnJS(resetToOneX)();
+      } else {
+        scale.value = withTiming(2.5);
+        savedScale.value = 2.5;
+      }
+    });
+
+  const composed = Gesture.Simultaneous(pinch, pan, doubleTap);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={composed}>
+      <Animated.View style={{ width: SCREEN_W, height: SCREEN_H, justifyContent: 'center', alignItems: 'center' }}>
+        <Animated.Image
+          source={{ uri }}
+          style={[{ width: SCREEN_W, height: SCREEN_H * 0.8 }, style]}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+function ZoomableImageViewer({ visible, images, initialIndex = 0, onClose }) {
+  const [idx, setIdx] = React.useState(initialIndex);
+  React.useEffect(() => {
+    if (visible) setIdx(initialIndex);
+  }, [visible, initialIndex]);
+  if (!images?.length) return null;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: initialIndex * SCREEN_W, y: 0 }}
+          onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
+          style={{ flex: 1 }}
+        >
+          {images.map((uri, i) => (
+            <ZoomableImage key={`${uri}-${i}`} uri={uri} />
+          ))}
+        </ScrollView>
+
+        <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }} edges={['top']}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md }}>
+            <TouchableOpacity onPress={onClose} style={{ padding: Spacing.sm }}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>
+              {idx + 1} / {images.length}
+            </Text>
+            <View style={{ width: 44 }} />
+          </View>
+        </SafeAreaView>
+
+        <SafeAreaView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }} edges={['bottom']}>
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, textAlign: 'center', padding: Spacing.md }}>
+            Pinch to zoom · Double-tap to toggle · Swipe to switch
+          </Text>
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+}
 
 // ============================================================
 // CARD DETAIL
@@ -1301,6 +1520,12 @@ export const CardDetailScreen = ({ navigation, route }) => {
       ]
     );
   };
+
+  // Lightbox state — open with the tapped photo, swipe between
+  // all of the owner's uploaded photos (catalog stock images are
+  // intentionally excluded; they're lower-resolution thumbnails).
+  const [zoomOpen, setZoomOpen] = React.useState(false);
+  const [zoomIndex, setZoomIndex] = React.useState(0);
 
   if (isLoading || !card) return <LoadingScreen />;
 
@@ -1360,11 +1585,18 @@ export const CardDetailScreen = ({ navigation, route }) => {
               </View>
             );
           }
+          // Tap any owner photo → fullscreen pinch-zoom. The catalog
+          // stock image stays a non-interactive fallback.
+          const openLightbox = (i) => { setZoomIndex(i); setZoomOpen(true); };
           if (ownPhotos.length === 1) {
             return (
-              <View style={styles.cardImageArea}>
+              <TouchableOpacity style={styles.cardImageArea} activeOpacity={0.85} onPress={() => openLightbox(0)}>
                 <Image source={{ uri: ownPhotos[0] }} style={styles.cardImage} resizeMode="contain" />
-              </View>
+                <View style={styles.zoomHint}>
+                  <Ionicons name="expand" size={12} color="#fff" />
+                  <Text style={styles.zoomHintText}>Tap to zoom</Text>
+                </View>
+              </TouchableOpacity>
             );
           }
           return (
@@ -1375,16 +1607,50 @@ export const CardDetailScreen = ({ navigation, route }) => {
               style={styles.cardImageArea}
             >
               {ownPhotos.map((uri, i) => (
-                <Image
-                  key={`${uri}-${i}`}
-                  source={{ uri }}
-                  style={styles.cardImage}
-                  resizeMode="contain"
-                />
+                <TouchableOpacity key={`${uri}-${i}`} activeOpacity={0.85} onPress={() => openLightbox(i)}>
+                  <Image source={{ uri }} style={styles.cardImage} resizeMode="contain" />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           );
         })()}
+
+        {/* Short video — Cloudinary auto-generates a poster frame
+            at $cloudinaryVideoUrl.replace('.mp4', '.jpg'). Tap opens
+            the system default video player / browser so we can play
+            without a native player module (no expo-av in this APK). */}
+        {card.video_url ? (() => {
+          const posterUrl = String(card.video_url).replace(/\.(mp4|mov|webm|m4v)$/i, '.jpg');
+          return (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(card.video_url).catch(() => Alert.alert('Could not open video', 'Try again or open in a browser.'))}
+              style={{ marginHorizontal: Spacing.base, marginTop: Spacing.md, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, backgroundColor: '#000' }}
+            >
+              <Image source={{ uri: posterUrl }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
+              <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', top: 0, bottom: 0, left: 0, right: 0 }}>
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 40, padding: 14 }}>
+                  <Ionicons name="play" size={28} color="#fff" />
+                </View>
+              </View>
+              <View style={{ position: 'absolute', bottom: 8, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>VIDEO</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })() : null}
+
+        <ZoomableImageViewer
+          visible={zoomOpen}
+          images={(() => {
+            const list = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+            if (card.own_image_front) list.unshift(card.own_image_front);
+            if (card.own_image_back) list.push(card.own_image_back);
+            return list;
+          })()}
+          initialIndex={zoomIndex}
+          onClose={() => setZoomOpen(false)}
+        />
 
         <View style={{ padding: Spacing.base }}>
           {/* Title block */}
@@ -1637,13 +1903,19 @@ export const EditCardScreen = ({ navigation, route }) => {
       Alert.alert('Camera permission needed', 'Enable camera access in Settings → Card Shop → Permissions.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85,
+      allowsEditing: true, aspect: [3, 4],
+    });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
     }
   };
   const pickFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, allowsMultipleSelection: true });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8,
+      allowsEditing: true, aspect: [3, 4],
+    });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
     }
@@ -1654,6 +1926,19 @@ export const EditCardScreen = ({ navigation, route }) => {
       { text: 'Choose from gallery', onPress: pickFromGallery },
       { text: 'Cancel', style: 'cancel' },
     ]);
+  };
+  const [newVideoUri, setNewVideoUri] = useState(null);
+  const recordVideo = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera permission needed', 'Enable camera access in Settings → Card Shop.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos, videoMaxDuration: 15,
+      quality: 0.8, allowsEditing: true,
+    });
+    if (!result.canceled && result.assets?.length) setNewVideoUri(result.assets[0].uri);
   };
 
   const saveMutation = useMutation({
@@ -1676,6 +1961,15 @@ export const EditCardScreen = ({ navigation, route }) => {
         })
       );
       const merged = [...existing, ...newlyConverted.filter(Boolean)];
+      let videoPayload;
+      if (newVideoUri) {
+        try {
+          const b64 = await FileSystem.readAsStringAsync(newVideoUri, { encoding: FileSystem.EncodingType.Base64 });
+          videoPayload = `data:video/mp4;base64,${b64}`;
+        } catch (err) {
+          Alert.alert('Video read failed', err?.message || 'Could not read the recorded video.');
+        }
+      }
       return cardsApi.update(cardId, {
         status: form.status,
         condition: form.condition,
@@ -1687,6 +1981,7 @@ export const EditCardScreen = ({ navigation, route }) => {
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
         photo_urls: merged,
+        video_url: videoPayload || undefined,
       });
     },
     onSuccess: () => {
@@ -1859,6 +2154,28 @@ export const EditCardScreen = ({ navigation, route }) => {
             ))}
           </ScrollView>
         </View>
+
+        {/* Video — replaces the existing one if the user records. */}
+        <View>
+          <SectionHeader title="Short Video" action={newVideoUri ? { label: 'Replace', onPress: recordVideo } : null} />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            {card.video_url ? 'A video is already attached — recording replaces it.' : 'Up to 15 seconds of the card in motion.'}
+          </Text>
+          {newVideoUri ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2 }}>
+              <Ionicons name="videocam" size={24} color={Colors.accent} />
+              <Text style={{ color: Colors.text, flex: 1, fontWeight: '600' }}>New video ready</Text>
+              <TouchableOpacity onPress={() => setNewVideoUri(null)}>
+                <Ionicons name="close-circle" size={22} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={recordVideo} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.border }}>
+              <Ionicons name="videocam-outline" size={20} color={Colors.textMuted} />
+              <Text style={{ color: Colors.textMuted, fontWeight: '500' }}>{card.video_url ? 'Record replacement video' : 'Record a short video'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
 
       <View style={styles.submitBar}>
@@ -1954,6 +2271,13 @@ const styles = StyleSheet.create({
   },
   cardImage: { width: 200, height: 280 },
   cardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  zoomHint: {
+    position: 'absolute', top: Spacing.sm, right: Spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 4,
+    paddingHorizontal: 6, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  zoomHintText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   detailPlayer: { color: Colors.text, fontSize: Typography.xl, fontWeight: Typography.heavy, marginBottom: 2 },
   detailSet: { color: Colors.textMuted, fontSize: Typography.base },
   detailParallel: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.medium, marginTop: 2 },
