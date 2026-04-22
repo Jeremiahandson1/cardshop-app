@@ -40,7 +40,19 @@ export const LoginScreen = ({ navigation }) => {
         });
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
+      // Verbose error surfacing while we diagnose the "login failed" report.
+      // Shows server error if present, else the network-level clue so the
+      // user can read back exactly what's happening.
+      const parts = [];
+      if (err.response?.data?.error) parts.push(err.response.data.error);
+      else {
+        parts.push('Login failed.');
+        if (err.code) parts.push('code=' + err.code);
+        if (err.message) parts.push(String(err.message).slice(0, 120));
+        if (err.response?.status) parts.push('http=' + err.response.status);
+        if (!err.response && err.request) parts.push('request never returned');
+      }
+      setError(parts.join(' · '));
     } finally {
       setLoading(false);
     }
