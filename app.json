@@ -60,7 +60,8 @@
       "expo-notifications",
       "react-native-nfc-manager",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "scheme": "cardshop",
     "extra": {
@@ -69,6 +70,12 @@
       "eas": {
         "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/810f9aa8-ed0a-44e8-adb3-e08db420e29a"
     }
   }
 }
