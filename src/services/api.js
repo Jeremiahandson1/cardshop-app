@@ -112,6 +112,11 @@ export const catalogApi = {
   create: (data) => api.post('/catalog', data),
   priceHistory: (id, params) => api.get(`/catalog/${id}/price-history`, { params }),
   parallels: (id) => api.get(`/catalog/${id}/parallels`),
+  // Browse-by-set endpoints, used after the manufacturer-checklist
+  // importer fills card_catalog. Distinct (mfr, year, set) + full
+  // card list for a specific set.
+  listSets: (params) => api.get('/catalog/sets', { params }),
+  setCards: (params) => api.get('/catalog/sets/cards', { params }),
 };
 
 // ============================================================
