@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, Image, Alert
+  FlatList, Image, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,7 +40,7 @@ const CascadePicker = ({
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
-  const { data: options, isLoading } = useQuery({
+  const { data: options, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['catalog-filter', cascadeDim, cascade, cascadeQuery],
     queryFn: () =>
       catalogApi
@@ -48,6 +48,13 @@ const CascadePicker = ({
         .then((r) => r.data?.values || []),
     // Keep typeahead snappy but not thrash-y while the user types.
     staleTime: 10_000,
+    // Distinct-over-1.7M-rows can take several seconds cold. Fail
+    // fast on error so the user sees a retry button instead of
+    // waiting through exponential backoff thinking nothing is
+    // happening. Keep previous data visible during refetch so the
+    // UI doesn't flash empty between steps.
+    retry: 1,
+    keepPreviousData: true,
   });
 
   const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
@@ -167,8 +174,31 @@ const CascadePicker = ({
         keyExtractor={(item, i) => String(item) + i}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.xxxl }}
+        ListHeaderComponent={
+          isFetching && (options?.length ?? 0) > 0 ? (
+            <Text style={{ color: Colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: Spacing.xs }}>
+              Updating…
+            </Text>
+          ) : null
+        }
         ListEmptyComponent={
-          isLoading ? null : (
+          isLoading || isFetching ? (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.sm }}>
+              <ActivityIndicator color={Colors.accent} />
+              <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                Loading {cascadeLabel[cascadeDim].toLowerCase()} options…
+              </Text>
+            </View>
+          ) : isError ? (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.md }}>
+              <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>
+                Couldn't load options. Check your connection.
+              </Text>
+              <TouchableOpacity onPress={() => refetch()}>
+                <Text style={{ color: Colors.accent, fontWeight: '600' }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.md }}>
               <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>
                 No matches for the filters so far.
