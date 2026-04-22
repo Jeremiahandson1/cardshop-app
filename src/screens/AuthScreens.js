@@ -286,21 +286,31 @@ export const ForgotPasswordScreen = ({ navigation }) => {
     }
     setError('');
     setLoading(true);
+
+    // Only the API call itself should be able to raise "couldn't send"
+    // to the user. A throw from showMessage/navigation after the server
+    // said 200 must NOT look like a send failure — the email was sent.
+    let apiOk = false;
     try {
       await authApi.forgotPassword(trimmed);
+      apiOk = true;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not send the reset email. Try again.');
+    } finally {
+      setLoading(false);
+    }
+
+    if (!apiOk) return;
+
+    try {
       showMessage({
         message: 'Check your email for a reset link.',
         type: 'success',
         duration: 4000,
       });
-      navigation.goBack();
-    } catch (err) {
-      // Backend is designed to always return 200, so a failure here is a
-      // network/server issue — surface it without leaking account existence.
-      setError(err.response?.data?.error || 'Could not send the reset email. Try again.');
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* toast is best-effort */ }
+
+    try { navigation.goBack(); } catch { /* same */ }
   };
 
   return (
