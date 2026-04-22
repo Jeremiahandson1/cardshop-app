@@ -162,19 +162,6 @@ export const qrApi = {
   generateBatch: (data) => api.post('/qr/generate-batch', data),
 };
 
-// ============================================================
-// MESSAGES
-// ============================================================
-// Card-scoped in-app chat. Every message persists for dispute
-// resolution (no edit / delete). Send goes through /messages
-// which find-or-creates a conversation keyed on the two users +
-// optional owned_card_id.
-export const messagesApi = {
-  conversations: () => api.get('/messages/conversations'),
-  thread: (conversationId) => api.get(`/messages/conversations/${conversationId}`),
-  send: ({ to_user_id, to_username, owned_card_id, body }) =>
-    api.post('/messages', { to_user_id, to_username, owned_card_id, body }),
-};
 
 // ============================================================
 // WANT LIST
@@ -188,10 +175,18 @@ export const wantListApi = {
 // ============================================================
 // MESSAGES
 // ============================================================
+// Card-scoped in-app chat. Every message persists for dispute
+// resolution (no edit / delete). Send goes through /messages
+// which find-or-creates a conversation keyed on the two users +
+// optional owned_card_id.
 export const messagesApi = {
   conversations: () => api.get('/messages/conversations'),
+  thread: (conversationId) => api.get(`/messages/conversations/${conversationId}`),
+  // Back-compat alias used by a couple of older callers; prefer
+  // .thread() for new code.
   getMessages: (id) => api.get(`/messages/conversations/${id}`),
-  send: (data) => api.post('/messages', data),
+  send: ({ to_user_id, to_username, owned_card_id, body }) =>
+    api.post('/messages', { to_user_id, to_username, owned_card_id, body }),
 };
 
 // ============================================================
