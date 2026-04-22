@@ -1165,17 +1165,58 @@ export const CardDetailScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Card image */}
-        <View style={styles.cardImageArea}>
-          {card.front_image_url
-            ? <Image source={{ uri: card.front_image_url }} style={styles.cardImage} resizeMode="contain" />
-            : (
-              <View style={styles.cardImagePlaceholder}>
-                <Text style={{ fontSize: 60 }}>🃏</Text>
+        {/* Card image — prefer the owner's uploaded photos (photo_urls
+            first, then the dedicated image_front/back fields) because
+            most Panini/Topps catalog rows ship with no stock image.
+            Fall back to the catalog image only if the user didn't
+            upload anything. Show all photos in a horizontal carousel
+            if there's more than one. */}
+        {(() => {
+          const ownPhotos = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+          if (card.own_image_front) ownPhotos.unshift(card.own_image_front);
+          if (card.own_image_back) ownPhotos.push(card.own_image_back);
+          const catalogFallback = card.front_image_url;
+          if (ownPhotos.length === 0 && !catalogFallback) {
+            return (
+              <View style={styles.cardImageArea}>
+                <View style={styles.cardImagePlaceholder}>
+                  <Text style={{ fontSize: 60 }}>🃏</Text>
+                </View>
               </View>
-            )
+            );
           }
-        </View>
+          if (ownPhotos.length === 0) {
+            return (
+              <View style={styles.cardImageArea}>
+                <Image source={{ uri: catalogFallback }} style={styles.cardImage} resizeMode="contain" />
+              </View>
+            );
+          }
+          if (ownPhotos.length === 1) {
+            return (
+              <View style={styles.cardImageArea}>
+                <Image source={{ uri: ownPhotos[0] }} style={styles.cardImage} resizeMode="contain" />
+              </View>
+            );
+          }
+          return (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.base }}
+              style={styles.cardImageArea}
+            >
+              {ownPhotos.map((uri, i) => (
+                <Image
+                  key={`${uri}-${i}`}
+                  source={{ uri }}
+                  style={styles.cardImage}
+                  resizeMode="contain"
+                />
+              ))}
+            </ScrollView>
+          );
+        })()}
 
         <View style={{ padding: Spacing.base }}>
           {/* Title block */}
