@@ -125,6 +125,11 @@ export const catalogApi = {
   // Example: filterValues({ dimension: 'set_name', sport: 'football', year: 2025, manufacturer: 'Panini' })
   //   → { values: ['Prizm', 'Mosaic', ...] }
   filterValues: (params) => api.get('/catalog/filter-values', { params }),
+  // POST a base64 card photo, get ranked catalog candidates.
+  // Returns 503 + code='ocr_not_configured' when GOOGLE_VISION_API_KEY
+  // isn't set on the API — the Scan button stays visible but
+  // raises an alert explaining it's coming soon.
+  ocrSuggest: (image_base64) => api.post('/catalog/ocr-suggest', { image_base64 }, { timeout: 30_000 }),
 };
 
 // ============================================================

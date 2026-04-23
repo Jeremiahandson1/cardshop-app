@@ -47,7 +47,7 @@ const useEbayStatus = () => {
 const CascadePicker = ({
   navigation, cascade, setCascade, cascadeDim, setCascadeDim,
   cascadeQuery, setCascadeQuery, cascadeOrder, cascadeLabel,
-  onComplete, onManualFallback,
+  onComplete, onManualFallback, onScan,
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
@@ -185,7 +185,13 @@ const CascadePicker = ({
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Register Card</Text>
-        <View style={{ width: 22 }} />
+        {onScan ? (
+          <TouchableOpacity onPress={onScan} accessibilityLabel="Scan card">
+            <Ionicons name="scan-outline" size={22} color={Colors.accent} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
       </View>
 
       {/* Breadcrumbs of what's been picked so far. */}
@@ -760,6 +766,63 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         setCascadeQuery={setCascadeQuery}
         cascadeOrder={CASCADE_ORDER}
         cascadeLabel={CASCADE_LABEL}
+        onScan={async () => {
+          // Quick-scan path: camera → OCR → match → pre-select
+          // catalog row. If confidence is high, jump straight to
+          // details/serial. If low, drop filters into the cascade
+          // so the user confirms the player/set and moves on.
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('Camera needed', 'Enable camera to scan a card.');
+            return;
+          }
+          const pick = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.75,
+            allowsEditing: true,
+            aspect: [3, 4],
+            base64: true,
+          });
+          if (pick.canceled || !pick.assets?.length) return;
+          const asset = pick.assets[0];
+          const b64 = asset.base64
+            || await FileSystem.readAsStringAsync(asset.uri, {
+                 encoding: FileSystem.EncodingType.Base64,
+               });
+          try {
+            const res = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${b64}`);
+            const cands = res.data?.candidates || [];
+            const best = cands[0];
+            if (best && best.confidence >= 0.65) {
+              setSelectedCatalog(best);
+              setPhotos((p) => [...p, asset.uri]);
+              setPhotoSources((s) => [...s, 'camera']);
+              setStep(best.print_run ? 'serial' : 'details');
+            } else if (cands.length) {
+              // Pre-fill cascade with the top candidate's set + player,
+              // let the user narrow from there.
+              setCascade({
+                sport: best.sport || undefined,
+                year: best.year || undefined,
+                manufacturer: best.manufacturer || undefined,
+                set_name: best.set_name || undefined,
+                player_name: best.player_name || undefined,
+              });
+              setCascadeDim('card_number');
+              setPhotos((p) => [...p, asset.uri]);
+              setPhotoSources((s) => [...s, 'camera']);
+            } else {
+              Alert.alert('Scan inconclusive', 'Could not match this card. Use the cascade to find it.');
+            }
+          } catch (err) {
+            const code = err?.response?.data?.code;
+            if (code === 'ocr_not_configured') {
+              Alert.alert('Scan coming soon', 'Cloud OCR isn\u2019t enabled yet. Use the cascade for now.');
+            } else {
+              Alert.alert('Scan failed', err?.response?.data?.error || err?.message || 'Try again.');
+            }
+          }
+        }}
         onComplete={async (filters) => {
           // Resolve to one catalog row and advance. If we find it,
           // jump straight to owned-card details. If the cascade
