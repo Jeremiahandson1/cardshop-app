@@ -416,6 +416,11 @@ export const intelligenceApi = {
         ...(grade != null && grade !== '' ? { grade } : {}),
       },
     }),
+  // Wipes the caller's snapshots + scoped eBay cache so the next
+  // list() call rebuilds every row from fresh comps. Used after
+  // a provider cred swap (sandbox → production) or when the user
+  // wants to force-rebuild intelligence.
+  refresh: () => api.post('/collection/intelligence/refresh'),
 };
 
 // ============================================================

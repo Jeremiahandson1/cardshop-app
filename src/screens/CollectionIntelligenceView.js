@@ -99,7 +99,27 @@ export const CollectionIntelligenceView = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
   const [selected, setSelected] = useState(null);
+
+  // Force-rebuild all snapshots from scratch. Wipes the user's
+  // cached intelligence rows + scoped eBay cache entries so the
+  // next list() call pulls fresh comps. Used after a provider-
+  // side change (e.g. eBay sandbox → production) where cached
+  // rows are locked in "insufficient" and won't refresh on their
+  // own until TTL expires.
+  const rebuild = useCallback(async () => {
+    try {
+      setRebuilding(true);
+      await intelligenceApi.refresh();
+      await fetchPage({ reset: true, currentFilter: activeFilterRef.current });
+    } catch (err) {
+      Alert.alert('Rebuild failed', err?.response?.data?.error || err?.message || 'Try again.');
+    } finally {
+      setRebuilding(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Prevent stale responses from overwriting fresher ones when the filter
   // changes mid-flight. We tag each in-flight request with the filter it
@@ -194,8 +214,38 @@ export const CollectionIntelligenceView = () => {
     );
   }, [loadingMore]);
 
+  // Count how many cards currently have insufficient data so we
+  // can prompt for a rebuild when most/all cards are empty —
+  // usually means cached snapshots landed before comps data was
+  // available and are stuck until TTL.
+  const insufficientCount = useMemo(
+    () => rows.filter((r) => r.confidence === 'insufficient').length,
+    [rows]
+  );
+  const needsRebuild = rows.length > 0 && insufficientCount === rows.length;
+
   return (
     <View style={styles.container}>
+      {/* Rebuild banner — only surfaces when every visible row is
+          "insufficient" (data arrived after the cache was filled). */}
+      {needsRebuild ? (
+        <TouchableOpacity
+          onPress={rebuild}
+          disabled={rebuilding}
+          style={styles.rebuildBanner}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.rebuildTitle}>
+            {rebuilding ? 'Rebuilding intelligence…' : 'No comps on record yet'}
+          </Text>
+          <Text style={styles.rebuildBody}>
+            {rebuilding
+              ? 'Hitting eBay for fresh sold data.'
+              : 'Tap to rebuild snapshots from live comps. First run can take 30–60s.'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Filter chips */}
       <FlatList
         horizontal
@@ -368,5 +418,26 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: Spacing.lg,
     alignItems: 'center',
+  },
+
+  rebuildBanner: {
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.accent + '15',
+    borderWidth: 1,
+    borderColor: Colors.accent + '55',
+  },
+  rebuildTitle: {
+    color: Colors.accent,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+    marginBottom: 2,
+  },
+  rebuildBody: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
   },
 });
