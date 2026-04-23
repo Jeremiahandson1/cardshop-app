@@ -187,6 +187,40 @@ const badgeStyles = StyleSheet.create({
 // ============================================================
 // CARD TILE
 // ============================================================
+// Verification badge for a card's claim. Three states, each a
+// clear visual: green check when OCR matched the cert, amber
+// circle for "claimed but not photo-verified", red warning when
+// a counter-claim is open.
+export const VerificationBadge = ({ status, size = 'md', style }) => {
+  const MAP = {
+    verified_by_photo:   { icon: 'checkmark-circle', color: '#4CAF50', label: 'Verified' },
+    claimed_unverified:  { icon: 'ellipse-outline',  color: '#D4A24C', label: 'Claimed' },
+    disputed:            { icon: 'warning',          color: '#E74C3C', label: 'Disputed' },
+  };
+  const cfg = MAP[status] || MAP.claimed_unverified;
+  const fontSize = size === 'sm' ? 10 : size === 'lg' ? 13 : 11;
+  const iconSize = size === 'sm' ? 12 : size === 'lg' ? 16 : 14;
+  return (
+    <View style={[{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: cfg.color,
+      backgroundColor: cfg.color + '18',
+      alignSelf: 'flex-start',
+    }, style]}>
+      <Ionicons name={cfg.icon} size={iconSize} color={cfg.color} />
+      <Text style={{ color: cfg.color, fontWeight: '600', fontSize, letterSpacing: 0.3 }}>
+        {cfg.label}
+      </Text>
+    </View>
+  );
+};
+
 export const CardTile = ({ card, onPress, style }) => {
   // Prefer the owner's uploaded photo over the catalog stock image
   // because most Panini/Topps rows ship with no image at all. Order:
@@ -217,6 +251,11 @@ export const CardTile = ({ card, onPress, style }) => {
           <Text style={cardTileStyles.rookieText}>RC</Text>
         </View>
       )}
+      {card.cert_number && card.verification_status ? (
+        <View style={{ position: 'absolute', top: 6, left: 6 }}>
+          <VerificationBadge status={card.verification_status} size="sm" />
+        </View>
+      ) : null}
     </View>
     <View style={cardTileStyles.info}>
       <Text style={cardTileStyles.player} numberOfLines={1}>{card.player_name}</Text>

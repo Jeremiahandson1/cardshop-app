@@ -152,6 +152,10 @@ export const cardsApi = {
   update: (id, data) => api.patch(`/cards/${id}`, data, { timeout: 90_000 }),
   delete: (id) => api.delete(`/cards/${id}`),
   history: (id) => api.get(`/cards/${id}/history`),
+  // "This is actually my card, not theirs." Files a counter-claim
+  // on a graded cert. Only useful for non-owners viewing a card.
+  counterClaim: (id, { reason, evidence_url } = {}) =>
+    api.post(`/cards/${id}/counter-claim`, { reason, evidence_url }),
 };
 
 // ============================================================

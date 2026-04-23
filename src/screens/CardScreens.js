@@ -19,7 +19,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider } from '../components/ui';
+import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 
 // Shared hook for eBay feature-flag + connection state. Cached in
@@ -2065,6 +2065,14 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
           <Divider />
 
+          {/* Verification badge for graded cards — surfaces
+              claim status at a glance. Raw cards skip this. */}
+          {card.cert_number && card.verification_status ? (
+            <View style={{ flexDirection: 'row', marginBottom: Spacing.sm }}>
+              <VerificationBadge status={card.verification_status} size="md" />
+            </View>
+          ) : null}
+
           {/* Grade or condition with cert link */}
           {card.grading_company && card.grading_company !== 'raw' ? (
             <View style={styles.gradeBlock}>
@@ -2275,6 +2283,67 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 Message {card.owner_display_name || card.owner_username}
               </Text>
             </TouchableOpacity>
+          ) : null}
+
+          {/* "This is my card" counter-claim — graded cards only,
+              non-owners only. Fraud-deterrent: the real owner of a
+              slab can flag it if they see their cert registered by
+              someone else. Flips the card to 'disputed' pending
+              admin review. */}
+          {card.owner_id && currentUserId && card.owner_id !== currentUserId
+            && card.cert_number && card.verification_status !== 'disputed' ? (
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                'This is my card?',
+                `Filing a counter-claim tells us you're the real owner of ${card.grading_company?.toUpperCase()} cert #${card.cert_number}. ` +
+                'An admin will review. Be ready to show proof — photos of the slab in your hand with a timestamped note work best.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'File counter-claim',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await cardsApi.counterClaim(card.id, { reason: 'User-initiated counter-claim from CardDetail' });
+                        queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+                        Alert.alert(
+                          'Counter-claim filed',
+                          'The card is now marked disputed. Admin will reach out. Gather your evidence in the meantime.'
+                        );
+                      } catch (err) {
+                        Alert.alert(
+                          'Could not file',
+                          err?.response?.data?.error || 'Try again.'
+                        );
+                      }
+                    },
+                  },
+                ]
+              )}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.sm,
+                borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.error,
+              }}
+            >
+              <Ionicons name="flag-outline" size={18} color={Colors.error} />
+              <Text style={{ color: Colors.error, fontWeight: '600' }}>
+                This is my card
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {/* Trust-nudge copy — visible to everyone, draws extra
+              attention when the claim isn't photo-verified. */}
+          {card.cert_number && card.verification_status === 'claimed_unverified' ? (
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginTop: Spacing.sm }}>
+              Not photo-verified. Ask to see the slab in hand before trading.
+            </Text>
+          ) : null}
+          {card.verification_status === 'disputed' ? (
+            <Text style={{ color: Colors.error, fontSize: 12, textAlign: 'center', marginTop: Spacing.sm, fontWeight: '600' }}>
+              ⚠ A counter-claim is open on this card. Hold off on trades until it resolves.
+            </Text>
           ) : null}
 
           {/* Transfer button */}

@@ -21,6 +21,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, EmptyState, LoadingScreen,
   ScreenHeader, SectionHeader, Divider, CardTile,
+  VerificationBadge,
 } from '../components/ui';
 import { FairnessPanel } from '../components/FairnessPanel';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -177,6 +178,26 @@ export const TradeBoardScreen = ({ navigation }) => {
           <Text numberOfLines={1} style={[styles.listingTitle, { flex: 1 }]}>{formatCardTitle(item)}</Text>
           <VerifiedBadge status={item.verification_status} />
         </View>
+        {/* Cert-claim verification badge — only shows when the
+            underlying card is graded. Separate signal from the
+            listing photo verification above. */}
+        {item.cert_verification_status ? (
+          <View style={{ marginTop: 4 }}>
+            <VerificationBadge status={item.cert_verification_status} size="sm" />
+          </View>
+        ) : null}
+        {/* Trust nudge — drives buyers to ask for in-hand proof
+            before committing to an unverified or disputed claim. */}
+        {item.cert_verification_status === 'claimed_unverified' ? (
+          <Text style={{ color: Colors.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 3 }}>
+            Not photo-verified — ask to see it in hand.
+          </Text>
+        ) : null}
+        {item.cert_verification_status === 'disputed' ? (
+          <Text style={{ color: Colors.error, fontSize: 11, fontWeight: '600', marginTop: 3 }}>
+            Counter-claim open — hold off until resolved.
+          </Text>
+        ) : null}
         {item.parallel ? (
           <Text numberOfLines={1} style={styles.listingParallel}>{item.parallel}</Text>
         ) : null}
