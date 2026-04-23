@@ -1752,31 +1752,64 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
 
-          {/* Market snapshot — live eBay asks (not sold). Sold data
-              lives on third-party tools; we surface them as a quick
-              "research this card" link list so collectors don't have
-              to guess where to verify recent sale prices. */}
+          {/* Market snapshot — sold first (when available from the
+              Finding API), active asks second. We only count
+              auction closes in the sold median because Fixed-Price
+              / BIN sales show the listing price, not the accepted
+              Best Offer — that's what 130point gets right and raw
+              eBay sold search doesn't. Research links stay visible
+              below so collectors can cross-reference. */}
           {asks ? (
             <View style={{ marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Current eBay asks
-              </Text>
-              {asks.summary ? (
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <Text style={{ color: Colors.text, fontSize: 22, fontWeight: Typography.semibold }}>
-                    ${Number(asks.summary.median).toFixed(0)}
+              {/* Verified sold block (auction closes) */}
+              {asks.sold?.verified ? (
+                <>
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Recently sold (verified auction closes)
                   </Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
-                    median · ${Number(asks.summary.min).toFixed(0)}–${Number(asks.summary.max).toFixed(0)} range · {asks.summary.count} active
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                    <Text style={{ color: Colors.text, fontSize: 22, fontWeight: Typography.semibold }}>
+                      ${Number(asks.sold.verified.median).toFixed(0)}
+                    </Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                      median · ${Number(asks.sold.verified.min).toFixed(0)}–${Number(asks.sold.verified.max).toFixed(0)} · {asks.sold.verified.count} sale{asks.sold.verified.count === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                </>
+              ) : null}
+
+              {/* Asking-only warning — BIN sales where the "sold at"
+                  price is actually the listing price, not the accepted
+                  Best Offer. eBay hides the accepted-offer amount. */}
+              {asks.sold?.asking_only ? (
+                <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: asks.sold?.verified ? 8 : 0, fontStyle: 'italic' }}>
+                  ⚠ {asks.sold.asking_only.count} more sold via Buy-It-Now (asking price shown, actual sale may be lower if a Best Offer was accepted).
+                </Text>
+              ) : null}
+
+              {/* Active asks — shown as a secondary signal */}
+              {asks.asks?.summary ? (
+                <View style={{ marginTop: (asks.sold?.verified || asks.sold?.asking_only) ? 12 : 0 }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Current asks
+                  </Text>
+                  <Text style={{ color: Colors.text, fontSize: 14 }}>
+                    <Text style={{ fontWeight: Typography.semibold }}>${Number(asks.asks.summary.median).toFixed(0)}</Text>
+                    <Text style={{ color: Colors.textMuted }}> median · ${Number(asks.asks.summary.min).toFixed(0)}–${Number(asks.asks.summary.max).toFixed(0)} · {asks.asks.summary.count} active</Text>
                   </Text>
                 </View>
-              ) : (
+              ) : null}
+
+              {/* Empty state */}
+              {!asks.sold?.verified && !asks.sold?.asking_only && !asks.asks?.summary ? (
                 <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
-                  No active eBay listings match this card right now.
+                  No recent eBay data for this card. Check research tools below.
                 </Text>
-              )}
-              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 8, fontStyle: 'italic' }}>
-                These are live asks, not sold prices. Check recent sales on:
+              ) : null}
+
+              {/* Research links — always visible */}
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 12, fontStyle: 'italic' }}>
+                Cross-check on:
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                 {(asks.research_links || []).map((link) => (
