@@ -259,8 +259,13 @@ export const TradeBoardScreen = ({ navigation }) => {
         }
       />
 
-      {/* Scope tabs */}
-      <View style={styles.scopeTabs}>
+      {/* Scope tabs — horizontal scroll so nothing gets cut off on
+          narrow phones (5 tabs + "Groups (N)" easily overflows). */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scopeTabs}
+      >
         <ScopeTab label="All" active={scope === 'all'} onPress={() => { setScope('all'); setGroupId(null); }} />
         <ScopeTab label="Global" active={scope === 'global'} onPress={() => { setScope('global'); setGroupId(null); }} />
         <ScopeTab label="Nearby" active={scope === 'nearby'} onPress={enableNearby} />
@@ -270,7 +275,7 @@ export const TradeBoardScreen = ({ navigation }) => {
           active={scope === 'group'}
           onPress={() => navigation.navigate('TradeGroupsList')}
         />
-      </View>
+      </ScrollView>
 
       {/* Nearby filter bar */}
       {scope === 'nearby' && nearbyLocation ? (
