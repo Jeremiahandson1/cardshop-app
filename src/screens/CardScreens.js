@@ -589,45 +589,59 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       });
       const payload = res.data || {};
       setCertLookupResult(payload);
-
-      if (payload.already_claimed) {
-        // Stop here — duplicate cert. Payload is displayed below
-        // the form so the user sees who claimed it.
-        return;
-      }
-
-      // Lock grading fields on the owned-card form either way.
-      setForm((f) => ({
-        ...f,
-        grading_company: certForm.company,
-        cert_number: cert,
-        grade: payload.slab?.grade != null ? String(payload.slab.grade) : f.grade,
-      }));
-
-      if (payload.slab && payload.catalog_match) {
-        // High-confidence: we have slab data AND a catalog row.
-        setSelectedCatalog(payload.catalog_match);
-        setStep('details');
-        return;
-      }
-
-      // Otherwise drop to manual entry with everything we know
-      // pre-filled. The user confirms / corrects from there.
-      setManualForm((f) => ({
-        ...f,
-        sport:          payload.slab?.sport || f.sport,
-        player_name:    payload.slab?.player_name || f.player_name,
-        year:           payload.slab?.year ? String(payload.slab.year) : f.year,
-        manufacturer:   payload.slab?.brand || payload.slab?.set_name || f.manufacturer,
-        set_name:       payload.slab?.set_name || f.set_name,
-        card_number:    payload.slab?.card_number || f.card_number,
-      }));
-      setStep('manual_entry');
+      // Stay on the cert_entry screen — the preview block
+      // renders below the form so the user can confirm this is
+      // their card before we proceed. Duplicate-claim warning
+      // also shows there; any next-step routing happens via the
+      // "Confirm & continue" button in the preview.
     } catch (err) {
       Alert.alert('Lookup failed', err?.response?.data?.error || err?.message || 'Try again.');
     } finally {
       setCertLookupBusy(false);
     }
+  };
+
+  // Invoked from the preview block's "Confirm & continue" button.
+  // Fans out to the same four outcomes runCertLookup used to do
+  // inline — now separated so the user decides to proceed.
+  const confirmCertLookup = () => {
+    const payload = certLookupResult;
+    const cert = certForm.cert_number.trim();
+    if (!payload || payload.already_claimed) return;
+
+    // Lock grading fields on the owned-card form. If PSA returned
+    // a front image, also pre-stage it as the first registered
+    // photo so the user isn't starting from scratch.
+    setForm((f) => ({
+      ...f,
+      grading_company: certForm.company,
+      cert_number: cert,
+      grade: payload.slab?.grade != null ? String(payload.slab.grade) : f.grade,
+    }));
+    if (payload.slab?.front_image_url) {
+      setPhotos((p) => [...p, payload.slab.front_image_url]);
+      setPhotoSources((s) => [...s, 'grading_service']);
+    }
+    if (payload.slab?.back_image_url) {
+      setPhotos((p) => [...p, payload.slab.back_image_url]);
+      setPhotoSources((s) => [...s, 'grading_service']);
+    }
+
+    if (payload.slab && payload.catalog_match) {
+      setSelectedCatalog(payload.catalog_match);
+      setStep('details');
+      return;
+    }
+    setManualForm((f) => ({
+      ...f,
+      sport:          payload.slab?.sport || f.sport,
+      player_name:    payload.slab?.player_name || f.player_name,
+      year:           payload.slab?.year ? String(payload.slab.year) : f.year,
+      manufacturer:   payload.slab?.brand || payload.slab?.set_name || f.manufacturer,
+      set_name:       payload.slab?.set_name || f.set_name,
+      card_number:    payload.slab?.card_number || f.card_number,
+    }));
+    setStep('manual_entry');
   };
 
   const goManualEntry = () => {
@@ -1036,6 +1050,83 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   ? 'PSA has no record of that cert. You can still continue manually.'
                   : 'Could not reach the grading service just now. You can still continue manually.'}
             </Text>
+          ) : null}
+
+          {/* Preview block — renders after a successful lookup so
+              the user confirms this is actually their card before
+              we proceed with registration. Shows the PSA scans
+              (if available) and a summary of the slab metadata. */}
+          {certLookupResult && !certLookupResult.already_claimed && certLookupResult.slab ? (
+            <View style={{ marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent, backgroundColor: Colors.surface2 }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+                Match found
+              </Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                {certLookupResult.slab.front_image_url ? (
+                  <Image
+                    source={{ uri: certLookupResult.slab.front_image_url }}
+                    style={{ width: 80, height: 112, borderRadius: 6, backgroundColor: Colors.surface3 }}
+                    resizeMode="contain"
+                  />
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text, fontSize: 16, fontWeight: Typography.semibold }}>
+                    {certLookupResult.slab.player_name || 'Unknown player'}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 2 }}>
+                    {[certLookupResult.slab.year, certLookupResult.slab.set_name].filter(Boolean).join(' ')}
+                  </Text>
+                  {certLookupResult.slab.card_number ? (
+                    <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                      #{certLookupResult.slab.card_number}
+                    </Text>
+                  ) : null}
+                  <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: Typography.semibold, marginTop: 4 }}>
+                    {certForm.company.toUpperCase()} {certLookupResult.slab.grade_description}
+                  </Text>
+                  {certLookupResult.slab.population_total ? (
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                      Pop {certLookupResult.slab.population_total} · {certLookupResult.slab.population_higher || 0} higher
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {certLookupResult.catalog_match ? (
+                <Text style={{ color: Colors.success, fontSize: 12, marginTop: 10 }}>
+                  ✓ Matched to an existing catalog entry.
+                </Text>
+              ) : (
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 10, fontStyle: 'italic' }}>
+                  No catalog match — you'll confirm the card details on the next screen.
+                </Text>
+              )}
+
+              <Button
+                title="Confirm & continue"
+                onPress={confirmCertLookup}
+                style={{ marginTop: 14 }}
+              />
+            </View>
+          ) : null}
+
+          {/* No-slab path: lookup returned nothing usable but the
+              cert isn't claimed. Offer a "continue manually"
+              shortcut so non-PSA certs still flow. */}
+          {certLookupResult && !certLookupResult.already_claimed && !certLookupResult.slab ? (
+            <Button
+              title="Continue to manual entry"
+              variant="secondary"
+              onPress={() => {
+                setForm((f) => ({
+                  ...f,
+                  grading_company: certForm.company,
+                  cert_number: certForm.cert_number.trim(),
+                }));
+                setStep('manual_entry');
+              }}
+              style={{ marginTop: Spacing.md }}
+            />
           ) : null}
         </ScrollView>
       </SafeAreaView>
