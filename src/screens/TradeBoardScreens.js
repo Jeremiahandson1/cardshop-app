@@ -260,10 +260,13 @@ export const TradeBoardScreen = ({ navigation }) => {
       />
 
       {/* Scope tabs — horizontal scroll so nothing gets cut off on
-          narrow phones (5 tabs + "Groups (N)" easily overflows). */}
+          narrow phones (5 tabs + "Groups (N)" easily overflows).
+          flexGrow:0 prevents the ScrollView from eating the feed's
+          vertical space. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
         contentContainerStyle={styles.scopeTabs}
       >
         <ScopeTab label="All" active={scope === 'all'} onPress={() => { setScope('all'); setGroupId(null); }} />
@@ -1528,7 +1531,7 @@ const styles = StyleSheet.create({
   },
   scopeTab: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: Radius.full,
     backgroundColor: Colors.surface,
     borderWidth: 1,
