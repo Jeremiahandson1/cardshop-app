@@ -79,7 +79,7 @@ export const LCSHomeScreen = ({ navigation }) => {
           <TouchableOpacity
             onPress={openArbitrage}
             hitSlop={8}
-            accessibilityLabel="LCS Arbitrage"
+            accessibilityLabel="Deals near you"
           >
             <Ionicons name="flash" size={22} color={Colors.accent} />
           </TouchableOpacity>
@@ -99,7 +99,7 @@ export const LCSHomeScreen = ({ navigation }) => {
         />
         <Button title="Find shops" onPress={go} />
         <Button
-          title="Arbitrage"
+          title="Deals near you"
           variant="ghost"
           onPress={openArbitrage}
           icon={<Ionicons name="flash" size={16} color={Colors.accent} />}

@@ -122,8 +122,8 @@ export const LCSArbitrageScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScreenHeader
-        title="Arbitrage"
-        subtitle="Buy-local / sell-online opportunities"
+        title="Deals near you"
+        subtitle="Local shops pricing boxes below the going online rate"
         right={(
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={Colors.text} />
@@ -171,15 +171,16 @@ export const LCSArbitrageScreen = ({ navigation, route }) => {
       ) : !zip ? (
         <View style={styles.hintWrap}>
           <Text style={styles.hint}>
-            Enter your ZIP to see where local box prices diverge from eBay comps.
+            Enter your ZIP to see which local shops near you are pricing sealed
+            boxes below the typical online rate.
             {'\n'}Numbers only. We use the first 3 digits to find your region.
           </Text>
         </View>
       ) : rows.length === 0 ? (
         <EmptyState
           icon="🔍"
-          title="No opportunities yet"
-          message={`No arbitrage opportunities in your area right now. Check back tomorrow ${MDASH} the scan runs nightly.`}
+          title="No deals matching right now"
+          message={`No local shops in your area are below the online rate right now. Check back tomorrow ${MDASH} the scan runs nightly.`}
         />
       ) : (
         <FlatList
@@ -269,7 +270,7 @@ const ParticipationLock = ({ message, onPostPrice }) => (
     <Text style={styles.lockTitle}>Collectors-only feature</Text>
     <Text style={styles.lockBody}>
       {message
-        || 'LCS Arbitrage is for collectors who participate in the network. Post or confirm a local shop price to unlock it.'}
+        || 'Deals near you is for collectors who participate in the network. Post or confirm a local shop price to unlock it.'}
     </Text>
     <Button
       title="Post a local price"
