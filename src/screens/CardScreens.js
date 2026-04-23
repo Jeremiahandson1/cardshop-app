@@ -1487,6 +1487,18 @@ export const CardDetailScreen = ({ navigation, route }) => {
     queryFn: () => cardsApi.history(cardId).then((r) => r.data),
   });
 
+  // Live eBay active-ask summary for the catalog row. We
+  // deliberately don't show sold-comp medians — eBay deprecated
+  // Finding API in 2024 and the Marketplace Insights replacement
+  // is gated. Third-party SOLD data is one-click away via the
+  // research_links block below.
+  const { data: asks } = useQuery({
+    queryKey: ['catalog-asks', card?.catalog_id],
+    queryFn: () => catalogApi.marketAsks(card.catalog_id).then((r) => r.data),
+    enabled: !!card?.catalog_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data) => cardsApi.update(cardId, data),
     onSuccess: () => {
@@ -1739,6 +1751,51 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Text style={styles.infoLabel}>Ownership History</Text>
             <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
+
+          {/* Market snapshot — live eBay asks (not sold). Sold data
+              lives on third-party tools; we surface them as a quick
+              "research this card" link list so collectors don't have
+              to guess where to verify recent sale prices. */}
+          {asks ? (
+            <View style={{ marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Current eBay asks
+              </Text>
+              {asks.summary ? (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                  <Text style={{ color: Colors.text, fontSize: 22, fontWeight: Typography.semibold }}>
+                    ${Number(asks.summary.median).toFixed(0)}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                    median · ${Number(asks.summary.min).toFixed(0)}–${Number(asks.summary.max).toFixed(0)} range · {asks.summary.count} active
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                  No active eBay listings match this card right now.
+                </Text>
+              )}
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 8, fontStyle: 'italic' }}>
+                These are live asks, not sold prices. Check recent sales on:
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                {(asks.research_links || []).map((link) => (
+                  <TouchableOpacity
+                    key={link.label}
+                    onPress={() => Linking.openURL(link.url).catch(() => {})}
+                    style={{
+                      paddingHorizontal: 10, paddingVertical: 4,
+                      borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.accent,
+                    }}
+                  >
+                    <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: Typography.semibold }}>
+                      {link.label} ↗
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {/* Public notes — owner's description, visible to everyone */}
           {card.public_notes ? (

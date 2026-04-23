@@ -109,6 +109,9 @@ export const authApi = {
 export const catalogApi = {
   search: (params) => api.get('/catalog/search', { params }),
   get: (id) => api.get(`/catalog/${id}`),
+  // Live active-listing asks on eBay, plus links to research sold
+  // prices on third-party tools (we don't host sold comps).
+  marketAsks: (id) => api.get(`/catalog/${id}/market-asks`),
   create: (data) => api.post('/catalog', data),
   priceHistory: (id, params) => api.get(`/catalog/${id}/price-history`, { params }),
   parallels: (id) => api.get(`/catalog/${id}/parallels`),
