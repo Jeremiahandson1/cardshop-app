@@ -136,13 +136,18 @@ export const TradeBoardScreen = ({ navigation }) => {
   // lets_talk cards are actually on the board.
   const isMine = scope === 'mine';
   const {
-    data, isLoading, refetch, isFetching,
+    data, isLoading, refetch, isFetching, isError,
   } = useQuery({
     queryKey: isMine ? ['trade-listings', 'mine'] : ['trade-listings', 'feed', queryParams],
     queryFn: () => (isMine
       ? tradeListingsApi.mine().then((r) => r.data)
       : tradeListingsApi.feed(queryParams).then((r) => r.data)
     ),
+    // Graceful degradation: one fast retry, don't blow up if the
+    // API is rate-limited or mid-deploy — we show a retry tile
+    // instead of an empty feed indistinguishable from "no results".
+    retry: 1,
+    keepPreviousData: true,
   });
 
   const listings = data?.listings || [];
@@ -309,21 +314,30 @@ export const TradeBoardScreen = ({ navigation }) => {
           <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
         }
         ListEmptyComponent={
-          <EmptyState
-            icon="🔍"
-            title="No listings yet"
-            message={
-              scope === 'group'
-                ? 'No one in this group has posted a card yet.'
-                : 'Be the first to list a card for trade.'
-            }
-            action={
-              <Button
-                title="List a card"
-                onPress={() => navigation.navigate('CreateTradeListing')}
-              />
-            }
-          />
+          isError ? (
+            <EmptyState
+              icon="⚠️"
+              title="Couldn't load the trade board"
+              message="The API didn't respond. Check your connection and retry."
+              action={<Button title="Retry" onPress={() => refetch()} />}
+            />
+          ) : (
+            <EmptyState
+              icon="🔍"
+              title="No listings yet"
+              message={
+                scope === 'group'
+                  ? 'No one in this group has posted a card yet.'
+                  : 'Be the first to list a card for trade.'
+              }
+              action={
+                <Button
+                  title="List a card"
+                  onPress={() => navigation.navigate('CreateTradeListing')}
+                />
+              }
+            />
+          )
         }
       />
     </SafeAreaView>
