@@ -176,6 +176,18 @@ export const wantListApi = {
 };
 
 // ============================================================
+// BILLING (Card Shop Pro — dormant until Stripe env vars set)
+// ============================================================
+// status() always returns successfully with tier='free' if billing
+// isn't configured. checkout() returns 503 billing_not_configured
+// so the app can hide the Upgrade CTA instead of hard-erroring.
+export const billingApi = {
+  status: () => api.get('/billing/status'),
+  checkout: ({ successUrl, cancelUrl } = {}) =>
+    api.post('/billing/checkout', { successUrl, cancelUrl }),
+};
+
+// ============================================================
 // MESSAGES
 // ============================================================
 // Card-scoped in-app chat. Every message persists for dispute

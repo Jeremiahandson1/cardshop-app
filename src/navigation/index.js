@@ -22,6 +22,7 @@ import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
 import { ConversationListScreen, ConversationScreen } from '../screens/MessagesScreens';
+import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
@@ -281,6 +282,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="ChangeEmail" component={ChangeEmailScreen} />
     <ProfileStackNav.Screen name="DownloadData" component={DownloadDataScreen} />
     <ProfileStackNav.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+    <ProfileStackNav.Screen name="Upgrade" component={UpgradeScreen} />
   </ProfileStackNav.Navigator>
 );
 

@@ -50,6 +50,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'chatbox-ellipses-outline', label: 'Offers', onPress: () => navigation.navigate('OffersList') },
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
+        { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
     {
