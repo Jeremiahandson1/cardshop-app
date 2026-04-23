@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { setsApi, wantListApi } from '../services/api';
+import { setsApi, wantListApi, catalogApi } from '../services/api';
 import {
   Button, EmptyState, LoadingScreen, ScreenHeader, SectionHeader, Divider,
 } from '../components/ui';
@@ -61,15 +61,13 @@ export const SetsListScreen = ({ navigation }) => {
           <TouchableOpacity
             onPress={() => navigation.navigate('BrowseSets')}
             style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 10, paddingVertical: 6,
-              borderRadius: Radius.full, backgroundColor: Colors.accent,
+              width: 36, height: 36, borderRadius: 18,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: Colors.accent,
             }}
+            accessibilityLabel="Add a set"
           >
-            <Ionicons name="add" size={16} color={Colors.bg} />
-            <Text style={{ color: Colors.bg, fontWeight: Typography.semibold, fontSize: Typography.xs }}>
-              Add set
-            </Text>
+            <Ionicons name="add" size={22} color={Colors.bg} />
           </TouchableOpacity>
         }
       />
@@ -101,140 +99,281 @@ export const SetsListScreen = ({ navigation }) => {
 };
 
 // ============================================================
-// BROWSE SETS — pick from the full catalog, subscribe/unsubscribe
-// inline. Typeahead search against /api/sets?q=.
+// BROWSE SETS — cascading picker (sport → year → manufacturer →
+// set_name). Mirrors the RegisterCard cascade so collectors who
+// already know the chain can drill in quickly. Every step has a
+// "type to filter" search box and a manual-entry escape hatch
+// for sets that haven't hit the catalog yet.
+//
+// At the final step, tapping a set subscribes immediately — no
+// extra confirm — because that matches the "tap to add" flow
+// people already know from Netflix / Letterboxd / etc. The
+// subscribed set shows a checkmark and becomes un-tap-to-remove.
 // ============================================================
+const CASCADE_ORDER = ['sport', 'year', 'manufacturer', 'set_name'];
+const CASCADE_LABEL = {
+  sport:        'Sport',
+  year:         'Year',
+  manufacturer: 'Manufacturer',
+  set_name:     'Set',
+};
+
 export const BrowseSetsScreen = ({ navigation }) => {
   const qc = useQueryClient();
+  const [cascade, setCascade] = useState({});
+  const [cascadeDim, setCascadeDim] = useState('sport');
   const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ manufacturer: '', year: '', set_name: '' });
 
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 250);
-    return () => clearTimeout(t);
-  }, [query]);
+  const currentIdx = CASCADE_ORDER.indexOf(cascadeDim);
+  const picked = CASCADE_ORDER.filter((d) => cascade[d] !== undefined);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['sets-browse', debounced],
-    queryFn: () => setsApi.list({ q: debounced || undefined, limit: 200 }).then((r) => r.data),
+  // What values are available at this cascade level?
+  const { data: options, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ['sets-cascade', cascadeDim, cascade, query],
+    queryFn: () =>
+      catalogApi.filterValues({ dimension: cascadeDim, ...cascade, q: query || undefined, limit: 200 })
+        .then((r) => r.data?.values || []),
+    staleTime: 10_000,
+    retry: 1,
+    keepPreviousData: true,
   });
+
+  // Cards already tracked (to show checkmarks and prevent dupes
+  // at the terminal step).
+  const { data: mineData } = useQuery({
+    queryKey: ['sets-mine'],
+    queryFn: () => setsApi.mine().then((r) => r.data),
+  });
+  const mineKeys = React.useMemo(() => {
+    const s = new Set();
+    for (const m of (mineData?.sets || [])) {
+      s.add(`${m.manufacturer}|${m.year ?? ''}|${m.set_name}`);
+    }
+    return s;
+  }, [mineData]);
 
   const subscribeMutation = useMutation({
     mutationFn: (payload) => setsApi.subscribe(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sets-mine'] });
-      qc.invalidateQueries({ queryKey: ['sets-browse'] });
     },
     onError: (err) => Alert.alert('Could not add set', err?.response?.data?.error || 'Please try again.'),
   });
   const unsubscribeMutation = useMutation({
     mutationFn: (payload) => setsApi.unsubscribe(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sets-mine'] });
-      qc.invalidateQueries({ queryKey: ['sets-browse'] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sets-mine'] }),
   });
 
-  const sets = data?.sets || [];
+  const pick = (value) => {
+    const next = { ...cascade, [cascadeDim]: value };
+    setCascade(next);
+    setQuery('');
+    if (currentIdx + 1 < CASCADE_ORDER.length) {
+      setCascadeDim(CASCADE_ORDER[currentIdx + 1]);
+    }
+  };
+  const stepBack = () => {
+    if (currentIdx <= 0) {
+      navigation.goBack();
+      return;
+    }
+    const cleared = { ...cascade };
+    for (let i = currentIdx - 1; i < CASCADE_ORDER.length; i++) delete cleared[CASCADE_ORDER[i]];
+    setCascade(cleared);
+    setCascadeDim(CASCADE_ORDER[currentIdx - 1]);
+    setQuery('');
+  };
+
+  // Final step → tap subscribes immediately. Preserve item value
+  // from the options list so year stays numeric.
+  const handleSetPick = (setName) => {
+    const payload = {
+      manufacturer: cascade.manufacturer,
+      year: cascade.year ? Number(cascade.year) : null,
+      set_name: setName,
+    };
+    const key = `${payload.manufacturer}|${payload.year ?? ''}|${payload.set_name}`;
+    if (mineKeys.has(key)) {
+      unsubscribeMutation.mutate(payload);
+    } else {
+      subscribeMutation.mutate(payload);
+    }
+  };
+
+  const submitManual = () => {
+    const mf = manualForm.manufacturer.trim();
+    const yr = manualForm.year.trim();
+    const sn = manualForm.set_name.trim();
+    if (!mf || !sn) {
+      Alert.alert('Fill in manufacturer and set name at minimum.');
+      return;
+    }
+    subscribeMutation.mutate(
+      { manufacturer: mf, year: yr ? parseInt(yr, 10) : null, set_name: sn },
+      {
+        onSuccess: () => {
+          setManualOpen(false);
+          setManualForm({ manufacturer: '', year: '', set_name: '' });
+          Alert.alert('Added', `Tracking ${sn}`);
+        },
+      }
+    );
+  };
+
+  const isSetStep = cascadeDim === 'set_name';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
-      <ScreenHeader
-        title="Add a Set"
-        subtitle="Search the catalog, tap the star to track any set."
-        right={
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="close" size={24} color={Colors.text} />
-          </TouchableOpacity>
-        }
-      />
+      <View style={styles.browseHeader}>
+        <TouchableOpacity onPress={stepBack} style={{ padding: 4 }}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.browseHeaderTitle}>Add a Set</Text>
+        <View style={{ width: 22 }} />
+      </View>
 
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-        padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border,
-      }}>
-        <Ionicons name="search" size={18} color={Colors.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search by set name or manufacturer…"
-          placeholderTextColor={Colors.textMuted}
-          style={{
-            flex: 1, color: Colors.text, fontSize: 15,
-            paddingVertical: 8,
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {query ? (
-          <TouchableOpacity onPress={() => setQuery('')}>
-            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        ) : null}
+      {picked.length > 0 ? (
+        <View style={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm }}>
+          <Text style={{ fontSize: 11, color: Colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' }}>
+            {picked.map((d) => cascade[d]).join(' · ')}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={{ paddingHorizontal: Spacing.base, marginBottom: Spacing.sm }}>
+        <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 6 }}>
+          Step {currentIdx + 1} of {CASCADE_ORDER.length} — {CASCADE_LABEL[cascadeDim]}
+        </Text>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 6,
+          backgroundColor: Colors.surface2, borderRadius: Radius.md,
+          paddingHorizontal: 10, borderWidth: 1, borderColor: Colors.border,
+        }}>
+          <Ionicons name="search" size={16} color={Colors.textMuted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={`Search ${CASCADE_LABEL[cascadeDim].toLowerCase()}…`}
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{ flex: 1, color: Colors.text, paddingVertical: 8 }}
+          />
+          {query ? (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       <FlatList
-        data={sets}
-        keyExtractor={(s) => s.set_code}
-        contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
-        ItemSeparatorComponent={() => <View style={{ height: Spacing.xs }} />}
+        data={options || []}
+        keyExtractor={(item, i) => String(item) + i}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.xxxl }}
         ListEmptyComponent={
-          isLoading ? null : (
-            <EmptyState
-              icon="🔍"
-              title={debounced ? `No sets match “${debounced}”` : 'Type to search'}
-              message={debounced ? 'Try a different manufacturer or year.' : 'Every Panini, Topps, Pokemon, Magic, and Yu-Gi-Oh release we’ve imported is searchable here.'}
-            />
-          )
-        }
-        renderItem={({ item }) => {
-          const payload = { manufacturer: item.manufacturer, year: item.year, set_name: item.set_name };
-          const isPending =
-            (subscribeMutation.isPending && subscribeMutation.variables?.set_name === item.set_name) ||
-            (unsubscribeMutation.isPending && unsubscribeMutation.variables?.set_name === item.set_name);
-          return (
-            <View style={styles.browseRow}>
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => navigation.navigate('SetCompletion', { setCode: item.set_code })}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.browseName} numberOfLines={1}>
-                  {item.year ? `${item.year} ` : ''}{item.set_name}
-                </Text>
-                <Text style={styles.browseMeta} numberOfLines={1}>
-                  {item.manufacturer} · {item.total_cards} cards
-                </Text>
+          isLoading || isFetching ? (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.sm }}>
+              <Text style={{ color: Colors.textMuted }}>Loading…</Text>
+            </View>
+          ) : isError ? (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.md }}>
+              <Text style={{ color: Colors.textMuted }}>Couldn't load options.</Text>
+              <TouchableOpacity onPress={() => refetch()}>
+                <Text style={{ color: Colors.accent, fontWeight: '600' }}>Retry</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                disabled={isPending}
-                onPress={() =>
-                  item.subscribed
-                    ? unsubscribeMutation.mutate(payload)
-                    : subscribeMutation.mutate(payload)
-                }
-                style={[
-                  styles.browseToggle,
-                  item.subscribed && { backgroundColor: Colors.accent, borderColor: Colors.accent },
-                  isPending && { opacity: 0.5 },
-                ]}
-              >
-                <Ionicons
-                  name={item.subscribed ? 'star' : 'star-outline'}
-                  size={16}
-                  color={item.subscribed ? Colors.bg : Colors.accent}
-                />
-                <Text style={[
-                  styles.browseToggleText,
-                  item.subscribed && { color: Colors.bg },
-                ]}>
-                  {item.subscribed ? 'Tracking' : 'Track'}
+            </View>
+          ) : (
+            <View style={{ paddingVertical: Spacing.xl, alignItems: 'center', gap: Spacing.md }}>
+              <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>
+                Nothing matches this filter yet.
+              </Text>
+              <TouchableOpacity onPress={() => setManualOpen(true)}>
+                <Text style={{ color: Colors.accent, fontWeight: '600' }}>
+                  Add it manually →
                 </Text>
               </TouchableOpacity>
             </View>
+          )
+        }
+        renderItem={({ item }) => {
+          const isTracked = isSetStep
+            && mineKeys.has(`${cascade.manufacturer}|${cascade.year ?? ''}|${item}`);
+          return (
+            <TouchableOpacity
+              onPress={() => isSetStep ? handleSetPick(item) : pick(item)}
+              style={[styles.cascadeRow, isTracked && { borderColor: Colors.accent }]}
+            >
+              <Text style={{ color: Colors.text, fontSize: 15, flex: 1 }}>{String(item)}</Text>
+              {isSetStep ? (
+                <Ionicons
+                  name={isTracked ? 'checkmark-circle' : 'add-circle-outline'}
+                  size={20}
+                  color={isTracked ? Colors.accent : Colors.textMuted}
+                />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              )}
+            </TouchableOpacity>
           );
         }}
       />
+
+      <View style={{ padding: Spacing.base, gap: Spacing.sm }}>
+        <TouchableOpacity onPress={() => setManualOpen(true)}>
+          <Text style={{ textAlign: 'center', color: Colors.textMuted, fontSize: 13 }}>
+            Set not in our catalog? Add manually →
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Manual-entry sheet — simple three-field form. We pass it
+          straight to /sets/subscribe which validates that the triple
+          exists in card_catalog (it may not, for brand-new releases
+          before we've imported a checklist). If the server rejects,
+          we surface that error so the collector knows the checklist
+          still needs admin approval. */}
+      {manualOpen ? (
+        <View style={styles.manualOverlay}>
+          <View style={styles.manualSheet}>
+            <Text style={styles.manualTitle}>Add a set manually</Text>
+            <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: Spacing.md }}>
+              If we don't have the checklist yet, the server will say so. You can submit it through admin import.
+            </Text>
+            <TextInput
+              value={manualForm.manufacturer}
+              onChangeText={(v) => setManualForm((f) => ({ ...f, manufacturer: v }))}
+              placeholder="Manufacturer (e.g. Panini)"
+              placeholderTextColor={Colors.textMuted}
+              style={styles.manualInput}
+              autoCapitalize="words"
+            />
+            <TextInput
+              value={manualForm.year}
+              onChangeText={(v) => setManualForm((f) => ({ ...f, year: v }))}
+              placeholder="Year (e.g. 2025)"
+              placeholderTextColor={Colors.textMuted}
+              style={styles.manualInput}
+              keyboardType="number-pad"
+            />
+            <TextInput
+              value={manualForm.set_name}
+              onChangeText={(v) => setManualForm((f) => ({ ...f, set_name: v }))}
+              placeholder="Set name (e.g. Prizm)"
+              placeholderTextColor={Colors.textMuted}
+              style={styles.manualInput}
+              autoCapitalize="words"
+            />
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md }}>
+              <Button title="Cancel" variant="ghost" onPress={() => setManualOpen(false)} style={{ flex: 1 }} />
+              <Button title="Add set" onPress={submitManual} loading={subscribeMutation.isPending} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -426,24 +565,37 @@ const styles = StyleSheet.create({
     fontWeight: Typography.semibold,
     marginTop: 4,
   },
-  browseRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 10, paddingHorizontal: Spacing.sm,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  browseHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
   },
-  browseName: {
-    color: Colors.text, fontSize: 15, fontWeight: Typography.semibold,
+  browseHeaderTitle: {
+    color: Colors.text, fontSize: Typography.md, fontWeight: Typography.semibold,
   },
-  browseMeta: {
-    color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2,
+  cascadeRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: Spacing.md, paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface2, marginBottom: Spacing.xs,
   },
-  browseToggle: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.accent,
+  manualOverlay: {
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
   },
-  browseToggleText: {
-    color: Colors.accent, fontSize: Typography.xs, fontWeight: Typography.semibold,
+  manualSheet: {
+    backgroundColor: Colors.bg, padding: Spacing.lg,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    borderWidth: 1, borderColor: Colors.border, borderBottomWidth: 0,
+  },
+  manualTitle: {
+    color: Colors.text, fontSize: Typography.lg,
+    fontWeight: Typography.semibold, marginBottom: 6,
+  },
+  manualInput: {
+    color: Colors.text, backgroundColor: Colors.surface2,
+    borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm,
   },
 
   statsRow: {
