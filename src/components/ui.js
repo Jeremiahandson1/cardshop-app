@@ -187,15 +187,26 @@ const badgeStyles = StyleSheet.create({
 // ============================================================
 // CARD TILE
 // ============================================================
-export const CardTile = ({ card, onPress, style }) => (
+export const CardTile = ({ card, onPress, style }) => {
+  // Prefer the owner's uploaded photo over the catalog stock image
+  // because most Panini/Topps rows ship with no image at all. Order:
+  // photo_urls[0] → owner's dedicated front image → catalog front
+  // image → 🃏 placeholder. Field-name hedge covers both /cards/mine
+  // (aliased own_image_front) and /cards/:id (raw image_front_url).
+  const ownPhoto = Array.isArray(card.photo_urls) && card.photo_urls.length
+    ? card.photo_urls[0] : null;
+  const displayUri = ownPhoto
+    || card.own_image_front || card.image_front_url
+    || card.front_image_url;
+  return (
   <TouchableOpacity
     style={[cardTileStyles.container, style]}
     onPress={onPress}
     activeOpacity={0.85}
   >
     <View style={cardTileStyles.imageContainer}>
-      {card.front_image_url ? (
-        <Image source={{ uri: card.front_image_url }} style={cardTileStyles.image} resizeMode="contain" />
+      {displayUri ? (
+        <Image source={{ uri: displayUri }} style={cardTileStyles.image} resizeMode="contain" />
       ) : (
         <View style={cardTileStyles.imagePlaceholder}>
           <Text style={{ fontSize: 28 }}>🃏</Text>
@@ -220,7 +231,8 @@ export const CardTile = ({ card, onPress, style }) => (
       </View>
     </View>
   </TouchableOpacity>
-);
+  );
+};
 
 const cardTileStyles = StyleSheet.create({
   container: {
