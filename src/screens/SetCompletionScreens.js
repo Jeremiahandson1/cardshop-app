@@ -47,10 +47,12 @@ export const SetsListScreen = ({ navigation }) => {
             activeOpacity={0.85}
           >
             <View style={{ flex: 1 }}>
-              <Text style={styles.setName} numberOfLines={1}>{item.set_name}</Text>
+              <Text style={styles.setName} numberOfLines={1}>
+                {item.year ? `${item.year} ` : ''}{item.set_name}
+              </Text>
               <Text style={styles.setMeta}>
+                {item.manufacturer ? `${item.manufacturer} · ` : ''}
                 {item.owned_cards} / {item.total_cards} cards
-                {item.year ? ` · ${item.year}` : ''}
               </Text>
 
               {/* Progress bar */}
@@ -113,8 +115,12 @@ export const SetCompletionScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
-        title={setCode}
-        subtitle={`${data.owned}/${data.total} owned · ${data.percent_complete}% complete`}
+        title={data.set_name ? `${data.year || ''} ${data.set_name}`.trim() : setCode}
+        subtitle={
+          data.manufacturer
+            ? `${data.manufacturer} · ${data.owned}/${data.total} owned · ${data.percent_complete}% complete`
+            : `${data.owned}/${data.total} owned · ${data.percent_complete}% complete`
+        }
         right={
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={Colors.text} />
