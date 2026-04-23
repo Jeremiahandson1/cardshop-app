@@ -20,7 +20,8 @@
         "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
         "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
         "NSPhotoLibraryUsageDescription": "Used to upload card photos",
-        "NSLocationWhenInUseUsageDescription": "Used to show nearby trade listings and snapshot your city on your own listings"
+        "NSLocationWhenInUseUsageDescription": "Used to show nearby trade listings and snapshot your city on your own listings",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.nfc.readersession.formats": [
@@ -61,7 +62,8 @@
       "react-native-nfc-manager",
       "expo-secure-store",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-video"
     ],
     "scheme": "cardshop",
     "extra": {
