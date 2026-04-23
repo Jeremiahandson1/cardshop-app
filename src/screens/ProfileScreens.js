@@ -51,6 +51,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
+        { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
       ]
     },
     {

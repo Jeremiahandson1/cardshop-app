@@ -190,6 +190,18 @@ export const wantListApi = {
 };
 
 // ============================================================
+// SUPPORT / FEEDBACK
+// ============================================================
+// Sends to the existing /api/safety/support endpoint which lands
+// rows in support_tickets. Admins see these in the dashboard.
+export const supportApi = {
+  file: ({ subject, body, category, context_data, contact_email }) =>
+    api.post('/safety/support', {
+      subject, body, category, context_data, contact_email,
+    }),
+};
+
+// ============================================================
 // BILLING (Card Shop Pro — dormant until Stripe env vars set)
 // ============================================================
 // status() always returns successfully with tier='free' if billing
