@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ScrollView, Alert,
+  RefreshControl, ScrollView, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,23 +13,65 @@ import {
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
-// SETS LIST — entry point showing every known set + my % complete
+// SETS LIST — the caller's subscribed sets. Defaults to the
+// "My Sets" view; an "+ Add Set" action opens the browse /
+// search screen where users can subscribe to any set in the
+// catalog they actually collect.
 // ============================================================
+const SetCard = ({ item, onPress }) => (
+  <TouchableOpacity style={styles.setCard} onPress={onPress} activeOpacity={0.85}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.setName} numberOfLines={1}>
+        {item.year ? `${item.year} ` : ''}{item.set_name}
+      </Text>
+      <Text style={styles.setMeta}>
+        {item.manufacturer ? `${item.manufacturer} · ` : ''}
+        {item.owned_cards} / {item.total_cards} cards
+      </Text>
+      <View style={styles.progressBarBg}>
+        <View
+          style={[
+            styles.progressBarFill,
+            { width: `${Math.max(0, Math.min(100, item.percent_complete))}%` },
+          ]}
+        />
+      </View>
+      <Text style={styles.percentLabel}>{item.percent_complete}% complete</Text>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+  </TouchableOpacity>
+);
+
 export const SetsListScreen = ({ navigation }) => {
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['sets-list'],
-    queryFn: () => setsApi.list().then((r) => r.data),
+    queryKey: ['sets-mine'],
+    queryFn: () => setsApi.mine().then((r) => r.data),
   });
 
   const sets = data?.sets || [];
 
-  if (isLoading) return <LoadingScreen message="Loading sets..." />;
+  if (isLoading) return <LoadingScreen message="Loading your sets..." />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
-        title="Sets"
-        subtitle="Track completion across every set"
+        title="My Sets"
+        subtitle="Sets you're tracking — completion updates automatically."
+        right={
+          <TouchableOpacity
+            onPress={() => navigation.navigate('BrowseSets')}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 6,
+              borderRadius: Radius.full, backgroundColor: Colors.accent,
+            }}
+          >
+            <Ionicons name="add" size={16} color={Colors.bg} />
+            <Text style={{ color: Colors.bg, fontWeight: Typography.semibold, fontSize: Typography.xs }}>
+              Add set
+            </Text>
+          </TouchableOpacity>
+        }
       />
 
       <FlatList
@@ -41,41 +83,157 @@ export const SetsListScreen = ({ navigation }) => {
           <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.setCard}
+          <SetCard
+            item={item}
             onPress={() => navigation.navigate('SetCompletion', { setCode: item.set_code })}
-            activeOpacity={0.85}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.setName} numberOfLines={1}>
-                {item.year ? `${item.year} ` : ''}{item.set_name}
-              </Text>
-              <Text style={styles.setMeta}>
-                {item.manufacturer ? `${item.manufacturer} · ` : ''}
-                {item.owned_cards} / {item.total_cards} cards
-              </Text>
-
-              {/* Progress bar */}
-              <View style={styles.progressBarBg}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${Math.max(0, Math.min(100, item.percent_complete))}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.percentLabel}>{item.percent_complete}% complete</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
+          />
         )}
         ListEmptyComponent={
           <EmptyState
             icon="📋"
-            title="No sets in the catalog yet"
-            message="An admin needs to import set checklists before you can track completion."
+            title="No sets tracked yet"
+            message="Tap “Add set” to pick the releases you actually collect. Completion % updates as you register cards."
           />
         }
+      />
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// BROWSE SETS — pick from the full catalog, subscribe/unsubscribe
+// inline. Typeahead search against /api/sets?q=.
+// ============================================================
+export const BrowseSetsScreen = ({ navigation }) => {
+  const qc = useQueryClient();
+  const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['sets-browse', debounced],
+    queryFn: () => setsApi.list({ q: debounced || undefined, limit: 200 }).then((r) => r.data),
+  });
+
+  const subscribeMutation = useMutation({
+    mutationFn: (payload) => setsApi.subscribe(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sets-mine'] });
+      qc.invalidateQueries({ queryKey: ['sets-browse'] });
+    },
+    onError: (err) => Alert.alert('Could not add set', err?.response?.data?.error || 'Please try again.'),
+  });
+  const unsubscribeMutation = useMutation({
+    mutationFn: (payload) => setsApi.unsubscribe(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sets-mine'] });
+      qc.invalidateQueries({ queryKey: ['sets-browse'] });
+    },
+  });
+
+  const sets = data?.sets || [];
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+      <ScreenHeader
+        title="Add a Set"
+        subtitle="Search the catalog, tap the star to track any set."
+        right={
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="close" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        }
+      />
+
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+        padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border,
+      }}>
+        <Ionicons name="search" size={18} color={Colors.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by set name or manufacturer…"
+          placeholderTextColor={Colors.textMuted}
+          style={{
+            flex: 1, color: Colors.text, fontSize: 15,
+            paddingVertical: 8,
+          }}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {query ? (
+          <TouchableOpacity onPress={() => setQuery('')}>
+            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <FlatList
+        data={sets}
+        keyExtractor={(s) => s.set_code}
+        contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
+        ItemSeparatorComponent={() => <View style={{ height: Spacing.xs }} />}
+        ListEmptyComponent={
+          isLoading ? null : (
+            <EmptyState
+              icon="🔍"
+              title={debounced ? `No sets match “${debounced}”` : 'Type to search'}
+              message={debounced ? 'Try a different manufacturer or year.' : 'Every Panini, Topps, Pokemon, Magic, and Yu-Gi-Oh release we’ve imported is searchable here.'}
+            />
+          )
+        }
+        renderItem={({ item }) => {
+          const payload = { manufacturer: item.manufacturer, year: item.year, set_name: item.set_name };
+          const isPending =
+            (subscribeMutation.isPending && subscribeMutation.variables?.set_name === item.set_name) ||
+            (unsubscribeMutation.isPending && unsubscribeMutation.variables?.set_name === item.set_name);
+          return (
+            <View style={styles.browseRow}>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => navigation.navigate('SetCompletion', { setCode: item.set_code })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.browseName} numberOfLines={1}>
+                  {item.year ? `${item.year} ` : ''}{item.set_name}
+                </Text>
+                <Text style={styles.browseMeta} numberOfLines={1}>
+                  {item.manufacturer} · {item.total_cards} cards
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={isPending}
+                onPress={() =>
+                  item.subscribed
+                    ? unsubscribeMutation.mutate(payload)
+                    : subscribeMutation.mutate(payload)
+                }
+                style={[
+                  styles.browseToggle,
+                  item.subscribed && { backgroundColor: Colors.accent, borderColor: Colors.accent },
+                  isPending && { opacity: 0.5 },
+                ]}
+              >
+                <Ionicons
+                  name={item.subscribed ? 'star' : 'star-outline'}
+                  size={16}
+                  color={item.subscribed ? Colors.bg : Colors.accent}
+                />
+                <Text style={[
+                  styles.browseToggleText,
+                  item.subscribed && { color: Colors.bg },
+                ]}>
+                  {item.subscribed ? 'Tracking' : 'Track'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -267,6 +425,25 @@ const styles = StyleSheet.create({
     fontSize: Typography.xs,
     fontWeight: Typography.semibold,
     marginTop: 4,
+  },
+  browseRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    paddingVertical: 10, paddingHorizontal: Spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  browseName: {
+    color: Colors.text, fontSize: 15, fontWeight: Typography.semibold,
+  },
+  browseMeta: {
+    color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2,
+  },
+  browseToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.accent,
+  },
+  browseToggleText: {
+    color: Colors.accent, fontSize: Typography.xs, fontWeight: Typography.semibold,
   },
 
   statsRow: {

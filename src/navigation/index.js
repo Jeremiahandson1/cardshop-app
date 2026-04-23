@@ -54,7 +54,7 @@ import {
   TradeGroupManageScreen, JoinTradeGroupScreen,
 } from '../screens/TradeGroupsScreens';
 import { TradeCameraScreen } from '../screens/TradeCameraScreen';
-import { SetsListScreen, SetCompletionScreen } from '../screens/SetCompletionScreens';
+import { SetsListScreen, SetCompletionScreen, BrowseSetsScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
 import { DealRadarFeedScreen } from '../screens/DealRadarFeedScreen';
@@ -313,6 +313,7 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="JoinTradeGroup" component={JoinTradeGroupScreen} />
     <TradeStackNav.Screen name="TradeCameraCapture" component={TradeCameraScreen} />
     <TradeStackNav.Screen name="SetsList" component={SetsListScreen} />
+    <TradeStackNav.Screen name="BrowseSets" component={BrowseSetsScreen} />
     <TradeStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
     <TradeStackNav.Screen name="Help" component={HelpScreen} />
     <TradeStackNav.Screen name="ReportStolen" component={ReportStolenScreen} />

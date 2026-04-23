@@ -325,7 +325,15 @@ export const pricingApi = {
 // SETS (catalog + set completion)
 // ============================================================
 export const setsApi = {
-  list: () => api.get('/sets'),
+  // Browse every set in the catalog (with ?q= typeahead and a
+  // `subscribed` flag per row). Use mine() for the Sets tab's
+  // default view; list() is for the Add/Browse screen.
+  list: (params) => api.get('/sets', { params }),
+  mine: () => api.get('/sets/mine'),
+  subscribe: ({ manufacturer, year, set_name }) =>
+    api.post('/sets/subscribe', { manufacturer, year, set_name }),
+  unsubscribe: ({ manufacturer, year, set_name }) =>
+    api.delete('/sets/subscribe', { data: { manufacturer, year, set_name } }),
   completion: (setCode) => api.get(`/sets/${setCode}/completion`),
   // Admin-only — returns 403 otherwise
   adminImport: (data) => api.post('/sets/admin/import', data),
