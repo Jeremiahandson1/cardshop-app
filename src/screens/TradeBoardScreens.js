@@ -240,7 +240,7 @@ export const TradeBoardScreen = ({ navigation }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
         title="Trade Board"
-        subtitle="List cards. Find trades. Meet up off-platform."
+        subtitle="List cards. Find trades. Meet up off-platform. [v4]"
         right={
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
             <TouchableOpacity
