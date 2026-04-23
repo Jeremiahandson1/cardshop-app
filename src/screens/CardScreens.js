@@ -47,7 +47,7 @@ const useEbayStatus = () => {
 const CascadePicker = ({
   navigation, cascade, setCascade, cascadeDim, setCascadeDim,
   cascadeQuery, setCascadeQuery, cascadeOrder, cascadeLabel,
-  onComplete, onManualFallback, onScan,
+  onComplete, onManualFallback, onScan, onCertEntry,
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
@@ -312,6 +312,13 @@ const CascadePicker = ({
             </Text>
           </TouchableOpacity>
         ) : null}
+        {onCertEntry ? (
+          <TouchableOpacity onPress={onCertEntry}>
+            <Text style={{ textAlign: 'center', color: Colors.accent, fontSize: 13, fontWeight: Typography.semibold }}>
+              Have a graded slab? Enter the cert number →
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity onPress={onManualFallback}>
           <Text style={{ textAlign: 'center', color: Colors.textMuted, fontSize: 13 }}>
             Card not in catalog? Enter manually →
@@ -342,6 +349,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [step, setStep] = useState(
     qrCode || catalogId ? 'search' : 'cascade'
   );
+  // Cert-lookup local state — only matters while step === 'cert_entry'.
+  const [certForm, setCertForm] = useState({ company: 'psa', cert_number: '' });
+  const [certLookupBusy, setCertLookupBusy] = useState(false);
+  const [certLookupResult, setCertLookupResult] = useState(null); // { already_claimed, slab, catalog_match, provider_error }
 
   // Cascade state — each level records the picked value, narrowing
   // the options for the next level. Order matters: each dimension
@@ -559,6 +570,65 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       Alert.alert('Could not create card', err.response?.data?.error || 'Please check all fields.');
     },
   });
+
+  // ========== Cert-lookup handler for graded slabs ==========
+  // Walks: validate → POST /cert-lookup → branch on result:
+  //   already_claimed   → surface warning, keep user on form
+  //   slab + match      → pre-fill form + grading info, jump to details
+  //   slab, no match    → pre-fill manual form, drop user there
+  //   no slab           → pre-fill manual with just cert+company
+  const runCertLookup = async () => {
+    const cert = certForm.cert_number.trim();
+    if (!cert) return;
+    setCertLookupBusy(true);
+    setCertLookupResult(null);
+    try {
+      const res = await catalogApi.certLookup({
+        company: certForm.company,
+        cert_number: cert,
+      });
+      const payload = res.data || {};
+      setCertLookupResult(payload);
+
+      if (payload.already_claimed) {
+        // Stop here — duplicate cert. Payload is displayed below
+        // the form so the user sees who claimed it.
+        return;
+      }
+
+      // Lock grading fields on the owned-card form either way.
+      setForm((f) => ({
+        ...f,
+        grading_company: certForm.company,
+        cert_number: cert,
+        grade: payload.slab?.grade != null ? String(payload.slab.grade) : f.grade,
+      }));
+
+      if (payload.slab && payload.catalog_match) {
+        // High-confidence: we have slab data AND a catalog row.
+        setSelectedCatalog(payload.catalog_match);
+        setStep('details');
+        return;
+      }
+
+      // Otherwise drop to manual entry with everything we know
+      // pre-filled. The user confirms / corrects from there.
+      setManualForm((f) => ({
+        ...f,
+        sport:          payload.slab?.sport || f.sport,
+        player_name:    payload.slab?.player_name || f.player_name,
+        year:           payload.slab?.year ? String(payload.slab.year) : f.year,
+        manufacturer:   payload.slab?.brand || payload.slab?.set_name || f.manufacturer,
+        set_name:       payload.slab?.set_name || f.set_name,
+        card_number:    payload.slab?.card_number || f.card_number,
+      }));
+      setStep('manual_entry');
+    } catch (err) {
+      Alert.alert('Lookup failed', err?.response?.data?.error || err?.message || 'Try again.');
+    } finally {
+      setCertLookupBusy(false);
+    }
+  };
 
   const goManualEntry = () => {
     // Pre-populate player_name from whatever the user typed in search.
@@ -871,7 +941,104 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           setStep('manual_entry');
         }}
         onManualFallback={() => setStep('manual_entry')}
+        onCertEntry={() => setStep('cert_entry')}
       />
+    );
+  }
+
+  if (step === 'cert_entry') {
+    const claimed = certLookupResult?.already_claimed;
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setStep('cascade')}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Graded Card</Text>
+          <View style={{ width: 22 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+          <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+            Enter the cert number off the slab label. We'll pull the card info when
+            possible and check that nobody else on Card Shop has already claimed
+            this exact slab.
+          </Text>
+
+          <View>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Grading Company
+            </Text>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
+              {['psa', 'bgs', 'sgc', 'csg', 'hga'].map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  onPress={() => setCertForm((f) => ({ ...f, company: g }))}
+                  style={[
+                    styles.toggleBtn,
+                    certForm.company === g && styles.toggleBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.toggleText,
+                    certForm.company === g && styles.toggleTextActive,
+                  ]}>{g.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <Input
+            label="Cert Number"
+            value={certForm.cert_number}
+            onChangeText={(v) => setCertForm((f) => ({ ...f, cert_number: v }))}
+            placeholder="e.g. 12345678"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {certForm.company !== 'psa' ? (
+            <View style={{ padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
+              <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+                We only have a live data feed for PSA right now. For {certForm.company.toUpperCase()} cards,
+                we'll still check that the cert isn't already claimed and you can fill in the rest manually.
+              </Text>
+            </View>
+          ) : null}
+
+          <Button
+            title="Look up cert"
+            onPress={runCertLookup}
+            loading={certLookupBusy}
+          />
+
+          {claimed ? (
+            <View style={{ padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.error + '22', borderWidth: 1, borderColor: Colors.error }}>
+              <Text style={{ color: Colors.error, fontWeight: Typography.semibold, marginBottom: 4 }}>
+                ⚠ Already claimed on Card Shop
+              </Text>
+              <Text style={{ color: Colors.text, fontSize: 13, lineHeight: 18 }}>
+                <Text style={{ fontWeight: Typography.semibold }}>@{claimed.username}</Text>
+                {' registered this exact slab '}
+                {claimed.claimed_at ? `on ${new Date(claimed.claimed_at).toLocaleDateString()}` : 'previously'}.
+                {'\n\n'}
+                If you believe this is a mistake or fraud, tap Report to open a ticket.
+                A cert number is globally unique — two people can't own the same slab.
+              </Text>
+            </View>
+          ) : null}
+
+          {certLookupResult?.provider_error && !certLookupResult?.already_claimed ? (
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontStyle: 'italic' }}>
+              {certLookupResult.provider_error === 'invalid_cert'
+                ? 'That cert number format didn\u2019t look right to PSA. Double-check the slab label.'
+                : certLookupResult.provider_error === 'not_found'
+                  ? 'PSA has no record of that cert. You can still continue manually.'
+                  : 'Could not reach the grading service just now. You can still continue manually.'}
+            </Text>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 

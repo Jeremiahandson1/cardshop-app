@@ -130,6 +130,11 @@ export const catalogApi = {
   // isn't set on the API — the Scan button stays visible but
   // raises an alert explaining it's coming soon.
   ocrSuggest: (image_base64) => api.post('/catalog/ocr-suggest', { image_base64 }, { timeout: 30_000 }),
+  // Cert lookup for graded slabs. Always returns already_claimed
+  // status regardless of whether PSA is configured; slab metadata
+  // + images populate only when PSA_API_TOKEN is set upstream.
+  certLookup: ({ company, cert_number }) =>
+    api.post('/catalog/cert-lookup', { company, cert_number }),
 };
 
 // ============================================================
