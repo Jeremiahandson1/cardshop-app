@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import * as ImageManipulator from 'expo-image-manipulator';
 // Expo SDK 55 moved the classic readAsStringAsync API to
 // expo-file-system/legacy; the default export is now a
 // File/Directory class API with no readAsStringAsync. Importing
@@ -1467,6 +1469,38 @@ function ZoomableImageViewer({ visible, images, initialIndex = 0, onClose }) {
 }
 
 // ============================================================
+// INLINE VIDEO PLAYER
+// ============================================================
+// Mounts a full-screen expo-video VideoView for the given URI.
+// Auto-plays on mount, releases when the modal unmounts so we
+// don't hold a hardware decoder for every CardDetail screen.
+function InlineVideoPlayer({ uri, onClose }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.play();
+  });
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <VideoView
+        player={player}
+        style={{ flex: 1 }}
+        contentFit="contain"
+        allowsFullscreen
+        allowsPictureInPicture
+        nativeControls
+      />
+      <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }} edges={['top']}>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: Spacing.md }}>
+          <TouchableOpacity onPress={onClose} style={{ padding: Spacing.sm }}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+// ============================================================
 // CARD DETAIL
 // ============================================================
 export const CardDetailScreen = ({ navigation, route }) => {
@@ -1540,6 +1574,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
   // intentionally excluded; they're lower-resolution thumbnails).
   const [zoomOpen, setZoomOpen] = React.useState(false);
   const [zoomIndex, setZoomIndex] = React.useState(0);
+  const [videoOpen, setVideoOpen] = React.useState(false);
 
   if (isLoading || !card) return <LoadingScreen />;
 
@@ -1638,7 +1673,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
           return (
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => Linking.openURL(card.video_url).catch(() => Alert.alert('Could not open video', 'Try again or open in a browser.'))}
+              onPress={() => setVideoOpen(true)}
               style={{ marginHorizontal: Spacing.base, marginTop: Spacing.md, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, backgroundColor: '#000' }}
             >
               <Image source={{ uri: posterUrl }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
@@ -1653,6 +1688,17 @@ export const CardDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           );
         })() : null}
+
+        {/* In-app video player modal. expo-video's useVideoPlayer
+            is hook-based and needs to live inside a component —
+            split into InlineVideoPlayer below so we can conditionally
+            mount it only while the modal is open (avoids holding
+            a decoder open for every CardDetail mount). */}
+        {card.video_url ? (
+          <Modal visible={videoOpen} animationType="fade" onRequestClose={() => setVideoOpen(false)} transparent={false}>
+            <InlineVideoPlayer uri={card.video_url} onClose={() => setVideoOpen(false)} />
+          </Modal>
+        ) : null}
 
         <ZoomableImageViewer
           visible={zoomOpen}
@@ -2126,6 +2172,32 @@ export const EditCardScreen = ({ navigation, route }) => {
     }).catch((err) => Alert.alert('Could not remove photo', err.response?.data?.error || 'Please try again.'));
   };
 
+  // Rotate an already-saved photo 90° clockwise via ImageManipulator.
+  // Writes the rotated image back as a base64 data URL so the API
+  // re-uploads to Cloudinary and the photo_urls list gets the new
+  // hosted URL. Runs one API call per tap; four taps cycle back.
+  // Full in-flow re-crop needs a canvas editor we don't have yet —
+  // rotate + re-capture covers 90% of fix-the-photo cases for now.
+  const rotateExistingPhoto = async (idx) => {
+    const existing = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+    const uri = existing[idx];
+    if (!uri) return;
+    try {
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ rotate: 90 }],
+        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const next = [...existing];
+      next[idx] = `data:image/jpeg;base64,${result.base64}`;
+      await cardsApi.update(cardId, { photo_urls: next });
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
+    } catch (err) {
+      Alert.alert('Could not rotate', err?.message || 'Try again.');
+    }
+  };
+
   if (isLoading || !card || !form) return <LoadingScreen />;
 
   const existingPhotos = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
@@ -2248,6 +2320,16 @@ export const EditCardScreen = ({ navigation, route }) => {
             {existingPhotos.map((uri, i) => (
               <View key={`ex-${i}`} style={styles.photoThumb}>
                 <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                {/* Rotate button — 90° per tap, saves immediately.
+                    Positioned bottom-right so the close button
+                    stays in its usual top-right spot. */}
+                <TouchableOpacity
+                  style={styles.photoRotate}
+                  onPress={() => rotateExistingPhoto(i)}
+                  accessibilityLabel="Rotate 90°"
+                >
+                  <Ionicons name="refresh" size={14} color="#fff" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.photoRemove}
                   onPress={() => Alert.alert('Remove photo?', 'This cannot be undone.', [
@@ -2380,6 +2462,12 @@ const styles = StyleSheet.create({
   photoAddText: { color: Colors.textMuted, fontSize: Typography.xs },
   photoThumb: { position: 'relative' },
   photoRemove: { position: 'absolute', top: -6, right: -6 },
+  photoRotate: {
+    position: 'absolute', bottom: 4, right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10, width: 20, height: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
   submitBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: Spacing.base, backgroundColor: Colors.bg,
