@@ -95,6 +95,15 @@ export const StoreIntakeScreen = ({ navigation }) => {
       // Accept bare short codes (8-12 chars A-Z0-9) or full UUIDs
       const code = /^[0-9A-Za-z]{6,}$/.test(raw) ? raw : raw.replace(/^cardshop:\/\/(card\/|c\/)?/i, '');
       const { data: look } = await qrApi.lookup(code);
+      if (look.status === 'superseded') {
+        Alert.alert(
+          'Outdated sticker',
+          'This QR was replaced. Do not reuse — grab a blank sticker from the sheet instead. ' +
+          'The old sticker is kept in the ledger as evidence that it was superseded.',
+        );
+        setScanBusy(false);
+        return;
+      }
       if (look.status !== 'unregistered') {
         Alert.alert(
           'Already registered',

@@ -31,9 +31,44 @@ export const QRScannerScreen = ({ navigation, route }) => {
     setScanning(true);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+    const resetScanner = () => {
+      setScanned(false);
+      setScanning(false);
+      scanGuardRef.current = false;
+    };
+
     try {
       const res = await qrApi.lookup(code);
       const insert = res.data;
+
+      // Superseded — this sticker was replaced. Tell the user
+      // explicitly so they don't mistakenly think the card has a
+      // problem. Offer to jump to the current sticker's card if we
+      // can resolve the owned_card_id. Never silently route to
+      // CardDetail — that would mask the provenance signal.
+      if (insert.status === 'superseded') {
+        const supersededWhen = insert.superseded_at
+          ? new Date(insert.superseded_at).toLocaleDateString() : 'earlier';
+        const cardName = insert.card
+          ? [insert.card.year, insert.card.set_name, insert.card.player_name].filter(Boolean).join(' · ')
+          : 'this card';
+        const actions = [
+          { text: 'OK', onPress: resetScanner, style: 'cancel' },
+        ];
+        if (insert.owned_card_id) {
+          actions.unshift({
+            text: 'View current card',
+            onPress: () => navigation.replace('CardDetail', { cardId: insert.owned_card_id }),
+          });
+        }
+        Alert.alert(
+          'Outdated sticker',
+          `This sticker was replaced on ${supersededWhen}.\n\n` +
+          `${cardName} still lives in Card Shop — ask the current owner to scan their up-to-date sticker for full provenance.`,
+          actions,
+        );
+        return;
+      }
 
       if (mode === 'register') {
         if (insert.status === 'unregistered') {
@@ -44,18 +79,14 @@ export const QRScannerScreen = ({ navigation, route }) => {
           navigation.replace('CardDetail', { cardId: insert.owned_card_id });
         } else {
           Alert.alert('Already Registered', 'This QR insert has already been used but the card is no longer available.');
-          setScanned(false);
-          setScanning(false);
-          scanGuardRef.current = false;
+          resetScanner();
         }
       } else if (mode === 'transfer') {
         if (insert.owned_card_id) {
           navigation.replace('InitiateTransfer', { cardId: insert.owned_card_id });
         } else {
           Alert.alert('Not Registered', 'This card has not been registered yet.');
-          setScanned(false);
-          setScanning(false);
-          scanGuardRef.current = false;
+          resetScanner();
         }
       } else {
         // Just lookup
@@ -64,7 +95,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
         } else {
           Alert.alert('Unregistered', 'This QR insert has not been registered to a card yet.', [
             { text: 'Register It', onPress: () => navigation.replace('RegisterCard', { qrCode: code }) },
-            { text: 'Cancel', onPress: () => { setScanned(false); scanGuardRef.current = false; }, style: 'cancel' }
+            { text: 'Cancel', onPress: resetScanner, style: 'cancel' },
           ]);
           setScanning(false);
         }
