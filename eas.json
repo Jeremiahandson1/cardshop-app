@@ -55,9 +55,16 @@
     }
   },
   "submit": {
+    "preview": {
+      "ios": {
+        "appleTeamId": "63XSWU8M5Z",
+        "ascAppId": "6763437381"
+      }
+    },
     "production": {
       "ios": {
-        "appleTeamId": "63XSWU8M5Z"
+        "appleTeamId": "63XSWU8M5Z",
+        "ascAppId": "6763437381"
       },
       "android": {
         "track": "internal",
