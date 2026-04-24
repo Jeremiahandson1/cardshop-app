@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { showMessage } from 'react-native-flash-message';
 
 import { dealRadarApi } from '../services/api';
-import { EmptyState, LoadingScreen } from '../components/ui';
+import { Button, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
@@ -32,10 +32,35 @@ export const DealRadarFeedScreen = ({ navigation }) => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['deal-radar', 'feed'],
     queryFn: () => dealRadarApi.getFeed({ limit: 50 }).then((r) => r.data),
+    retry: false,
   });
+
+  // 402 → Pro upsell (see DealRadarSettingsScreen for the matching copy).
+  const proRequired = error?.response?.status === 402
+    && error?.response?.data?.code === 'pro_required';
+  if (proRequired) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg, gap: Spacing.md }}>
+          <Ionicons name="pulse" size={56} color={Colors.accent} />
+          <Text style={{ color: Colors.text, fontSize: Typography.xl, fontWeight: Typography.bold, textAlign: 'center' }}>
+            Deal Radar is a Pro feature
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.base, textAlign: 'center', lineHeight: 22 }}>
+            Get alerts when cards on your want list drop below the 30-day median on eBay.
+          </Text>
+          <Button
+            title="Upgrade to Card Shop Pro"
+            onPress={() => navigation.navigate('Upgrade')}
+            style={{ alignSelf: 'stretch', marginTop: Spacing.md }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const actionMutation = useMutation({
     mutationFn: ({ id, status }) => dealRadarApi.setStatus(id, status).then((r) => r.data),

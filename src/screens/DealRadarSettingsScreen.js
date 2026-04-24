@@ -34,10 +34,40 @@ const INTERVAL_OPTIONS = [
 export const DealRadarSettingsScreen = ({ navigation }) => {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['deal-radar', 'preferences'],
     queryFn: () => dealRadarApi.getPreferences().then((r) => r.data),
+    retry: false, // 402 doesn't need retries — it's a permanent gate until upgrade
   });
+
+  // Backend returns 402 { code: 'pro_required' } for free users. Swap
+  // the whole screen for an upgrade CTA so non-Pro users see why they
+  // can't reach the settings rather than a confusing empty form.
+  const proRequired = error?.response?.status === 402
+    && error?.response?.data?.code === 'pro_required';
+  if (proRequired) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+        <ScrollView contentContainerStyle={{ padding: Spacing.lg, alignItems: 'center', gap: Spacing.md, flexGrow: 1, justifyContent: 'center' }}>
+          <Ionicons name="pulse" size={56} color={Colors.accent} />
+          <Text style={{ color: Colors.text, fontSize: Typography.xl, fontWeight: Typography.bold, textAlign: 'center' }}>
+            Deal Radar is a Pro feature
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.base, textAlign: 'center', lineHeight: 22 }}>
+            Get push alerts when cards on your want list hit below-market prices on eBay — filtered by condition, seller rep, and time-to-close. Runs 24/7 so you don't have to keep refreshing search.
+          </Text>
+          <Button
+            title="Upgrade to Card Shop Pro"
+            onPress={() => navigation.navigate('Upgrade')}
+            style={{ alignSelf: 'stretch', marginTop: Spacing.md }}
+          />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: Spacing.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>Back</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   // Local form state mirrored off server-provided prefs.
   const [form, setForm] = useState(null);

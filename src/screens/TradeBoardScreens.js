@@ -974,10 +974,28 @@ export const TradeCardPickerScreen = ({ navigation, route }) => {
 // MAKE TRADE OFFER
 // ============================================================
 export const MakeTradeOfferScreen = ({ navigation, route }) => {
-  const { listingId } = route.params;
+  const { listingId, editOfferId } = route.params;
+  const isEditing = !!editOfferId;
   const qc = useQueryClient();
   const [selectedCardIds, setSelectedCardIds] = useState([]);
   const [message, setMessage] = useState('');
+  const [cashAmount, setCashAmount] = useState('');
+
+  // In edit mode, load the existing offer and pre-fill the form so
+  // the user can swap cards / adjust cash instead of starting over.
+  const { data: existingOffer } = useQuery({
+    queryKey: ['offer-detail', editOfferId],
+    queryFn: () => offersApi.get(editOfferId).then((r) => r.data),
+    enabled: isEditing,
+  });
+
+  useEffect(() => {
+    if (!existingOffer) return;
+    const cardIds = Array.isArray(existingOffer.trade_card_ids)
+      ? existingOffer.trade_card_ids : [];
+    setSelectedCardIds(cardIds);
+    if (existingOffer.offer_amount) setCashAmount(String(existingOffer.offer_amount));
+  }, [existingOffer]);
 
   const { data: listing } = useQuery({
     queryKey: ['trade-listing', listingId],
@@ -994,23 +1012,44 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
   );
 
   const createOffer = useMutation({
-    mutationFn: () => tradeOffersApi.create({
-      trade_listing_id: listingId,
-      trade_card_ids: selectedCardIds,
-      message: message.trim() || undefined,
-    }),
+    mutationFn: () => {
+      const cash = parseFloat(cashAmount);
+      const cashVal = Number.isFinite(cash) && cash > 0 ? cash : undefined;
+      if (isEditing) {
+        return tradeOffersApi.edit(editOfferId, {
+          trade_card_ids: selectedCardIds,
+          offer_amount: cashVal ?? null,
+          message: message.trim() || undefined,
+        });
+      }
+      return tradeOffersApi.create({
+        trade_listing_id: listingId,
+        trade_card_ids: selectedCardIds,
+        message: message.trim() || undefined,
+        offer_amount: cashVal,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
       qc.invalidateQueries({ queryKey: ['trade-offers-mine'] });
-      analytics.track(Events.OFFER_SENT, {
+      if (isEditing) qc.invalidateQueries({ queryKey: ['offer-detail', editOfferId] });
+      analytics.track(isEditing ? Events.OFFER_UPDATED : Events.OFFER_SENT, {
         cards_offered: selectedCardIds.length,
         has_message: !!message.trim(),
       });
-      Alert.alert('Offer sent', 'You will be notified if it is accepted, declined, or countered.');
+      Alert.alert(
+        isEditing ? 'Offer updated' : 'Offer sent',
+        isEditing
+          ? 'The recipient has been notified that your terms changed.'
+          : 'You will be notified if it is accepted, declined, or countered.'
+      );
       navigation.goBack();
     },
     onError: (err) => {
-      Alert.alert('Could not send offer', err?.response?.data?.error || 'Please try again.');
+      Alert.alert(
+        isEditing ? 'Could not update offer' : 'Could not send offer',
+        err?.response?.data?.error || 'Please try again.'
+      );
     },
   });
 
@@ -1029,7 +1068,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
-        title="Make offer"
+        title={isEditing ? 'Edit offer' : 'Make offer'}
         subtitle={listing ? formatCardTitle(listing) : ''}
         right={
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -1066,6 +1105,17 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
           );
         })}
 
+        <SectionHeader title="Cash on top (optional)" />
+        <Input
+          value={cashAmount}
+          onChangeText={setCashAmount}
+          placeholder="e.g. 20"
+          keyboardType="decimal-pad"
+        />
+        <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: -Spacing.sm, marginBottom: Spacing.md, fontStyle: 'italic' }}>
+          Off-platform IOU — cash, Venmo, Zelle at the meetup. Card Shop doesn't process payments.
+        </Text>
+
         <SectionHeader title="Add a note (optional)" />
         <Input
           value={message}
@@ -1076,7 +1126,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
         />
 
         <Button
-          title="Send offer"
+          title={isEditing ? 'Save changes' : 'Send offer'}
           onPress={() => createOffer.mutate()}
           loading={createOffer.isPending}
           disabled={!selectedCardIds.length}
@@ -1202,6 +1252,24 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
+        {/* Offered cards summary + optional cash boot */}
+        <View style={styles.offerTerms}>
+          <Text style={styles.offerTermsLabel}>Offer</Text>
+          <Text style={styles.offerTermsLine}>
+            {Array.isArray(offer.trade_card_ids) && offer.trade_card_ids.length
+              ? `${offer.trade_card_ids.length} card${offer.trade_card_ids.length === 1 ? '' : 's'}`
+              : 'No cards'}
+            {offer.offer_amount && Number(offer.offer_amount) > 0
+              ? ` + $${Number(offer.offer_amount).toFixed(2)} cash`
+              : ''}
+          </Text>
+          {offer.offer_amount && Number(offer.offer_amount) > 0 ? (
+            <Text style={styles.offerTermsSub}>
+              Cash handled off-platform at the meetup (Venmo, Zelle, in person).
+            </Text>
+          ) : null}
+        </View>
+
         {/* Trust card for the other party */}
         <View style={styles.trustCard}>
           <Text style={styles.trustCardLabel}>Other party</Text>
@@ -1267,14 +1335,28 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
+        {/* Sender actions — edit (only while pending) + withdraw. Edit
+            reuses MakeTradeOffer in 'edit' mode so the same UI drives
+            both create and update. */}
         {canRespond && amISender ? (
-          <Button
-            title="Withdraw offer"
-            variant="danger"
-            onPress={() => withdraw.mutate()}
-            loading={withdraw.isPending}
-            style={{ marginTop: Spacing.lg }}
-          />
+          <View style={{ gap: Spacing.sm, marginTop: Spacing.lg }}>
+            {offer.status === 'pending' ? (
+              <Button
+                title="Edit offer"
+                variant="secondary"
+                onPress={() => navigation.navigate('MakeTradeOffer', {
+                  listingId: offer.trade_listing_id,
+                  editOfferId: offer.id,
+                })}
+              />
+            ) : null}
+            <Button
+              title="Withdraw offer"
+              variant="danger"
+              onPress={() => withdraw.mutate()}
+              loading={withdraw.isPending}
+            />
+          </View>
         ) : null}
 
         {/* Block user — always available (can't block yourself) */}
@@ -1996,6 +2078,33 @@ const styles = StyleSheet.create({
   statusBannerText: {
     color: Colors.text,
     fontSize: Typography.sm,
+  },
+  offerTerms: {
+    padding: Spacing.base,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.base,
+  },
+  offerTermsLabel: {
+    color: Colors.accent,
+    fontSize: Typography.xs,
+    fontWeight: Typography.semibold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  offerTermsLine: {
+    color: Colors.text,
+    fontSize: Typography.base,
+    fontWeight: Typography.semibold,
+  },
+  offerTermsSub: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   trustCard: {
     padding: Spacing.base,

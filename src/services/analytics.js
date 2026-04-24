@@ -62,6 +62,7 @@ export const Events = {
 
   // Offers
   OFFER_SENT: 'offer_sent',
+  OFFER_UPDATED: 'offer_updated',
   OFFER_ACCEPTED: 'offer_accepted',
   OFFER_DECLINED: 'offer_declined',
   OFFER_COUNTERED: 'offer_countered',

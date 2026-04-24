@@ -418,6 +418,9 @@ export const tradeListingsApi = {
 export const tradeOffersApi = {
   create: (data) => api.post('/offers', { target_type: 'trade_listing', ...data }),
   withdraw: (id) => api.delete(`/offers/${id}`),
+  // Edit a pending offer you sent — swap cards, change cash, update
+  // message. Backend refuses once status !== 'pending'.
+  edit: (id, data) => api.patch(`/offers/${id}`, data),
 };
 
 // ============================================================
