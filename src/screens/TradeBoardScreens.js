@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ScrollView, Modal, Alert, Image,
@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   tradeListingsApi, tradeGroupsApi, tradeOffersApi,
   cardsApi, offersApi, pricingApi, safetyApi,
@@ -94,8 +94,17 @@ export const TradeBoardScreen = ({ navigation }) => {
   const [scope, setScope] = useState('all');
   const [groupId, setGroupId] = useState(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [nearbyLocation, setNearbyLocation] = useState(null); // { latitude, longitude }
   const [distanceMiles, setDistanceMiles] = useState(50);
+
+  // Debounce search input so we don't fire a new request on every
+  // keystroke. Queryfn still runs eventually, but the TextInput
+  // keeps focus because we're not changing the queryKey mid-typing.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const { data: groupsData } = useQuery({
     queryKey: ['my-trade-groups'],
@@ -113,9 +122,9 @@ export const TradeBoardScreen = ({ navigation }) => {
       p.lng = nearbyLocation.longitude;
       p.distance_miles = distanceMiles;
     }
-    if (search.trim()) p.search = search.trim();
+    if (debouncedSearch) p.search = debouncedSearch;
     return p;
-  }, [scope, groupId, search, nearbyLocation, distanceMiles]);
+  }, [scope, groupId, debouncedSearch, nearbyLocation, distanceMiles]);
 
   const enableNearby = async () => {
     const loc = await getDeviceLocation();
@@ -147,13 +156,19 @@ export const TradeBoardScreen = ({ navigation }) => {
     // Graceful degradation: one fast retry, don't blow up if the
     // API is rate-limited or mid-deploy — we show a retry tile
     // instead of an empty feed indistinguishable from "no results".
+    // placeholderData=keepPreviousData keeps the old results visible
+    // while a new query (e.g. search typing) is in flight — critical
+    // so we don't remount the SafeAreaView and drop keyboard focus.
     retry: 1,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const listings = data?.listings || [];
 
-  if (isLoading) return <LoadingScreen message="Loading the trade board..." />;
+  // Only show the full-screen loader on the very first load (no data
+  // yet). After that we keep the tree mounted so the TextInput keeps
+  // focus while search queries fire in the background.
+  if (isLoading && !data) return <LoadingScreen message="Loading the trade board..." />;
 
   const renderListing = ({ item }) => (
     <TouchableOpacity
