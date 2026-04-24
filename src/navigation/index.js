@@ -343,7 +343,7 @@ const AuthStack = () => (
 // cardshop://trade/<id>       → TradeListingDetail
 // ============================================================
 const linkingConfig = {
-  prefixes: ['cardshop://', 'https://admin.twomiah.com'],
+  prefixes: ['cardshop://', 'https://cardshopadmin.twomiah.com'],
   config: {
     screens: {
       Trade: {
