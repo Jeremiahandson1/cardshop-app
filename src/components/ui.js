@@ -84,36 +84,62 @@ export const Input = ({
   label, value, onChangeText, placeholder, secureTextEntry,
   keyboardType, autoCapitalize = 'none', error, style, multiline,
   numberOfLines, autoComplete, returnKeyType, onSubmitEditing, inputRef
-}) => (
-  <View style={{ marginBottom: Spacing.md }}>
-    {label && (
-      <Text style={inputStyles.label}>{label}</Text>
-    )}
-    <TextInput
-      ref={inputRef}
-      style={[
-        inputStyles.input,
-        multiline && { height: numberOfLines ? numberOfLines * 24 : 80, textAlignVertical: 'top', paddingTop: 12 },
-        error && { borderColor: Colors.error },
-        style
-      ]}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor={Colors.textMuted}
-      secureTextEntry={secureTextEntry}
-      keyboardType={keyboardType}
-      autoCapitalize={autoCapitalize}
-      multiline={multiline}
-      numberOfLines={numberOfLines}
-      autoComplete={autoComplete}
-      returnKeyType={returnKeyType}
-      onSubmitEditing={onSubmitEditing}
-      autoCorrect={false}
-    />
-    {error && <Text style={inputStyles.error}>{error}</Text>}
-  </View>
-);
+}) => {
+  // Local visibility state for password fields — tapping the eye
+  // icon flips secureTextEntry so the user can confirm what they
+  // typed. Only rendered when the caller asked for a secure input.
+  const [revealed, setRevealed] = useState(false);
+  const isSecure = !!secureTextEntry;
+  const obscure = isSecure && !revealed;
+
+  return (
+    <View style={{ marginBottom: Spacing.md }}>
+      {label && (
+        <Text style={inputStyles.label}>{label}</Text>
+      )}
+      <View style={{ position: 'relative', justifyContent: 'center' }}>
+        <TextInput
+          ref={inputRef}
+          style={[
+            inputStyles.input,
+            multiline && { height: numberOfLines ? numberOfLines * 24 : 80, textAlignVertical: 'top', paddingTop: 12 },
+            error && { borderColor: Colors.error },
+            isSecure && { paddingRight: 44 },
+            style
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={Colors.textMuted}
+          secureTextEntry={obscure}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          autoComplete={autoComplete}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          autoCorrect={false}
+        />
+        {isSecure ? (
+          <TouchableOpacity
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={8}
+            style={{ position: 'absolute', right: 12, padding: 4 }}
+            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+          >
+            <Ionicons
+              name={revealed ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color={Colors.textMuted}
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {error && <Text style={inputStyles.error}>{error}</Text>}
+    </View>
+  );
+};
 
 const inputStyles = StyleSheet.create({
   label: {

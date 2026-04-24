@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
+  RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { intelligenceApi } from '../services/api';
 import { CardIntelDetail } from '../components/CardIntelDetail';
@@ -101,6 +101,13 @@ export const CollectionIntelligenceView = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Guard against overlapping fetches. Without this a re-render
+  // mid-flight can fire a second request on top of the first;
+  // each failure used to surface its own Alert modal, producing
+  // the stacking/flickering "seizure" the user reported.
+  const inFlightRef = useRef(false);
 
   // Force-rebuild all snapshots from scratch. Wipes the user's
   // cached intelligence rows + scoped eBay cache entries so the
@@ -111,10 +118,11 @@ export const CollectionIntelligenceView = () => {
   const rebuild = useCallback(async () => {
     try {
       setRebuilding(true);
+      setErrorMsg(null);
       await intelligenceApi.refresh();
       await fetchPage({ reset: true, currentFilter: activeFilterRef.current });
     } catch (err) {
-      Alert.alert('Rebuild failed', err?.response?.data?.error || err?.message || 'Try again.');
+      setErrorMsg(err?.response?.data?.error || err?.message || 'Rebuild failed — try again.');
     } finally {
       setRebuilding(false);
     }
@@ -128,6 +136,8 @@ export const CollectionIntelligenceView = () => {
 
   const fetchPage = useCallback(
     async ({ reset = false, currentFilter }) => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       const useFilter = currentFilter ?? activeFilterRef.current;
       const nextOffset = reset ? 0 : offset;
 
@@ -145,6 +155,7 @@ export const CollectionIntelligenceView = () => {
         const incoming = Array.isArray(payload.rows) ? payload.rows : [];
 
         setTotal(typeof payload.total === 'number' ? payload.total : incoming.length);
+        setErrorMsg(null);
 
         if (reset) {
           setRows(incoming);
@@ -167,10 +178,15 @@ export const CollectionIntelligenceView = () => {
         }
       } catch (err) {
         const msg =
-          err?.response?.data?.message ||
-          err?.message ||
-          'Could not load intelligence.';
-        Alert.alert('Intelligence unavailable', msg);
+          err?.response?.status === 429
+            ? 'Too many requests — wait a minute and try again.'
+            : err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              err?.message ||
+              'Could not load intelligence.';
+        setErrorMsg(msg);
+      } finally {
+        inFlightRef.current = false;
       }
     },
     [offset],
@@ -226,6 +242,21 @@ export const CollectionIntelligenceView = () => {
 
   return (
     <View style={styles.container}>
+      {/* Error banner — replaces the old stacking Alert.alert so
+          repeated failures don't pile up modals. Dismissable, and
+          cleared on any successful fetch. */}
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.errorTitle}>Intelligence unavailable</Text>
+            <Text style={styles.errorBody}>{errorMsg}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setErrorMsg(null)} hitSlop={8}>
+            <Text style={styles.errorDismiss}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* Rebuild banner — only surfaces when every visible row is
           "insufficient" (data arrived after the cache was filled). */}
       {needsRebuild ? (
@@ -288,15 +319,17 @@ export const CollectionIntelligenceView = () => {
           onEndReachedThreshold={0.4}
           ListFooterComponent={listFooter}
           ListEmptyComponent={
-            <EmptyState
-              icon="📊"
-              title="No intelligence yet"
-              message={
-                filter === 'all'
-                  ? 'Register cards to start seeing blended values and trend signals.'
-                  : 'No cards match this filter. Try another one.'
-              }
-            />
+            errorMsg ? null : (
+              <EmptyState
+                icon="📊"
+                title="No intelligence yet"
+                message={
+                  filter === 'all'
+                    ? 'Register cards to start seeing blended values and trend signals.'
+                    : 'No cards match this filter. Try another one.'
+                }
+              />
+            )
           }
         />
       )}
@@ -429,6 +462,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent + '15',
     borderWidth: 1,
     borderColor: Colors.accent + '55',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.error + '15',
+    borderWidth: 1,
+    borderColor: Colors.error + '55',
+  },
+  errorTitle: {
+    color: Colors.error,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+    marginBottom: 2,
+  },
+  errorBody: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+  },
+  errorDismiss: {
+    color: Colors.error,
+    fontSize: 16,
+    fontWeight: Typography.semibold,
+    paddingLeft: 4,
   },
   rebuildTitle: {
     color: Colors.accent,
