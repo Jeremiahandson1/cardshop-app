@@ -2256,6 +2256,31 @@ export const CardDetailScreen = ({ navigation, route }) => {
             </View>
           )}
 
+          {/* Request new sticker — owner only. Reprint replaces the
+              physical QR on a card when it peels, gets damaged, or
+              goes missing. Owner is the only role that can request
+              one (fraud prevention — someone else can't invalidate
+              your sticker). */}
+          {card.owner_id && currentUserId && card.owner_id === currentUserId ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('RequestReprint', {
+                cardId: card.id,
+                cardTitle: [card.year, card.set_name, card.player_name].filter(Boolean).join(' · '),
+              })}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+                backgroundColor: Colors.surface,
+              }}
+            >
+              <Ionicons name="refresh-outline" size={18} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontWeight: '600' }}>
+                Request new sticker
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           {/* Message Owner — only when a non-owner is viewing
               this card. Opens (or resumes) the card-scoped chat
               thread. Owners see the Transfer button below instead. */}

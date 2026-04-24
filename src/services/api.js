@@ -179,6 +179,12 @@ export const qrApi = {
   generateBatch: (data) => api.post('/qr/generate-batch', data),
 };
 
+// Sticker reprints — owner requests a replacement QR sticker.
+// Fee is $2/single. Old sticker superseded at request time.
+export const stickerReprintApi = {
+  request: (cardId, data) => api.post(`/cards/${cardId}/reprint-request`, data),
+};
+
 // ============================================================
 // STORE INVENTORY — for store_staff + store_owner roles only.
 // Back-end gates every call by role + store_staff membership.
