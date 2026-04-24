@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, Alert, KeyboardAvoidingView, Platform,
+  FlatList, Alert, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { showMessage } from 'react-native-flash-message';
-import { wantListApi, authApi } from '../services/api';
+import { wantListApi, authApi, notificationsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -17,9 +17,58 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 // ============================================================
 // PROFILE SCREEN
 // ============================================================
+// Pick the right icon + tap destination for a given notification
+// type/data. Centralized here so the Profile banner and the full
+// Notifications screen can agree on behavior. The destination
+// defaults to the Notifications inbox if we don't recognize the type.
+const NOTIFICATION_MAP = {
+  message:           { icon: 'mail',              color: '#4ecdc4', dest: (n, nav) => n.data?.conversation_id ? nav.navigate('Conversation', { conversationId: n.data.conversation_id }) : nav.navigate('ConversationList') },
+  transfer_request:  { icon: 'swap-horizontal',   color: '#e8c547', dest: (n, nav) => nav.navigate('Transfers') },
+  transfer_complete: { icon: 'checkmark-circle',  color: '#4ade80', dest: (n, nav) => nav.navigate('Transfers') },
+  want_list_match:   { icon: 'heart',             color: '#ff6b6b', dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('WantList') },
+  inquiry:           { icon: 'chatbubble',        color: '#4ecdc4', dest: (n, nav) => nav.navigate('ConversationList') },
+  dispute:           { icon: 'warning',           color: '#f87171', dest: (n, nav) => nav.navigate('DisputeList') },
+  tracking_update:   { icon: 'cube',              color: '#60a5fa', dest: (n, nav) => nav.navigate('Transfers') },
+  counter_claim:     { icon: 'git-compare',       color: '#f87171', dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+};
+const defaultNotifCfg = { icon: 'notifications', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') };
+
 export const ProfileScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const qc = useQueryClient();
+
+  // Pull the 3 most recent unread notifications so we can show a
+  // banner at the top of Profile explaining why the tab badge is
+  // lit. Without this the user sees "Profile (1)" and has no clue
+  // what the 1 refers to.
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications', 'unread-preview'],
+    queryFn: () => notificationsApi.get({ unread_only: true, limit: 3 }).then((r) => r.data),
+    refetchInterval: 30000,
+  });
+  const unreadNotifs = unreadData?.notifications || [];
+
+  const markReadMut = useMutation({
+    mutationFn: (ids) => notificationsApi.markRead(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const tapNotification = (n) => {
+    markReadMut.mutate([n.id]);
+    const cfg = NOTIFICATION_MAP[n.type] || defaultNotifCfg;
+    cfg.dest(n, navigation);
+  };
+
+  // Deep-link helper for the Admin + Store sections. These surfaces
+  // are web-only right now, so we open the browser rather than
+  // building 20 mobile screens that duplicate the dashboard. When a
+  // given page is needed more ergonomically on the phone we'll build
+  // a native version and swap the URL for a navigation() call.
+  const openAdminUrl = (path) => {
+    const url = `https://cardshopadmin.twomiah.com${path}`;
+    Linking.openURL(url).catch(() => Alert.alert('Could not open', url));
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure?', [
@@ -67,7 +116,23 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Store',
       items: [
         { icon: 'add-circle-outline', label: 'Intake card (scan → tag)', onPress: () => navigation.navigate('StoreIntake') },
-        { icon: 'storefront-outline', label: 'My Store Dashboard', onPress: () => {} },
+        { icon: 'search-outline', label: 'Cross-location inventory search', onPress: () => openAdminUrl('/inventory/search') },
+        { icon: 'git-compare-outline', label: 'Transfer requests', onPress: () => openAdminUrl('/inventory/transfer-requests') },
+        { icon: 'people-outline', label: 'Manage staff', onPress: () => openAdminUrl('/staff') },
+        { icon: 'location-outline', label: 'Manage locations', onPress: () => openAdminUrl('/locations') },
+        { icon: 'analytics-outline', label: 'Store analytics', onPress: () => openAdminUrl('/analytics') },
+        { icon: 'qr-code-outline', label: 'QR batches', onPress: () => openAdminUrl('/qr') },
+      ]
+    }] : []),
+    ...(user?.role === 'admin' ? [{
+      section: 'Admin (platform-wide)',
+      items: [
+        { icon: 'shield-outline', label: 'Admin overview', onPress: () => openAdminUrl('/admin') },
+        { icon: 'person-outline', label: 'Users', onPress: () => openAdminUrl('/admin/users') },
+        { icon: 'clipboard-outline', label: 'Support tickets', onPress: () => openAdminUrl('/admin/tickets') },
+        { icon: 'warning-outline', label: 'Stolen reports', onPress: () => openAdminUrl('/admin/stolen') },
+        { icon: 'git-compare-outline', label: 'Counter-claims', onPress: () => openAdminUrl('/admin/counter-claims') },
+        { icon: 'time-outline', label: 'Audit log', onPress: () => openAdminUrl('/admin/audit-log') },
       ]
     }] : []),
     {
@@ -120,6 +185,51 @@ export const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Unread notification banner — explains what the tab
+            badge is about and gives one-tap access. Each tap marks
+            the notification read (so the badge clears) and navigates
+            to the right screen. */}
+        {unreadNotifs.length > 0 && (
+          <View style={styles.notifBanner}>
+            <View style={styles.notifBannerHeader}>
+              <Text style={styles.notifBannerTitle}>
+                {unreadNotifs.length} new {unreadNotifs.length === 1 ? 'notification' : 'notifications'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => markReadMut.mutate(unreadNotifs.map((n) => n.id))}
+              >
+                <Text style={styles.notifMarkAll}>Mark all read</Text>
+              </TouchableOpacity>
+            </View>
+            {unreadNotifs.map((n) => {
+              const cfg = NOTIFICATION_MAP[n.type] || defaultNotifCfg;
+              return (
+                <TouchableOpacity
+                  key={n.id}
+                  style={styles.notifRow}
+                  onPress={() => tapNotification(n)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.notifIcon, { backgroundColor: cfg.color + '22', borderColor: cfg.color + '55' }]}>
+                    <Ionicons name={cfg.icon} size={16} color={cfg.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifRowTitle} numberOfLines={1}>{n.title}</Text>
+                    {n.body ? <Text style={styles.notifRowBody} numberOfLines={1}>{n.body}</Text> : null}
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.notifViewAll}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Text style={styles.notifViewAllText}>View all notifications →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Menu sections */}
         {MENU.map((section) => (
@@ -564,6 +674,37 @@ const styles = StyleSheet.create({
   statValue: { color: Colors.text, fontSize: Typography.lg, fontWeight: Typography.bold },
   statLabel: { color: Colors.textMuted, fontSize: Typography.xs },
   statDivider: { width: 1, height: 24, backgroundColor: Colors.border },
+
+  notifBanner: {
+    marginHorizontal: Spacing.base, marginTop: Spacing.md, marginBottom: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.accent + '55',
+    overflow: 'hidden',
+  },
+  notifBannerHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.base, paddingTop: Spacing.sm, paddingBottom: 6,
+  },
+  notifBannerTitle: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
+  notifMarkAll: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold },
+  notifRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  notifIcon: {
+    width: 32, height: 32, borderRadius: 16, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  notifRowTitle: { color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.semibold },
+  notifRowBody: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 1 },
+  notifViewAll: {
+    paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    alignItems: 'center',
+  },
+  notifViewAllText: { color: Colors.accent, fontSize: Typography.xs, fontWeight: Typography.semibold },
+
   menuSection: { paddingHorizontal: Spacing.base, marginBottom: Spacing.md },
   menuSectionTitle: {
     color: Colors.textMuted, fontSize: Typography.xs,
