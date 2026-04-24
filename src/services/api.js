@@ -179,6 +179,20 @@ export const qrApi = {
   generateBatch: (data) => api.post('/qr/generate-batch', data),
 };
 
+// ============================================================
+// STORE INVENTORY — for store_staff + store_owner roles only.
+// Back-end gates every call by role + store_staff membership.
+// ============================================================
+export const storeInventoryApi = {
+  myLocations: () => api.get('/store-inventory/my-locations'),
+  search: (params) => api.get('/store-inventory/search', { params }),
+  getCard: (id) => api.get(`/store-inventory/card/${id}`),
+  transferRequests: (params) =>
+    api.get('/store-inventory/transfer-requests', { params }),
+  createTransferRequest: (data) =>
+    api.post('/store-inventory/transfer-requests', data),
+};
+
 
 // ============================================================
 // WANT LIST

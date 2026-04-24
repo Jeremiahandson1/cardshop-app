@@ -21,6 +21,7 @@ import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/Au
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
+import { StoreIntakeScreen } from '../screens/StoreIntakeScreen';
 import { ConversationListScreen, ConversationScreen } from '../screens/MessagesScreens';
 import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { FeedbackScreen } from '../screens/FeedbackScreen';
@@ -200,6 +201,7 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="ConversationList" component={ConversationListScreen} />
     <CollectionStackNav.Screen name="Conversation" component={ConversationScreen} />
     <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <CollectionStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <CollectionStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <CollectionStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
@@ -285,6 +287,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="DeleteAccount" component={DeleteAccountScreen} />
     <ProfileStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <ProfileStackNav.Screen name="Feedback" component={FeedbackScreen} />
+    <ProfileStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
   </ProfileStackNav.Navigator>
 );
 

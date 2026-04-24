@@ -63,11 +63,11 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
       ]
     },
-    ...(user?.role === 'store_owner' ? [{
+    ...(['store_owner', 'store_staff', 'admin'].includes(user?.role) ? [{
       section: 'Store',
       items: [
+        { icon: 'add-circle-outline', label: 'Intake card (scan → tag)', onPress: () => navigation.navigate('StoreIntake') },
         { icon: 'storefront-outline', label: 'My Store Dashboard', onPress: () => {} },
-        { icon: 'add-circle-outline', label: 'Create Store', onPress: () => {} },
       ]
     }] : []),
     {
