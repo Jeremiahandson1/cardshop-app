@@ -21,13 +21,15 @@
       "channel": "development"
     },
     "preview": {
-      "distribution": "internal",
+      "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium",
-        "simulator": false
+        "simulator": false,
+        "distribution": "store"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "distribution": "internal"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://cardshop-api-ow4q.onrender.com",
@@ -55,8 +57,7 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "appleTeamId": "63XSWU8M5Z"
       },
       "android": {
         "track": "internal",
