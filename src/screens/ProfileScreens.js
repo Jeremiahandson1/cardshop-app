@@ -92,13 +92,26 @@ export const ProfileScreen = ({ navigation }) => {
       ]
     },
     {
-      section: 'Binders & Offers',
+      section: 'Trading',
       items: [
+        { icon: 'swap-horizontal-outline', label: 'My trade offers (sent & received)', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'My Binders', onPress: () => navigation.navigate('BinderList') },
+        { icon: 'chatbox-ellipses-outline', label: 'Binder offers', onPress: () => navigation.navigate('OffersList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
-        { icon: 'chatbox-ellipses-outline', label: 'Offers', onPress: () => navigation.navigate('OffersList') },
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
+      ]
+    },
+    {
+      section: 'Collection',
+      items: [
+        { icon: 'grid-outline', label: 'Set completion', onPress: () => navigation.navigate('SetsList') },
+        { icon: 'search-outline', label: 'Browse sets', onPress: () => navigation.navigate('BrowseSets') },
+      ]
+    },
+    {
+      section: 'Upgrade',
+      items: [
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
         { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
       ]

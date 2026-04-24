@@ -255,18 +255,20 @@ export const TradeBoardScreen = ({ navigation }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
         title="Trade Board"
-        subtitle="List cards. Find trades. Meet up off-platform. [v4]"
+        subtitle="List cards. Find trades. Meet up off-platform."
         right={
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('SetsList')}
+              onPress={() => navigation.navigate('TradeOffersList')}
               style={styles.headerIconButton}
+              accessibilityLabel="My trade offers"
             >
-              <Ionicons name="grid-outline" size={18} color={Colors.accent} />
+              <Ionicons name="mail-outline" size={18} color={Colors.accent} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate('CreateTradeListing')}
               style={styles.newListingButton}
+              accessibilityLabel="New listing"
             >
               <Ionicons name="add" size={18} color={Colors.bg} />
             </TouchableOpacity>

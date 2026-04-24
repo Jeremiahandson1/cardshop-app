@@ -288,6 +288,11 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <ProfileStackNav.Screen name="Feedback" component={FeedbackScreen} />
     <ProfileStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
+    <ProfileStackNav.Screen name="TradeOffersList" component={TradeOffersListScreen} />
+    <ProfileStackNav.Screen name="TradeOfferDetail" component={TradeOfferDetailScreen} />
+    <ProfileStackNav.Screen name="SetsList" component={SetsListScreen} />
+    <ProfileStackNav.Screen name="BrowseSets" component={BrowseSetsScreen} />
+    <ProfileStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
   </ProfileStackNav.Navigator>
 );
 
