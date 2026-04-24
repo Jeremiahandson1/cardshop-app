@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  Image, KeyboardAvoidingView, Platform, ScrollView, Alert,
+  Image, KeyboardAvoidingView, Platform, ScrollView, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -226,6 +226,7 @@ export const LCSShopDetailScreen = ({ navigation, route }) => {
         )}
         ListHeaderComponent={
           <View style={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.md }}>
+            <ShopActionRow shop={shopData} />
             <Button
               title="Post a price"
               onPress={() => navigation.navigate('LCSPostPrice', { shopId, shopName: shopData?.name || shopName })}
@@ -241,6 +242,67 @@ export const LCSShopDetailScreen = ({ navigation, route }) => {
         }
       />
     </SafeAreaView>
+  );
+};
+
+// ============================================================
+// Action row on the shop detail: directions / call / website.
+// Each button only appears if we have the data for it. Directions
+// opens Apple Maps on iOS and Google Maps on Android — both handle
+// the universal maps.google.com URL, but the native schemes give a
+// cleaner UX by skipping Safari/Chrome.
+// ============================================================
+const ShopActionRow = ({ shop }) => {
+  if (!shop) return null;
+  const openDirections = () => {
+    const { lat, lng, address_line1, city, state } = shop;
+    const label = encodeURIComponent(shop.name || 'Card shop');
+    let url;
+    if (lat != null && lng != null) {
+      url = Platform.select({
+        ios: `http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`,
+        android: `google.navigation:q=${lat},${lng}`,
+        default: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+      });
+    } else {
+      const addr = encodeURIComponent([address_line1, city, state].filter(Boolean).join(', '));
+      if (!addr) return;
+      url = Platform.select({
+        ios: `http://maps.apple.com/?daddr=${addr}`,
+        default: `https://www.google.com/maps/dir/?api=1&destination=${addr}`,
+      });
+    }
+    Linking.openURL(url).catch(() =>
+      Alert.alert('Could not open Maps', 'No maps app is available on this device.'),
+    );
+  };
+  const openPhone = () => Linking.openURL(`tel:${shop.phone}`);
+  const openWebsite = () => Linking.openURL(shop.website);
+
+  const hasAnyAction = (shop.lat != null && shop.lng != null) || shop.address_line1 || shop.phone || shop.website;
+  if (!hasAnyAction) return null;
+
+  return (
+    <View style={styles.actionRow}>
+      {((shop.lat != null && shop.lng != null) || shop.address_line1) ? (
+        <TouchableOpacity onPress={openDirections} style={styles.actionBtn}>
+          <Ionicons name="navigate" size={18} color={Colors.accent} />
+          <Text style={styles.actionBtnText}>Directions</Text>
+        </TouchableOpacity>
+      ) : null}
+      {shop.phone ? (
+        <TouchableOpacity onPress={openPhone} style={styles.actionBtn}>
+          <Ionicons name="call" size={18} color={Colors.accent} />
+          <Text style={styles.actionBtnText}>Call</Text>
+        </TouchableOpacity>
+      ) : null}
+      {shop.website ? (
+        <TouchableOpacity onPress={openWebsite} style={styles.actionBtn}>
+          <Ionicons name="globe-outline" size={18} color={Colors.accent} />
+          <Text style={styles.actionBtnText}>Website</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 };
 
@@ -557,6 +619,29 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     marginBottom: Spacing.base,
     lineHeight: 22,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  actionBtnText: {
+    color: Colors.accent,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
   },
 
   shopCard: {
