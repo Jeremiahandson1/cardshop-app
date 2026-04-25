@@ -602,7 +602,7 @@ export const BinderCardPickerScreen = ({ navigation, route }) => {
     if (!cardSettings[id]) {
       setCardSettings((prev) => ({
         ...prev,
-        [id]: { intent_signal: 'sell', asking_price: '', floor_price: '', owner_note: '' },
+        [id]: { intent_signal: 'priced_to_move', asking_price: '', floor_price: '', owner_note: '' },
       }));
     }
   };
@@ -620,9 +620,13 @@ export const BinderCardPickerScreen = ({ navigation, route }) => {
       Alert.alert('Select Cards', 'Please select at least one card to add.');
       return;
     }
+    // API expects { card_id, intent_signal, ... } — see binders.js
+    // POST /:id/cards. Mobile previously used `owned_card_id` and a
+    // different enum vocabulary, both of which got rejected by the
+    // validate middleware as "Validation failed".
     const cardsPayload = cardIds.map((id) => ({
-      owned_card_id: id,
-      intent_signal: cardSettings[id]?.intent_signal || 'sell',
+      card_id: id,
+      intent_signal: cardSettings[id]?.intent_signal || 'priced_to_move',
       asking_price: cardSettings[id]?.asking_price ? parseFloat(cardSettings[id].asking_price) : undefined,
       floor_price: cardSettings[id]?.floor_price ? parseFloat(cardSettings[id].floor_price) : undefined,
       owner_note: cardSettings[id]?.owner_note || undefined,
@@ -630,12 +634,13 @@ export const BinderCardPickerScreen = ({ navigation, route }) => {
     addCardsMutation.mutate({ cards: cardsPayload });
   };
 
+  // Keys must match the API enum exactly — see
+  // body('cards.*.intent_signal').isIn([...]) in binders.js.
   const INTENTS = [
-    { key: 'sell', label: 'Sell' },
-    { key: 'trade', label: 'Trade' },
-    { key: 'sell_or_trade', label: 'Both' },
-    { key: 'showcase', label: 'Showcase' },
-    { key: 'nfs', label: 'NFS' },
+    { key: 'priced_to_move', label: 'Priced' },
+    { key: 'lets_talk', label: 'Let\'s talk' },
+    { key: 'trade_only', label: 'Trade only' },
+    { key: 'not_for_sale', label: 'Showcase' },
   ];
 
   if (isLoading) return <LoadingScreen message="Loading your collection..." />;
@@ -1077,7 +1082,7 @@ export const BinderCardDetailScreen = ({ navigation, route }) => {
 
       {/* Action buttons */}
       <View style={styles.submitBar}>
-        {card.intent_signal !== 'nfs' && card.intent_signal !== 'showcase' ? (
+        {card.intent_signal !== 'not_for_sale' ? (
           <Button
             title={card.asking_price ? `Buy $${card.asking_price}` : 'Make Offer'}
             onPress={() => navigation.navigate('MakeOffer', {
