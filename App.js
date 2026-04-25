@@ -11,6 +11,11 @@ import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
 import { registerForPushNotificationsAsync } from './src/services/pushRegistration';
 import { initAnalytics, analytics } from './src/services/analytics';
+import {
+  configureRevenueCat,
+  linkRevenueCatUser,
+  unlinkRevenueCatUser,
+} from './src/lib/revenuecat';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,9 +35,14 @@ const AppInner = () => {
   useEffect(() => {
     initialize();
     initAnalytics();
+    // Bootstrap RevenueCat once on app launch — safe no-op when no
+    // platform key is configured (web, dev without keys).
+    configureRevenueCat();
   }, [initialize]);
 
-  // Once authenticated, register for push + identify to analytics.
+  // Once authenticated, register for push + identify to analytics +
+  // alias the RevenueCat anonymous purchaser to our user_id so the
+  // server-side webhook can map purchases back to a Card Shop user.
   const user = useAuthStore((s) => s.user);
   useEffect(() => {
     if (isAuthenticated) {
@@ -42,9 +52,11 @@ const AppInner = () => {
           email: user.email,
           username: user.username,
         });
+        linkRevenueCatUser(user.id);
       }
     } else {
       analytics.reset();
+      unlinkRevenueCatUser();
     }
   }, [isAuthenticated, user?.id]);
 

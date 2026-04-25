@@ -158,12 +158,15 @@
       "expo-secure-store",
       "expo-sharing",
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      "react-native-purchases"
     ],
     "scheme": "cardshop",
     "extra": {
       "API_URL": "https://cardshop-api-ow4q.onrender.com",
       "LCS_ENABLED": true,
+      "REVENUECAT_IOS_KEY": "test_wtknlvjBvQEZcaTxrqLmAsCiVXA",
+      "REVENUECAT_ANDROID_KEY": "test_wtknlvjBvQEZcaTxrqLmAsCiVXA",
       "eas": {
         "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
       }
