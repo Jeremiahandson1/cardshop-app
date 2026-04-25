@@ -98,7 +98,14 @@ export const BinderListScreen = ({ navigation }) => {
   const renderBinder = ({ item }) => (
     <TouchableOpacity
       style={styles.binderItem}
-      onPress={() => navigation.navigate('BinderEditor', { binderId: item.id })}
+      // Tapping a binder shows its cards (PublicBinder view). When
+      // the viewer is the owner, that screen surfaces an Edit gear
+      // that routes to BinderEditor for settings/sections. Going
+      // straight to BinderEditor was the old behavior and confused
+      // users who expected to see their cards first.
+      onPress={() => item.link_token
+        ? navigation.navigate('PublicBinder', { linkToken: item.link_token, binderId: item.id })
+        : navigation.navigate('BinderEditor', { binderId: item.id })}
       activeOpacity={0.85}
     >
       <View style={styles.binderIcon}>
@@ -873,6 +880,11 @@ export const PublicBinderScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   ), [navigation, binder, linkToken]);
 
+  // Owner viewing their own binder gets an Edit gear in the header.
+  // Compare against the resolved owner.id from the API response so we
+  // don't depend on the link_token alone (which could be public).
+  const isOwner = !!user && !!binder?.owner?.id && binder.owner.id === user.id;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header with back */}
@@ -881,9 +893,19 @@ export const PublicBinderScreen = ({ navigation, route }) => {
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{binder.name}</Text>
-        <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-          <Ionicons name="options-outline" size={22} color={Colors.accent} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {isOwner ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('BinderEditor', { binderId: paramBinderId || binder.id })}
+              accessibilityLabel="Edit binder"
+            >
+              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
+            <Ionicons name="options-outline" size={22} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
