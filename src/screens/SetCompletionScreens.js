@@ -403,9 +403,9 @@ export const SetCompletionScreen = ({ navigation, route }) => {
   });
 
   const filteredCards = useMemo(() => {
-    if (!data) return [];
-    if (filter === 'all') return data.cards;
-    return data.cards.filter((c) => c.state === filter);
+    const cards = data?.cards || [];
+    if (filter === 'all') return cards;
+    return cards.filter((c) => c.state === filter);
   }, [data, filter]);
 
   if (isLoading || !data) return <LoadingScreen message="Loading set..." />;

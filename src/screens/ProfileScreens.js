@@ -81,7 +81,9 @@ export const ProfileScreen = ({ navigation }) => {
     {
       section: 'Account',
       items: [
-        { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+        // "Edit Profile" was a no-op; the individual settings below
+        // (Change Email, Security, Notifications) cover what would
+        // have been on a single edit-profile screen.
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
         { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
@@ -89,7 +91,6 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
         { icon: 'trash-outline', label: 'Delete Account', onPress: () => navigation.navigate('DeleteAccount'), danger: true },
         { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
-        { icon: 'star-outline', label: 'Feedback & Ratings', onPress: () => {} },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
         { icon: 'swap-horizontal-outline', label: 'Transfer History', onPress: () => navigation.navigate('Transfers') },
       ]
@@ -123,8 +124,9 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'Tools',
       items: [
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
-        { icon: 'radio-outline', label: 'Receive via NFC', onPress: () => {} },
-        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => {} },
+        // "Receive via NFC" had no dedicated screen — NFC receive is
+        // already part of the Transfers flow. Removed to keep menu honest.
+        // "Messages" duplicated the Trading section row at line ~103.
         { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
       ]
     },
@@ -160,7 +162,9 @@ export const ProfileScreen = ({ navigation }) => {
     {
       section: 'Support',
       items: [
-        { icon: 'help-circle-outline', label: 'Help & FAQ', onPress: () => {} },
+        // No in-app FAQ screen yet — route to support email so the
+        // button isn't a dead end. Replace with a real FAQ later.
+        { icon: 'help-circle-outline', label: 'Help & FAQ', onPress: () => Linking.openURL('mailto:support@twomiah.com?subject=Card%20Shop%20question') },
         { icon: 'log-out-outline', label: 'Sign Out', onPress: handleLogout, danger: true },
       ]
     }

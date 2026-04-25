@@ -1299,17 +1299,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
             </TouchableOpacity>
           )}
-          ListFooterComponent={
-            <TouchableOpacity
-              style={styles.createNewBtn}
-              onPress={() => {
-                // TODO: navigate to add custom parallel
-              }}
-            >
-              <Ionicons name="add-circle" size={18} color={Colors.accent} />
-              <Text style={styles.createNewText}>Add a parallel not listed here</Text>
-            </TouchableOpacity>
-          }
+          // Custom-parallel entry was wired to a TODO; the screen
+          // doesn't exist yet. Hidden until we build it — better to
+          // omit than to ship a tap that does nothing.
         />
       </SafeAreaView>
     );
@@ -2190,7 +2182,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 {(asks.research_links || []).map((link) => (
                   <TouchableOpacity
                     key={link.label}
-                    onPress={() => Linking.openURL(link.url).catch(() => {})}
+                    onPress={() => Linking.openURL(link.url).catch((err) => {
+                      console.warn('Failed to open URL', link.url, err?.message);
+                      Alert.alert('Could not open link', 'Try tapping again, or copy the URL manually.');
+                    })}
                     style={{
                       paddingHorizontal: 10, paddingVertical: 4,
                       borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.accent,

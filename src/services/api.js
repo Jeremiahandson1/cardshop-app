@@ -10,6 +10,17 @@ const API_URL =
   Constants.expoConfig?.extra?.API_URL ||
   'http://localhost:5000';
 
+// Loud warning when a production build somehow ends up pointing at
+// localhost — typically means EXPO_PUBLIC_API_URL is missing from the
+// EAS profile AND app.json's extra.API_URL was emptied. Without this
+// the entire app silently 404s and looks like a backend outage.
+if (!__DEV__ && API_URL.includes('localhost')) {
+  console.error(
+    '[api] PRODUCTION BUILD POINTING AT LOCALHOST. ' +
+    'EXPO_PUBLIC_API_URL or app.json extra.API_URL must be set.',
+  );
+}
+
 export const api = axios.create({
   baseURL: `${API_URL}/api`,
   timeout: 15000,
