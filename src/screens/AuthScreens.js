@@ -16,9 +16,12 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 export const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpRequired, setTotpRequired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const passwordRef = useRef();
+  const totpRef = useRef();
   const login = useAuthStore((s) => s.login);
 
   const handleLogin = async () => {
@@ -26,10 +29,18 @@ export const LoginScreen = ({ navigation }) => {
       setError('Email and password are required');
       return;
     }
+    if (totpRequired && !totpCode) {
+      setError('2FA code required');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const result = await login(email.toLowerCase().trim(), password);
+      const result = await login(
+        email.toLowerCase().trim(),
+        password,
+        totpCode || undefined,
+      );
       // Signing in during the 30-day grace window cancels a pending deletion;
       // the server signals that via `deletion_cancelled` on the login response.
       if (result?.deletion_cancelled) {
@@ -40,9 +51,22 @@ export const LoginScreen = ({ navigation }) => {
         });
       }
     } catch (err) {
+      const code = err?.response?.data?.code;
+      if (code === 'totp_required') {
+        setTotpRequired(true);
+        setError('');
+        // Focus the TOTP field in the next render
+        setTimeout(() => totpRef.current?.focus?.(), 100);
+        setLoading(false);
+        return;
+      }
+      if (code === 'totp_invalid') {
+        setTotpRequired(true);
+        setError('That 2FA code is incorrect.');
+        setLoading(false);
+        return;
+      }
       // Verbose error surfacing while we diagnose the "login failed" report.
-      // Shows server error if present, else the network-level clue so the
-      // user can read back exactly what's happening.
       const parts = [];
       if (err.response?.data?.error) parts.push(err.response.data.error);
       else {
@@ -96,13 +120,27 @@ export const LoginScreen = ({ navigation }) => {
               placeholder="••••••••"
               secureTextEntry
               autoComplete="password"
-              returnKeyType="done"
-              onSubmitEditing={handleLogin}
+              returnKeyType={totpRequired ? 'next' : 'done'}
+              onSubmitEditing={totpRequired ? () => totpRef.current?.focus?.() : handleLogin}
               inputRef={passwordRef}
             />
 
+            {totpRequired ? (
+              <Input
+                label="2FA code"
+                value={totpCode}
+                onChangeText={setTotpCode}
+                placeholder="6-digit code or backup code"
+                autoComplete="one-time-code"
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                inputRef={totpRef}
+              />
+            ) : null}
+
             <Button
-              title="Sign In"
+              title={totpRequired ? 'Verify & sign in' : 'Sign In'}
               onPress={handleLogin}
               loading={loading}
               style={{ marginTop: Spacing.sm }}

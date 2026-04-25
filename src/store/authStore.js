@@ -46,8 +46,11 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async (email, password) => {
-    const res = await authApi.login({ email, password });
+  login: async (email, password, totpCode) => {
+    const res = await authApi.login({
+      email, password,
+      ...(totpCode ? { totp_code: totpCode } : {}),
+    });
     const { user, accessToken, refreshToken, deletion_cancelled } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);

@@ -179,6 +179,25 @@ export const qrApi = {
   generateBatch: (data) => api.post('/qr/generate-batch', data),
 };
 
+// ============================================================
+// TWO-FACTOR AUTH — mirrors the dashboard's /security page.
+// ============================================================
+export const twoFactorApi = {
+  status: () => api.get('/auth/2fa/status'),
+  setup: () => api.post('/auth/2fa/setup'),
+  verify: (code) => api.post('/auth/2fa/verify', { code }),
+  disable: (password, code) => api.post('/auth/2fa/disable', { password, code }),
+  regenerateBackupCodes: (password) =>
+    api.post('/auth/2fa/backup-codes/regenerate', { password }),
+};
+
+// Stripe Customer Portal — exchange for a short-lived URL and
+// open it in the system browser. Handles card swaps, cancellations,
+// invoices — all the usual subscription management.
+export const billingApi = {
+  portalUrl: () => api.post('/billing/portal'),
+};
+
 // Sticker reprints — owner requests a replacement QR sticker.
 // Fee is $2/single. Old sticker superseded at request time.
 export const stickerReprintApi = {
