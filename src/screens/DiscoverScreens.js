@@ -121,11 +121,7 @@ export const DiscoverScreen = ({ navigation }) => {
               <EmptyState
                 icon="🔍"
                 title="No results"
-                message="Try a different search or add this card to the catalog"
-                action={{
-                  label: 'Add to Catalog',
-                  onPress: () => {}
-                }}
+                message="Try a different search."
               />
             ) : null
           }
