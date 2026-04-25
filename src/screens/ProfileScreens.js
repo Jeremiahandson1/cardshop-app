@@ -84,6 +84,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
+        { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
         { icon: 'card-outline', label: 'Manage subscription', onPress: () => navigation.navigate('SubscriptionManage') },
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
         { icon: 'trash-outline', label: 'Delete Account', onPress: () => navigation.navigate('DeleteAccount'), danger: true },

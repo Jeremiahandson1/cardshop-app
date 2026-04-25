@@ -25,6 +25,7 @@ import { StoreIntakeScreen } from '../screens/StoreIntakeScreen';
 import { RequestReprintScreen } from '../screens/RequestReprintScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { SubscriptionManageScreen } from '../screens/SubscriptionManageScreen';
+import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
 import { ConversationListScreen, ConversationScreen } from '../screens/MessagesScreens';
 import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { FeedbackScreen } from '../screens/FeedbackScreen';
@@ -295,6 +296,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
     <ProfileStackNav.Screen name="Security" component={SecurityScreen} />
     <ProfileStackNav.Screen name="SubscriptionManage" component={SubscriptionManageScreen} />
+    <ProfileStackNav.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     <ProfileStackNav.Screen name="TradeOffersList" component={TradeOffersListScreen} />
     <ProfileStackNav.Screen name="TradeOfferDetail" component={TradeOfferDetailScreen} />
     <ProfileStackNav.Screen name="SetsList" component={SetsListScreen} />

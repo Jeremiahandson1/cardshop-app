@@ -182,6 +182,14 @@ export const qrApi = {
 // ============================================================
 // TWO-FACTOR AUTH — mirrors the dashboard's /security page.
 // ============================================================
+// Notification preferences — granular per-category opt out across
+// push / email / in_app channels. Server merges partial PATCH
+// updates into the user's JSONB.
+export const notificationPrefsApi = {
+  get: () => api.get('/notification-prefs'),
+  update: (updates) => api.patch('/notification-prefs', { updates }),
+};
+
 export const twoFactorApi = {
   status: () => api.get('/auth/2fa/status'),
   setup: () => api.post('/auth/2fa/setup'),
