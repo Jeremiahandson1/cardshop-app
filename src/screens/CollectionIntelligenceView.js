@@ -177,14 +177,20 @@ export const CollectionIntelligenceView = () => {
           setOffset(nextOffset + incoming.length);
         }
       } catch (err) {
-        const msg =
-          err?.response?.status === 429
-            ? 'Too many requests — wait a minute and try again.'
-            : err?.response?.data?.message ||
-              err?.response?.data?.error ||
-              err?.message ||
-              'Could not load intelligence.';
-        setErrorMsg(msg);
+        const isPro = err?.response?.status === 402
+          && err?.response?.data?.code === 'pro_required';
+        if (isPro) {
+          setErrorMsg('PRO_REQUIRED');
+        } else {
+          const msg =
+            err?.response?.status === 429
+              ? 'Too many requests — wait a minute and try again.'
+              : err?.response?.data?.message ||
+                err?.response?.data?.error ||
+                err?.message ||
+                'Could not load intelligence.';
+          setErrorMsg(msg);
+        }
       } finally {
         inFlightRef.current = false;
       }
@@ -245,7 +251,22 @@ export const CollectionIntelligenceView = () => {
       {/* Error banner — replaces the old stacking Alert.alert so
           repeated failures don't pile up modals. Dismissable, and
           cleared on any successful fetch. */}
-      {errorMsg ? (
+      {/* Pro gate — 402 from the backend means collector_pro required.
+          Swaps the whole intelligence surface for an upgrade prompt
+          instead of showing the empty "no cards" state (which would
+          make free users think their collection is blank). */}
+      {errorMsg === 'PRO_REQUIRED' ? (
+        <View style={styles.proGate}>
+          <Text style={styles.proGateTitle}>Intelligence is a Pro feature</Text>
+          <Text style={styles.proGateBody}>
+            Blended values, trend signals, and listable/thin-market flags
+            across your whole collection. Updated continuously from live
+            eBay comps.
+          </Text>
+          <View style={{ height: 12 }} />
+          <Text style={styles.proGateCta}>Upgrade in Profile → Card Shop Pro</Text>
+        </View>
+      ) : errorMsg ? (
         <View style={styles.errorBanner}>
           <View style={{ flex: 1 }}>
             <Text style={styles.errorTitle}>Intelligence unavailable</Text>
@@ -462,6 +483,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent + '15',
     borderWidth: 1,
     borderColor: Colors.accent + '55',
+  },
+  proGate: {
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.accent + '55',
+    alignItems: 'center',
+  },
+  proGateTitle: {
+    color: Colors.accent,
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  proGateBody: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  proGateCta: {
+    color: Colors.accent,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
   },
   errorBanner: {
     flexDirection: 'row',
