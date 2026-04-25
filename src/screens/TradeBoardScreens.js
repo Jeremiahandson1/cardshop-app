@@ -90,9 +90,13 @@ const verifiedBadgeStyles = StyleSheet.create({
 // ============================================================
 // FEED SCREEN (main Trade Board landing)
 // ============================================================
-export const TradeBoardScreen = ({ navigation }) => {
-  const [scope, setScope] = useState('all');
-  const [groupId, setGroupId] = useState(null);
+export const TradeBoardScreen = ({ navigation, route }) => {
+  // Allow callers (e.g. TradeGroupDetailScreen's "view this group's
+  // listings" button) to seed the board with a pre-selected scope.
+  const initialScope = route?.params?.scope || 'all';
+  const initialGroupId = route?.params?.groupId || null;
+  const [scope, setScope] = useState(initialScope);
+  const [groupId, setGroupId] = useState(initialGroupId);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [nearbyLocation, setNearbyLocation] = useState(null); // { latitude, longitude }
@@ -146,7 +150,7 @@ export const TradeBoardScreen = ({ navigation }) => {
   // lets_talk cards are actually on the board.
   const isMine = scope === 'mine';
   const {
-    data, isLoading, refetch, isFetching, isError,
+    data, isLoading, refetch, isFetching, isError, error,
   } = useQuery({
     queryKey: isMine ? ['trade-listings', 'mine'] : ['trade-listings', 'feed', queryParams],
     queryFn: () => (isMine
@@ -364,7 +368,15 @@ export const TradeBoardScreen = ({ navigation }) => {
             <EmptyState
               icon="⚠️"
               title="Couldn't load the trade board"
-              message="The API didn't respond. Check your connection and retry."
+              message={
+                // Surface the server's error string when there is one
+                // (4xx with a body), then status code for 5xx, finally
+                // fall back to a connection hint for true network errors.
+                error?.response?.data?.error
+                  || (error?.response?.status
+                    ? `API returned ${error.response.status}. Try again in a moment.`
+                    : "The API didn't respond. Check your connection and retry.")
+              }
               action={<Button title="Retry" onPress={() => refetch()} />}
             />
           ) : (

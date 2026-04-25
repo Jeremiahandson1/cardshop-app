@@ -209,6 +209,12 @@ export const TradeGroupDetailScreen = ({ navigation, route }) => {
           <Text style={styles.groupDescription}>{group.description}</Text>
         ) : null}
 
+        <Button
+          title="View this group's trade board"
+          onPress={() => navigation.navigate('TradeBoardMain', { scope: 'group', groupId })}
+          style={{ marginTop: Spacing.md }}
+        />
+
         <Divider style={{ marginVertical: Spacing.base }} />
 
         <SectionHeader title="Members" />
