@@ -1167,6 +1167,12 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
       refetchAll();
       Alert.alert('Accepted', 'Trade accepted. Arrange the meetup or shipping off-platform.');
     },
+    onError: (err) => {
+      Alert.alert(
+        'Could not accept',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
+    },
   });
 
   // On first-ever Accept, show the safety checklist first. After user
@@ -1200,13 +1206,39 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
       refetchAll();
       navigation.goBack();
     },
+    onError: (err) => {
+      Alert.alert(
+        'Could not decline',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
+    },
   });
+
+  // Confirm before declining — without this the button feels too easy
+  // to mistap, and worse: if the mutation silently failed before the
+  // onError above, users would tap repeatedly with no feedback.
+  const confirmDecline = () => {
+    Alert.alert(
+      'Decline this offer?',
+      'The other user will be notified. You can\'t undo this.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Decline', style: 'destructive', onPress: () => decline.mutate() },
+      ],
+    );
+  };
 
   const withdraw = useMutation({
     mutationFn: () => tradeOffersApi.withdraw(offerId),
     onSuccess: () => {
       refetchAll();
       navigation.goBack();
+    },
+    onError: (err) => {
+      Alert.alert(
+        'Could not withdraw',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
     },
   });
 
@@ -1224,6 +1256,12 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
       setCounterNote('');
       setValueGap('');
       refetchAll();
+    },
+    onError: (err) => {
+      Alert.alert(
+        'Could not send counter',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
     },
   });
 
@@ -1329,7 +1367,7 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
             <Button
               title="Decline"
               variant="danger"
-              onPress={() => decline.mutate()}
+              onPress={confirmDecline}
               loading={decline.isPending}
             />
           </View>
