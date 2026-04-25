@@ -424,6 +424,12 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
       Alert.alert('Bumped', 'Your listing is freshly dated. The 90-day auto-removal clock just reset.');
       qc.invalidateQueries({ queryKey: ['trade-listing', listingId] });
     },
+    onError: (err) => {
+      Alert.alert(
+        'Could not bump',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
+    },
   });
 
   const removeMutation = useMutation({
@@ -431,6 +437,12 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
       navigation.goBack();
+    },
+    onError: (err) => {
+      Alert.alert(
+        'Could not remove listing',
+        err?.response?.data?.error || err?.message || 'Try again in a moment.',
+      );
     },
   });
 

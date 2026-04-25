@@ -286,6 +286,17 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
   });
   const invites = invitesData?.invites || [];
 
+  // All five mutations share the same error pattern — surface the
+  // server's message so the user knows whether their action took.
+  // Without this the Modal closes and form clears even on 4xx, which
+  // makes failed actions look successful.
+  const onMutationError = (verb) => (err) => {
+    Alert.alert(
+      `Could not ${verb}`,
+      err?.response?.data?.error || err?.message || 'Try again in a moment.',
+    );
+  };
+
   const createInvite = useMutation({
     mutationFn: () => tradeGroupsApi.createInvite(groupId, { label: inviteLabel.trim() || null }),
     onSuccess: () => {
@@ -293,11 +304,13 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
       setInviteLabel('');
       refetchInvites();
     },
+    onError: onMutationError('create invite'),
   });
 
   const revokeInvite = useMutation({
     mutationFn: (token) => tradeGroupsApi.revokeInvite(groupId, token),
     onSuccess: () => refetchInvites(),
+    onError: onMutationError('revoke invite'),
   });
 
   const rename = useMutation({
@@ -306,6 +319,7 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
       setRenameOpen(false);
       refetchGroup();
     },
+    onError: onMutationError('rename group'),
   });
 
   const deleteGroup = useMutation({
@@ -314,11 +328,13 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
       qc.invalidateQueries({ queryKey: ['my-trade-groups'] });
       navigation.popToTop();
     },
+    onError: onMutationError('delete group'),
   });
 
   const kick = useMutation({
     mutationFn: (userId) => tradeGroupsApi.removeMember(groupId, userId),
     onSuccess: () => refetchGroup(),
+    onError: onMutationError('remove member'),
   });
 
   const copyInvite = async (token) => {

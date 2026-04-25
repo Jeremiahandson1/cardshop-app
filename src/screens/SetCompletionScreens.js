@@ -164,6 +164,7 @@ export const BrowseSetsScreen = ({ navigation }) => {
   const unsubscribeMutation = useMutation({
     mutationFn: (payload) => setsApi.unsubscribe(payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sets-mine'] }),
+    onError: (err) => Alert.alert('Could not remove set', err?.response?.data?.error || 'Please try again.'),
   });
 
   const pick = (value) => {
