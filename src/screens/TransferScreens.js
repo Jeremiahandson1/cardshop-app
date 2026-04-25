@@ -33,10 +33,12 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   useEffect(() => {
     NfcManager.isSupported().then((supported) => {
       if (supported) {
-        NfcManager.start().then(() => setNfcReady(true)).catch(() => {});
+        NfcManager.start().then(() => setNfcReady(true)).catch((err) => {
+          console.warn('[nfc] start failed:', err?.message);
+        });
       }
-    }).catch(() => {});
-    return () => { NfcManager.cancelTechnologyRequest().catch(() => {}); };
+    }).catch((err) => console.warn('[nfc] isSupported failed:', err?.message));
+    return () => { NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message)); };
   }, []);
 
   const transferMutation = useMutation({
@@ -67,12 +69,12 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       Alert.alert('Transfer Complete!', 'Card ownership transferred via NFC.', [
         { text: 'Done', onPress: () => navigation.goBack() }
       ]);
-      NfcManager.cancelTechnologyRequest().catch(() => {});
+      NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
     },
     onError: (err) => {
       Alert.alert('Error', err.response?.data?.error || 'NFC transfer failed');
       setNfcScanning(false);
-      NfcManager.cancelTechnologyRequest().catch(() => {});
+      NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
     },
   });
 
@@ -207,7 +209,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={styles.cancelNfc}
                   onPress={() => {
-                    NfcManager.cancelTechnologyRequest().catch(() => {});
+                    NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
                     setNfcScanning(false);
                   }}
                 >

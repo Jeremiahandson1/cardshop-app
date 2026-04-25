@@ -33,8 +33,8 @@ export const useAuthStore = create((set, get) => ({
       const status = err?.response?.status;
       if (status === 401) {
         // Server says the token is invalid — legitimately logged out.
-        await SecureStore.deleteItemAsync('access_token').catch(() => {});
-        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        await SecureStore.deleteItemAsync('access_token').catch((err) => console.warn('[auth] failed to clear access_token:', err?.message));
+        await SecureStore.deleteItemAsync('refresh_token').catch((err) => console.warn('[auth] failed to clear refresh_token:', err?.message));
         set({ user: null, isAuthenticated: false, isLoading: false });
       } else {
         // Transient (network, 5xx, timeout). Keep tokens. Optimistically

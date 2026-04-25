@@ -653,9 +653,12 @@ const EbayCompsSection = ({ catalogId }) => {
       <Text style={styles.detailSectionLabel}>Recent sold comps (eBay)</Text>
       {data.summary ? (
         <View style={styles.compsSummary}>
-          <CompStat label="Median" value={`$${data.summary.median.toFixed(2)}`} />
-          <CompStat label="Avg" value={`$${data.summary.average.toFixed(2)}`} />
-          <CompStat label="Range" value={`$${data.summary.min.toFixed(0)}–$${data.summary.max.toFixed(0)}`} />
+          <CompStat label="Median" value={`$${(data.summary.median ?? 0).toFixed(2)}`} />
+          <CompStat label="Avg" value={`$${(data.summary.average ?? 0).toFixed(2)}`} />
+          <CompStat
+            label="Range"
+            value={`$${(data.summary.min ?? 0).toFixed(0)}–$${(data.summary.max ?? 0).toFixed(0)}`}
+          />
         </View>
       ) : null}
       <View style={{ marginTop: Spacing.sm }}>
