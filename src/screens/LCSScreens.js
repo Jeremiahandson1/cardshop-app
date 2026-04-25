@@ -49,9 +49,14 @@ const timeAgo = (iso) => {
 // ============================================================
 // 1. HOME — zip entry
 // ============================================================
-export const LCSHomeScreen = ({ navigation }) => {
+export const LCSHomeScreen = ({ navigation, route }) => {
   const { zip, setZip } = useLcsStore();
   const [input, setInput] = useState(zip);
+
+  // The Arbitrage screen forwards `unlock: 'confirm' | 'post'` when the
+  // user came here from the participation gate. The banner explains the
+  // next step so this screen doesn't dead-end them.
+  const unlockHint = route?.params?.unlock;
 
   const go = () => {
     const clean = input.trim();
@@ -86,6 +91,16 @@ export const LCSHomeScreen = ({ navigation }) => {
         )}
       />
       <View style={styles.homeBody}>
+        {unlockHint ? (
+          <View style={styles.unlockBanner}>
+            <Ionicons name="flash" size={16} color={Colors.accent} />
+            <Text style={styles.unlockBannerText}>
+              {unlockHint === 'confirm'
+                ? 'Pick a shop, open a recent box-price post, and tap Verify. That confirmation unlocks Deals for 90 days.'
+                : 'Pick a shop and post one current box price. That contribution unlocks Deals for 90 days.'}
+            </Text>
+          </View>
+        ) : null}
         <Text style={styles.homeHint}>
           Enter your ZIP to see card shops within 100 miles and compare box prices.
         </Text>
@@ -614,6 +629,23 @@ const styles = StyleSheet.create({
   formPad: { padding: Spacing.base, paddingBottom: Spacing.xxxl },
 
   homeBody: { padding: Spacing.base, marginTop: Spacing.md },
+  unlockBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface2,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    marginBottom: Spacing.base,
+  },
+  unlockBannerText: {
+    color: Colors.text,
+    fontSize: Typography.sm,
+    lineHeight: 20,
+    flex: 1,
+  },
   homeHint: {
     color: Colors.textMuted,
     fontSize: Typography.base,

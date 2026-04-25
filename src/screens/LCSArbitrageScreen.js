@@ -101,6 +101,10 @@ export const LCSArbitrageScreen = ({ navigation, route }) => {
   const rows = data?.rows || [];
   const disclaimer = data?.disclaimer
     || 'Estimate based on reported prices. Verify before acting.';
+  // Server returns `access.trial_days_left` while the new-user grace
+  // window is still open. Surface a soft countdown so trial users
+  // contribute before the gate kicks in.
+  const trialDaysLeft = data?.access?.trial_days_left;
 
   const renderRow = useCallback(({ item }) => (
     <ArbitrageRow
@@ -160,7 +164,8 @@ export const LCSArbitrageScreen = ({ navigation, route }) => {
       ) : is403Participation ? (
         <ParticipationLock
           message={errData?.error}
-          onPostPrice={() => navigation.navigate('LCSHome')}
+          onConfirmPrice={() => navigation.navigate('LCSHome', { unlock: 'confirm' })}
+          onPostPrice={() => navigation.navigate('LCSHome', { unlock: 'post' })}
         />
       ) : query.isError && !is400 ? (
         <EmptyState
@@ -183,14 +188,31 @@ export const LCSArbitrageScreen = ({ navigation, route }) => {
           message={`No local shops in your area are below the online rate right now. Check back tomorrow ${MDASH} the scan runs nightly.`}
         />
       ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(r) => r.id}
-          renderItem={renderRow}
-          contentContainerStyle={styles.listPad}
-          onRefresh={query.refetch}
-          refreshing={query.isRefetching}
-        />
+        <>
+          {typeof trialDaysLeft === 'number' && trialDaysLeft > 0 ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('LCSHome', { unlock: 'confirm' })}
+              activeOpacity={0.85}
+              style={styles.trialBanner}
+            >
+              <Ionicons name="time-outline" size={16} color={Colors.accent} />
+              <Text style={styles.trialBannerText}>
+                {trialDaysLeft === 1
+                  ? 'Last day of your free Deals trial'
+                  : `${trialDaysLeft} days left in your free Deals trial`}
+                {' '}— confirm one box price to keep access for 90 days.
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          <FlatList
+            data={rows}
+            keyExtractor={(r) => r.id}
+            renderItem={renderRow}
+            contentContainerStyle={styles.listPad}
+            onRefresh={query.refetch}
+            refreshing={query.isRefetching}
+          />
+        </>
       )}
 
       {/* Sticky footer disclaimer — only while results are showing */}
@@ -261,22 +283,53 @@ const ArbitrageRow = ({ row, onPress }) => {
 
 // ============================================================
 // PARTICIPATION LOCK
+//
+// The arbitrage data only exists because users contribute LCS box
+// prices. Reading the data without ever contributing is the freerider
+// pattern; the 90-day rolling gate flips the incentive so the readers
+// are also the contributors. Server returns 403 with code
+// 'participation_required' — see lcs-arbitrage.js on the API side.
+//
+// UX guardrails for first-time users:
+//   - Confirm path is the lower-friction entry. Surface it first.
+//   - Be explicit about what the unlock costs (one action) and how
+//     long it lasts (90 days). Without that, the lock reads like a
+//     paywall and users bounce.
 // ============================================================
-const ParticipationLock = ({ message, onPostPrice }) => (
+const ParticipationLock = ({ message, onConfirmPrice, onPostPrice }) => (
   <View style={styles.lockCard}>
     <View style={styles.lockIconWrap}>
       <Ionicons name="lock-closed" size={28} color={Colors.accent} />
     </View>
-    <Text style={styles.lockTitle}>Collectors-only feature</Text>
+    <Text style={styles.lockTitle}>Unlock with one contribution</Text>
     <Text style={styles.lockBody}>
       {message
-        || 'Deals near you is for collectors who participate in the network. Post or confirm a local shop price to unlock it.'}
+        || 'Deals near you is built from prices collectors share. Confirm or post one box price at a local shop and we unlock arbitrage for the next 90 days.'}
     </Text>
+
+    <View style={styles.lockBullets}>
+      <View style={styles.lockBulletRow}>
+        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+        <Text style={styles.lockBulletText}>Confirming an existing price takes 5 seconds</Text>
+      </View>
+      <View style={styles.lockBulletRow}>
+        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+        <Text style={styles.lockBulletText}>One contribution unlocks for 90 days</Text>
+      </View>
+      <View style={styles.lockBulletRow}>
+        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+        <Text style={styles.lockBulletText}>Free — not a subscription</Text>
+      </View>
+    </View>
+
     <Button
-      title="Post a local price"
-      onPress={onPostPrice}
+      title="Confirm a price (fastest)"
+      onPress={onConfirmPrice}
       style={{ marginTop: Spacing.lg, alignSelf: 'stretch' }}
     />
+    <TouchableOpacity onPress={onPostPrice} style={styles.lockSecondary}>
+      <Text style={styles.lockSecondaryText}>Or post a new price →</Text>
+    </TouchableOpacity>
   </View>
 );
 
@@ -426,5 +479,51 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  lockBullets: {
+    alignSelf: 'stretch',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  lockBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  lockBulletText: {
+    color: Colors.text,
+    fontSize: Typography.sm,
+    flex: 1,
+  },
+  lockSecondary: {
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    alignSelf: 'center',
+  },
+  lockSecondaryText: {
+    color: Colors.accent,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+  },
+  trialBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface2,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  trialBannerText: {
+    color: Colors.text,
+    fontSize: Typography.sm,
+    lineHeight: 18,
+    flex: 1,
   },
 });
