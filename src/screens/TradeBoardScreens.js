@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   tradeListingsApi, tradeGroupsApi, tradeOffersApi,
-  cardsApi, offersApi, pricingApi, safetyApi,
+  cardsApi, offersApi, pricingApi, safetyApi, bindersApi,
 } from '../services/api';
 import { getDeviceLocation, getZipFromCoords } from '../services/deviceLocation';
 import { Linking } from 'react-native';
@@ -716,6 +716,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
 
   const [step, setStep] = useState(preselectedCardId ? 2 : 1);
   const [ownedCardId, setOwnedCardId] = useState(preselectedCardId || null);
+  const [binderId, setBinderId] = useState(null);
   const [visibility, setVisibility] = useState([]); // array of { scope_type, group_id }
   const [shippingPref, setShippingPref] = useState('either');
   const [acceptsBundles, setAcceptsBundles] = useState(false);
@@ -728,6 +729,29 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
     queryFn: () => tradeGroupsApi.mine().then((r) => r.data),
   });
   const myGroups = groupsData?.groups || [];
+
+  // Binder picker: every trade listing is anchored to a binder_card,
+  // so the user gets to pick which binder this listing's card lives
+  // in. Defaults to the binder the card is already in (if any),
+  // otherwise the user's first binder. Auto-creates a "Trade Board"
+  // binder if the user has none.
+  const { data: bindersData } = useQuery({
+    queryKey: ['my-binders'],
+    queryFn: () => bindersApi.list().then((r) => r.data),
+  });
+  const myBinders = bindersData?.binders || [];
+
+  // When a card is selected, default the binder choice to whichever
+  // binder already contains it (if any). Otherwise leave it to the
+  // user / fall through to the first binder once they reach the step.
+  useEffect(() => {
+    if (!ownedCardId || binderId) return;
+    const owning = myBinders.find((b) =>
+      (b.cards || []).some((c) => c.owned_card_id === ownedCardId),
+    );
+    if (owning) setBinderId(owning.id);
+    else if (myBinders.length) setBinderId(myBinders[0].id);
+  }, [ownedCardId, myBinders, binderId]);
 
   // After creating the listing, fire-and-forget the AI verification so
   // the badge populates. User doesn't wait on the result.
@@ -765,7 +789,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
     },
   });
 
-  const canSubmit = ownedCardId && visibility.length > 0 && photos.front && photos.back;
+  const canSubmit = ownedCardId && binderId && visibility.length > 0 && photos.front && photos.back;
 
   const submit = async () => {
     // Snapshot device location for distance filtering. Silent best-effort —
@@ -775,6 +799,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
 
     createMutation.mutate({
       owned_card_id: ownedCardId,
+      binder_id: binderId,
       visibility,
       shipping_pref: shippingPref,
       accepts_bundles: acceptsBundles,
@@ -824,8 +849,31 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
           )}
         </StepBlock>
 
-        {/* Step 2: visibility (REQUIRED) */}
-        <StepBlock n={2} title="Who sees this listing?" subtitle="Required. You pick every time." done={visibility.length > 0}>
+        {/* Step 2: which binder. Every listing is anchored to a
+            binder card. We default to the binder this card is
+            already in (or the user's first binder), but they can
+            change it before listing. */}
+        <StepBlock n={2} title="Which binder?" subtitle="The card lives in this binder while it's listed." done={!!binderId}>
+          {myBinders.length === 0 ? (
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+              You don't have any binders yet — we'll create a "Trade Board" binder automatically.
+            </Text>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+              {myBinders.map((b) => (
+                <ChoiceChip
+                  key={b.id}
+                  label={b.name}
+                  active={binderId === b.id}
+                  onPress={() => setBinderId(b.id)}
+                />
+              ))}
+            </View>
+          )}
+        </StepBlock>
+
+        {/* Step 3: visibility (REQUIRED) */}
+        <StepBlock n={3} title="Who sees this listing?" subtitle="Required. You pick every time." done={visibility.length > 0}>
           <VisibilityPicker
             visibility={visibility}
             setVisibility={setVisibility}
@@ -834,7 +882,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
         </StepBlock>
 
         {/* Step 3: shipping preference */}
-        <StepBlock n={3} title="Shipping preference" done>
+        <StepBlock n={4} title="Shipping preference" done>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
             <ChoiceChip label="In person only" active={shippingPref === 'in_person'} onPress={() => setShippingPref('in_person')} />
             <ChoiceChip label="Will ship" active={shippingPref === 'will_ship'} onPress={() => setShippingPref('will_ship')} />
@@ -843,7 +891,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
         </StepBlock>
 
         {/* Step 4: bundles */}
-        <StepBlock n={4} title="Accept bundle offers?" subtitle="Let people bundle multiple cards into one offer.">
+        <StepBlock n={5} title="Accept bundle offers?" subtitle="Let people bundle multiple cards into one offer.">
           <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
             <ChoiceChip label="Yes" active={acceptsBundles} onPress={() => setAcceptsBundles(true)} />
             <ChoiceChip label="No" active={!acceptsBundles} onPress={() => setAcceptsBundles(false)} />
@@ -851,7 +899,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
         </StepBlock>
 
         {/* Step 5: looking for */}
-        <StepBlock n={5} title="What are you looking for?" subtitle="Optional. Free-text hint for offerers.">
+        <StepBlock n={6} title="What are you looking for?" subtitle="Optional. Free-text hint for offerers.">
           <Input
             value={lookingFor}
             onChangeText={setLookingFor}
@@ -862,7 +910,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
         </StepBlock>
 
         {/* Step 6: time limit */}
-        <StepBlock n={6} title="Offer deadline" subtitle="Optional. Leave open-ended or pick a limit.">
+        <StepBlock n={7} title="Offer deadline" subtitle="Optional. Leave open-ended or pick a limit.">
           <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
             <ChoiceChip label="24 hours" active={timeLimitHours === 24} onPress={() => setTimeLimitHours(24)} />
             <ChoiceChip label="48 hours" active={timeLimitHours === 48} onPress={() => setTimeLimitHours(48)} />
@@ -871,9 +919,9 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
           </View>
         </StepBlock>
 
-        {/* Step 7: photos (required — front + back, AI-verified advisory) */}
+        {/* Step 8: photos (required — front + back, AI-verified advisory) */}
         <StepBlock
-          n={7}
+          n={8}
           title="Capture front + back"
           subtitle="Required. In-app camera ensures fresh photos; AI flags obvious mismatches."
           done={!!(photos.front && photos.back)}
