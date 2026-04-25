@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0a0f"
     },
@@ -16,6 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.twomiah.cardshop",
+      "buildNumber": "4",
       "infoPlist": {
         "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
         "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
@@ -122,6 +124,7 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0a0f"
       },
       "package": "com.twomiah.cardshop",
@@ -133,7 +136,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 2
+      "versionCode": 4
     },
     "plugins": [
       [
@@ -159,14 +162,14 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-video",
-      "react-native-purchases"
+      "./plugins/with-adi-registration"
     ],
     "scheme": "cardshop",
     "extra": {
       "API_URL": "https://cardshop-api-ow4q.onrender.com",
       "LCS_ENABLED": true,
-      "REVENUECAT_IOS_KEY": "test_wtknlvjBvQEZcaTxrqLmAsCiVXA",
-      "REVENUECAT_ANDROID_KEY": "test_wtknlvjBvQEZcaTxrqLmAsCiVXA",
+      "REVENUECAT_IOS_KEY": "appl_jsydmUQzZelWHmcQBxITcDAWRms",
+      "REVENUECAT_ANDROID_KEY": "goog_aFxDJkFARFeUhvEZCcxuwmQOUhz",
       "eas": {
         "projectId": "810f9aa8-ed0a-44e8-adb3-e08db420e29a"
       }
