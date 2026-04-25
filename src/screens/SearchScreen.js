@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, Dimensions
@@ -46,7 +46,14 @@ export const SearchScreen = ({ navigation }) => {
     enabled: query.trim().length >= 2,
   });
 
-  const results = data?.results || [];
+  // API returns { binder_cards, store_listings } as separate arrays —
+  // we render them inline, so flatten into a single list. Older code
+  // here read data?.results which never existed on the response, so
+  // search always showed "no results".
+  const results = useMemo(() => {
+    if (!data) return [];
+    return [...(data.binder_cards || []), ...(data.store_listings || [])];
+  }, [data]);
 
   const renderResult = useCallback(({ item }) => (
     <TouchableOpacity
