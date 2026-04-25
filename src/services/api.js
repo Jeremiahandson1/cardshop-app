@@ -191,13 +191,6 @@ export const twoFactorApi = {
     api.post('/auth/2fa/backup-codes/regenerate', { password }),
 };
 
-// Stripe Customer Portal — exchange for a short-lived URL and
-// open it in the system browser. Handles card swaps, cancellations,
-// invoices — all the usual subscription management.
-export const billingApi = {
-  portalUrl: () => api.post('/billing/portal'),
-};
-
 // Sticker reprints — owner requests a replacement QR sticker.
 // Fee is $2/single. Old sticker superseded at request time.
 export const stickerReprintApi = {
@@ -250,6 +243,9 @@ export const billingApi = {
   status: () => api.get('/billing/status'),
   checkout: ({ successUrl, cancelUrl } = {}) =>
     api.post('/billing/checkout', { successUrl, cancelUrl }),
+  // Stripe Customer Portal — short-lived URL we open in the
+  // system browser for payment/cancel/invoice management.
+  portalUrl: () => api.post('/billing/portal'),
 };
 
 // ============================================================
