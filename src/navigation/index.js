@@ -23,6 +23,7 @@ import { CollectionImportExportScreen } from '../screens/CollectionImportExportS
 import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
 import { StoreIntakeScreen } from '../screens/StoreIntakeScreen';
 import { RequestReprintScreen } from '../screens/RequestReprintScreen';
+import { OrderStickersScreen } from '../screens/OrderStickersScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { SubscriptionManageScreen } from '../screens/SubscriptionManageScreen';
 import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
@@ -293,6 +294,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Feedback" component={FeedbackScreen} />
     <ProfileStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <ProfileStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
+    <ProfileStackNav.Screen name="OrderStickers" component={OrderStickersScreen} />
     <ProfileStackNav.Screen name="Security" component={SecurityScreen} />
     <ProfileStackNav.Screen name="SubscriptionManage" component={SubscriptionManageScreen} />
     <ProfileStackNav.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />

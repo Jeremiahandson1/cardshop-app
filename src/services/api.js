@@ -437,6 +437,11 @@ export const setsApi = {
   adminReject: (ids) => api.post('/sets/admin/reject', { ids }),
 };
 
+export const stickerOrdersApi = {
+  list: () => api.get('/sticker-orders'),
+  create: (data) => api.post('/sticker-orders', data),
+};
+
 export const listingDefaultsApi = {
   // GET → { defaults }, PUT → save merged defaults. See migration 032
   // and src/routes/listing-defaults.js.

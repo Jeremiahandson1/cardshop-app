@@ -89,6 +89,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
+        { icon: 'pricetag-outline', label: 'Order stickers', onPress: () => navigation.navigate('OrderStickers') },
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
