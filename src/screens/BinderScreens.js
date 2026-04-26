@@ -984,7 +984,15 @@ export const PublicBinderScreen = ({ navigation, route }) => {
                 <Text style={styles.ownerName}>{binder.owner?.display_name || binder.owner?.username}</Text>
                 <View style={styles.trustRow}>
                   <Ionicons name="shield-checkmark" size={12} color={Colors.accent2} />
-                  <Text style={styles.trustScore}>Trust: {binder.owner?.trust_score || 'N/A'}</Text>
+                  {/* binder.owner.trust_score from /api/b/binder/* is
+                      an OBJECT (verified_deals, trades_completed,
+                      flags[], avg_response_hours, etc.) — rendering
+                      it directly inside <Text> crashes RN. Pull
+                      individual primitives instead. */}
+                  <Text style={styles.trustScore}>
+                    {binder.owner?.trust_score?.verified_deals || 0} verified deal
+                    {binder.owner?.trust_score?.verified_deals === 1 ? '' : 's'}
+                  </Text>
                 </View>
               </View>
               {user && binder.follow_enabled && (
