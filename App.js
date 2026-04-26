@@ -1,9 +1,29 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import FlashMessage from 'react-native-flash-message';
+
+// Global JS error handler — surfaces the message in an Alert so we
+// can capture the actual error when something crashes mid-flow.
+// Without this the user sees the red screen / hard crash with no
+// useful info to share. Logs to console too so a tethered Mac
+// session picks it up via adb logcat / Console.app.
+if (typeof ErrorUtils !== 'undefined' && ErrorUtils.setGlobalHandler) {
+  const origHandler = ErrorUtils.getGlobalHandler && ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((err, isFatal) => {
+    try {
+      console.error('[global]', isFatal ? 'FATAL' : 'non-fatal', err?.message, err?.stack);
+      Alert.alert(
+        isFatal ? 'App error (fatal)' : 'App error',
+        `${err?.message || 'Unknown error'}\n\n${(err?.stack || '').split('\n').slice(0, 6).join('\n')}`,
+      );
+    } catch {}
+    if (origHandler) origHandler(err, isFatal);
+  });
+}
 
 import { RootNavigator } from './src/navigation';
 import { useAuthStore } from './src/store/authStore';
