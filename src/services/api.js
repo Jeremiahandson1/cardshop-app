@@ -437,6 +437,13 @@ export const setsApi = {
   adminReject: (ids) => api.post('/sets/admin/reject', { ids }),
 };
 
+export const listingDefaultsApi = {
+  // GET → { defaults }, PUT → save merged defaults. See migration 032
+  // and src/routes/listing-defaults.js.
+  get: () => api.get('/listing-defaults'),
+  save: (data) => api.put('/listing-defaults', data),
+};
+
 export const tradeListingsApi = {
   create: (data) => api.post('/trade-listings', data),
   feed: (params) => api.get('/trade-listings', { params }),

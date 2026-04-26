@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   tradeListingsApi, tradeGroupsApi, tradeOffersApi,
   cardsApi, offersApi, pricingApi, safetyApi, bindersApi,
+  listingDefaultsApi,
 } from '../services/api';
 import { getDeviceLocation, getZipFromCoords } from '../services/deviceLocation';
 import { Linking } from 'react-native';
@@ -180,6 +181,15 @@ export const TradeBoardScreen = ({ navigation, route }) => {
       onPress={() => navigation.navigate('TradeListingDetail', { listingId: item.id })}
       activeOpacity={0.85}
     >
+      {/* Removed listings stay in the /mine response so users have
+          a history of what they listed; tag them clearly so a
+          "removed" listing doesn't read as "still active". */}
+      {item.status && item.status !== 'active' ? (
+        <View style={styles.removedBanner}>
+          <Ionicons name="archive-outline" size={13} color={Colors.textMuted} />
+          <Text style={styles.removedBannerText}>{String(item.status).toUpperCase()}</Text>
+        </View>
+      ) : null}
       {item.reported_stolen ? (
         <View style={styles.stolenBanner}>
           <Ionicons name="warning" size={14} color="#fff" />
@@ -769,6 +779,25 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
   const [lookingFor, setLookingFor] = useState('');
   const [timeLimitHours, setTimeLimitHours] = useState(null);
   const [photos, setPhotos] = useState({ front: null, back: null, video: null }); // data URLs
+  // Advanced (per-listing overrides) section is collapsed by
+  // default — defaults applied from user prefs cover most cases.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Pull saved listing defaults on mount; hydrate the form fields
+  // so the user only has to confirm + take photos.
+  useEffect(() => {
+    let cancelled = false;
+    listingDefaultsApi.get()
+      .then((r) => {
+        if (cancelled) return;
+        const d = r?.data?.defaults || {};
+        if (d.shipping_pref) setShippingPref(d.shipping_pref);
+        if (typeof d.accepts_bundles === 'boolean') setAcceptsBundles(d.accepts_bundles);
+        if (d.offer_time_limit_hours !== undefined) setTimeLimitHours(d.offer_time_limit_hours);
+        if (Array.isArray(d.visibility) && d.visibility.length) setVisibility(d.visibility);
+      })
+      .catch(() => { /* fall back to hard-coded defaults above */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const { data: groupsData } = useQuery({
     queryKey: ['my-trade-groups'],
@@ -928,6 +957,31 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
         </StepBlock>
 
         {/* Step 3: shipping preference */}
+        {/* Advanced (optional overrides) — collapsed by default.
+            Defaults loaded from listingDefaultsApi cover shipping,
+            bundles, deadline, and looking-for. Most users never
+            expand this; the ones who want per-listing tweaks can. */}
+        <TouchableOpacity
+          onPress={() => setShowAdvanced((v) => !v)}
+          style={{
+            marginTop: Spacing.md,
+            paddingVertical: Spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.semibold }}>
+            Advanced (shipping, bundles, deadline)
+          </Text>
+          <Ionicons
+            name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={Colors.textMuted}
+          />
+        </TouchableOpacity>
+        {showAdvanced ? (<>
         <StepBlock n={4} title="Shipping preference" done>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
             <ChoiceChip label="In person only" active={shippingPref === 'in_person'} onPress={() => setShippingPref('in_person')} />
@@ -964,6 +1018,7 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
             <ChoiceChip label="Open-ended" active={timeLimitHours === null} onPress={() => setTimeLimitHours(null)} />
           </View>
         </StepBlock>
+        </>) : null}
 
         {/* Step 8: photos (required — front + back, AI-verified advisory) */}
         <StepBlock
@@ -1958,6 +2013,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  removedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.surface3,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  removedBannerText: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   listingPhotoWrap: {
     width: 80, height: 110,
