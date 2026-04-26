@@ -124,19 +124,20 @@ const TabNavigator = () => {
         },
       }}
     >
+      {/* Binders is THE home for cards. Every card auto-files into
+          a Default binder (migration 033), so there's no separate
+          "Collection" — the binders ARE the collection.
+          CollectionStack screens (CardDetail, RegisterCard, etc.)
+          are still mounted inside BinderStack so card flows that
+          push into stack work the same way. */}
       <Tab.Screen
-        name="Collection"
-        component={CollectionStack}
+        name="Binders"
+        component={BinderStack}
         options={{
+          tabBarLabel: 'Collection',
           tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
         }}
       />
-      {/* Binders is no longer a top-level tab — collections live in
-          Collection now (every card is in a binder by default; the
-          two concepts merged in migration 033). The BinderStack
-          screens are still reachable from Profile → Binders, and
-          all the binder routes (BinderEditor, PublicBinder, etc.)
-          continue to exist for navigation pushes. */}
       <Tab.Screen
         name="Scan"
         component={QRScannerScreen}
@@ -232,6 +233,17 @@ const BinderStack = () => (
     <BinderStackNav.Screen name="EditCard" component={EditCardScreen} />
     <BinderStackNav.Screen name="Conversation" component={ConversationScreen} />
     <BinderStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
+    {/* Card-add + transfer flows used to live in CollectionStack
+        only. Now that Binders is the home tab, mount them here so
+        scanning a card / registering it / kicking off a transfer
+        works inside the binders stack without crossing tabs. */}
+    <BinderStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <BinderStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <BinderStackNav.Screen name="QRScanner" component={QRScannerScreen} />
+    <BinderStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
+    <BinderStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
+    <BinderStackNav.Screen name="ConversationList" component={ConversationListScreen} />
+    <BinderStackNav.Screen name="CollectionImportExport" component={CollectionImportExportScreen} />
   </BinderStackNav.Navigator>
 );
 
