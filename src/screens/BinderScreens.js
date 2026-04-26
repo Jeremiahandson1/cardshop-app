@@ -874,18 +874,37 @@ export const PublicBinderScreen = ({ navigation, route }) => {
         marginLeft: index % 2 === 0 ? 0 : COLUMN_GAP,
         marginBottom: COLUMN_GAP,
       }]}
-      onPress={() => navigation.navigate('BinderCardDetail', {
-        card: item,
-        binder,
-        linkToken,
-      })}
+      // If the viewer is the binder owner, send them to the owner's
+      // CardDetail screen — that's where they can edit the card,
+      // change intent_signal (NFS / NFT / Let's talk / etc.), set
+      // a price, move it to a different binder, and so on.
+      // BinderCardDetail is the public-facing buyer view (Make Offer,
+      // owner notes), which doesn't make sense for the owner.
+      onPress={() => {
+        const viewerIsOwner = !!user && !!binder?.owner?.id && binder.owner.id === user.id;
+        if (viewerIsOwner && item.owned_card_id) {
+          navigation.navigate('CardDetail', { cardId: item.owned_card_id });
+        } else {
+          navigation.navigate('BinderCardDetail', { card: item, binder, linkToken });
+        }
+      }}
       activeOpacity={0.85}
     >
       <View style={styles.publicCardImg}>
-        {item.front_image_url
-          ? <Image source={{ uri: item.front_image_url }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28 }}>🃏</Text></View>
-        }
+        {(() => {
+          // Prefer the owner's uploaded photo. Fall back to the
+          // catalog stock image only if no owner photo exists.
+          // The /api/b/binder/* response surfaces:
+          //   display_image_front — COALESCE(oc.image_front_url, cc.front_image_url)
+          //   photo_urls          — array of owner-uploaded photos
+          //   front_image_url     — catalog stock image
+          const uri = item.display_image_front
+            || (Array.isArray(item.photo_urls) && item.photo_urls[0])
+            || item.front_image_url;
+          return uri
+            ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+            : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28 }}>🃏</Text></View>;
+        })()}
         <View style={styles.publicCardIntentOverlay}>
           <IntentBadge signal={item.intent_signal} />
         </View>
@@ -898,7 +917,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
         )}
       </View>
     </TouchableOpacity>
-  ), [navigation, binder, linkToken]);
+  ), [navigation, binder, linkToken, user]);
 
   // Now safe to early-return — every hook above runs on every
   // render, regardless of the binder being loaded or not.
@@ -1179,25 +1198,44 @@ export const BinderCardDetailScreen = ({ navigation, route }) => {
 
       {/* Action buttons */}
       <View style={styles.submitBar}>
-        {card.intent_signal !== 'not_for_sale' ? (
-          <Button
-            title={card.asking_price ? `Buy $${card.asking_price}` : 'Make Offer'}
-            onPress={() => navigation.navigate('MakeOffer', {
-              cards: [card],
-              binderId: binder?.id,
-              binderOwnerId: binder?.owner?.id,
-            })}
-            style={{ flex: 1 }}
-          />
-        ) : (
-          <Button
-            title="Add to Want List"
-            variant="secondary"
-            onPress={() => Alert.alert('Want List', 'Card added to your want list.')}
-            icon={<Ionicons name="heart-outline" size={18} color={Colors.text} />}
-            style={{ flex: 1 }}
-          />
-        )}
+        {(() => {
+          // Hide buyer actions when the viewer is the binder owner.
+          // PublicBinder routes owners to CardDetail instead, but a
+          // deep link or stale navigation could still drop them here.
+          const viewerIsOwner = !!user && !!binder?.owner?.id && binder.owner.id === user.id;
+          if (viewerIsOwner) {
+            return (
+              <Button
+                title="Edit card"
+                onPress={() => card.owned_card_id && navigation.navigate('CardDetail', { cardId: card.owned_card_id })}
+                disabled={!card.owned_card_id}
+                style={{ flex: 1 }}
+              />
+            );
+          }
+          if (card.intent_signal !== 'not_for_sale') {
+            return (
+              <Button
+                title={card.asking_price ? `Buy $${card.asking_price}` : 'Make Offer'}
+                onPress={() => navigation.navigate('MakeOffer', {
+                  cards: [card],
+                  binderId: binder?.id,
+                  binderOwnerId: binder?.owner?.id,
+                })}
+                style={{ flex: 1 }}
+              />
+            );
+          }
+          return (
+            <Button
+              title="Add to Want List"
+              variant="secondary"
+              onPress={() => Alert.alert('Want List', 'Card added to your want list.')}
+              icon={<Ionicons name="heart-outline" size={18} color={Colors.text} />}
+              style={{ flex: 1 }}
+            />
+          );
+        })()}
       </View>
     </SafeAreaView>
   );
