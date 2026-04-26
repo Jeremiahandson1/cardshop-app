@@ -59,13 +59,23 @@ const bsBadge = StyleSheet.create({
 // INTENT SIGNAL BADGE
 // ============================================================
 const IntentBadge = ({ signal }) => {
+  // Maps both the API's current binder_intent_signal enum
+  // (lets_talk / priced_to_move / trade_only / not_for_sale) and
+  // the legacy strings the UI used to send (sell / trade / etc.)
+  // so old data + new data both render with proper labels.
   const config = {
-    sell: { label: 'Sell', color: Colors.accent },
-    trade: { label: 'Trade', color: Colors.accent2 },
-    sell_or_trade: { label: 'Sell/Trade', color: Colors.info },
-    showcase: { label: 'Showcase', color: Colors.accent4 },
-    nfs: { label: 'NFS', color: Colors.textMuted },
-  }[signal] || { label: signal || 'NFS', color: Colors.textMuted };
+    // Current canonical values (server-side enum):
+    priced_to_move: { label: 'Priced',     color: Colors.accent },
+    lets_talk:      { label: "Let's talk", color: Colors.info },
+    trade_only:     { label: 'Trade only', color: Colors.accent2 },
+    not_for_sale:   { label: 'Showcase',   color: Colors.accent4 },
+    // Legacy values still floating around in older clients:
+    sell:           { label: 'Sell',       color: Colors.accent },
+    trade:          { label: 'Trade',      color: Colors.accent2 },
+    sell_or_trade:  { label: 'Sell/Trade', color: Colors.info },
+    showcase:       { label: 'Showcase',   color: Colors.accent4 },
+    nfs:            { label: 'NFS',        color: Colors.textMuted },
+  }[signal] || { label: 'NFS', color: Colors.textMuted };
 
   return (
     <View style={[intentStyles.badge, { borderColor: config.color }]}>
@@ -865,9 +875,18 @@ export const PublicBinderScreen = ({ navigation, route }) => {
   if (sortBy === 'price') {
     displayCards = [...displayCards].sort((a, b) => (b.asking_price || 0) - (a.asking_price || 0));
   } else if (sortBy === 'intent') {
-    const intentOrder = { sell: 0, sell_or_trade: 1, trade: 2, showcase: 3, nfs: 4 };
+    // Order by purchase-readiness: priced first (one tap to buy),
+    // negotiable next, trade-only after, NFS / showcase last.
+    // Includes the legacy keys (sell/trade/etc.) so old binders
+    // sort sensibly until any remaining old data flushes.
+    const intentOrder = {
+      priced_to_move: 0, sell: 0,
+      lets_talk: 1, sell_or_trade: 1,
+      trade_only: 2, trade: 2,
+      not_for_sale: 3, nfs: 3, showcase: 3,
+    };
     displayCards = [...displayCards].sort((a, b) =>
-      (intentOrder[a.intent_signal] || 5) - (intentOrder[b.intent_signal] || 5)
+      (intentOrder[a.intent_signal] ?? 5) - (intentOrder[b.intent_signal] ?? 5)
     );
   }
 
