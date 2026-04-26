@@ -98,9 +98,18 @@ const CascadePicker = ({
   });
 
   const OPTIONAL_DIMS = new Set(['subset_name', 'parallel']);
+  // Identity dims define WHICH card this is. Auto-advancing past
+  // them (when the catalog has only one entry seeded for the set)
+  // hides the "this is a different player" choice from the user
+  // and silently merges new cards into the existing catalog row.
+  // Always require an explicit tap or typed entry on these.
+  const IDENTITY_DIMS = new Set(['player_name', 'card_number']);
 
   // Auto-advance behavior:
-  //  - Exactly one option (and no active typeahead) → pick it.
+  //  - Exactly one option (and no active typeahead) → pick it,
+  //    EXCEPT on identity dims (player_name, card_number) where
+  //    we always require explicit confirmation so the user can
+  //    add a new card to a sparsely-seeded set.
   //  - Zero options on an optional dim (subset / parallel) →
   //    skip silently. Lots of catalog rows have null subset or
   //    null parallel and the user shouldn't land on a dead-end
@@ -111,7 +120,7 @@ const CascadePicker = ({
     if (cascadeQuery) return;
     if (!options) return;
 
-    if (options.length === 1) {
+    if (options.length === 1 && !IDENTITY_DIMS.has(cascadeDim)) {
       const only = options[0];
       if (cascade[cascadeDim] === only) return;
       const next = { ...cascade, [cascadeDim]: only };
@@ -225,6 +234,37 @@ const CascadePicker = ({
             <Text style={{ color: Colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: Spacing.xs }}>
               Updating…
             </Text>
+          ) : null
+        }
+        ListFooterComponent={
+          // On identity dims (player / card #), always offer an
+          // explicit "add new" escape so a user adding a second
+          // card to a sparsely-seeded set isn't trapped picking
+          // the one existing entry. Routes to manual entry with
+          // the cascade picks pre-filled.
+          IDENTITY_DIMS.has(cascadeDim) && (options?.length ?? 0) > 0 ? (
+            <TouchableOpacity
+              onPress={onManualFallback}
+              style={{
+                paddingVertical: Spacing.md,
+                paddingHorizontal: Spacing.md,
+                borderRadius: Radius.md,
+                borderWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: Colors.accent,
+                backgroundColor: 'transparent',
+                marginTop: Spacing.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: Spacing.sm,
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: '600' }}>
+                Add a new {cascadeLabel[cascadeDim].toLowerCase()} to this set
+              </Text>
+            </TouchableOpacity>
           ) : null
         }
         ListEmptyComponent={
@@ -968,7 +1008,24 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           }));
           setStep('manual_entry');
         }}
-        onManualFallback={() => setStep('manual_entry')}
+        onManualFallback={() => {
+          // Pre-fill manual entry with whatever the user picked in
+          // the cascade — without this, hitting "Add a new player
+          // to this set" wipes the sport/year/manufacturer/set
+          // they already chose and forces them to type it all again.
+          setManualForm((f) => ({
+            ...f,
+            sport: cascade.sport || f.sport,
+            year: cascade.year ? String(cascade.year) : f.year,
+            manufacturer: cascade.manufacturer || f.manufacturer || '',
+            set_name: cascade.set_name || f.set_name || '',
+            subset_name: cascade.subset_name || f.subset_name || '',
+            player_name: cascade.player_name || f.player_name || '',
+            card_number: cascade.card_number || f.card_number || '',
+            parallel: cascade.parallel || f.parallel || '',
+          }));
+          setStep('manual_entry');
+        }}
         onCertEntry={() => setStep('cert_entry')}
       />
     );
