@@ -214,7 +214,7 @@ const CascadePicker = ({
 
       <View style={{ paddingHorizontal: Spacing.base, marginBottom: Spacing.sm }}>
         <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 6 }}>
-          Step {currentIdx + 1} of {cascadeOrder.length} — {cascadeLabel[cascadeDim]}
+          Step {currentIdx + 1} of {cascadeOrder.length} — {cascadeLabel[cascadeDim]} · v3
         </Text>
         <Input
           placeholder={`Search ${cascadeLabel[cascadeDim].toLowerCase()}...`}
