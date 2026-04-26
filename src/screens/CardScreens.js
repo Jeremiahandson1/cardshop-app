@@ -17,7 +17,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder } from '../services/api';
+import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -1926,6 +1926,23 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Could not move card', err?.response?.data?.error || 'Try again.'),
   });
 
+  // Setting the binder-level intent IS the trade-board switch.
+  // When the API tells us the card needs a listing (tradeable
+  // intent + no active trade_listing yet), launch the listing
+  // flow so the user picks visibility / takes photos.
+  const setIntentMutation = useMutation({
+    mutationFn: (intent_signal) => setCardIntent(cardId, intent_signal),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-binders'] });
+      queryClient.invalidateQueries({ queryKey: ['trade-listings'] });
+      if (res?.data?.needs_listing) {
+        navigation.navigate('CreateTradeListing', { ownedCardId: cardId });
+      }
+    },
+    onError: (err) => Alert.alert('Could not update intent', err?.response?.data?.error || 'Try again.'),
+  });
+
   const promptMoveToBinder = () => {
     if (!myBinders.length) {
       Alert.alert('No binders', 'Create a binder first from the Collection tab.');
@@ -2214,32 +2231,53 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
 
-          {/* Owner-only CTA: actually publish to the trade board.
-              Setting status='lets_talk' on the card alone doesn't
-              expose it on the board — the board reads from
-              trade_listings (with visibility, photos, shipping pref).
-              This button bridges the data model so users don't end
-              up with a card marked "Let's talk" that nobody can find. */}
+          {/* Owner-only intent picker — the binder card's intent
+              IS the trade-board switch. Setting a tradeable intent
+              auto-launches the CreateTradeListing flow when no
+              active listing exists; setting Showcase archives any
+              existing listing via the migration-028 trigger. The
+              user thinks "is this card tradeable?" and the data
+              model follows. */}
           {card?.owner_id === currentUserId ? (
-            <TouchableOpacity
-              style={{
-                marginTop: Spacing.lg,
-                paddingVertical: Spacing.md,
-                paddingHorizontal: Spacing.lg,
-                borderRadius: Radius.md,
-                backgroundColor: Colors.accent,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: Spacing.sm,
-              }}
-              onPress={() => navigation.navigate('CreateTradeListing', { ownedCardId: cardId })}
-            >
-              <Ionicons name="swap-horizontal" size={18} color={Colors.bg} />
-              <Text style={{ color: Colors.bg, fontWeight: Typography.bold, fontSize: Typography.base }}>
-                List on Trade Board
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.sm }}>
+                Trade status
               </Text>
-            </TouchableOpacity>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+                {[
+                  { key: 'priced_to_move', label: 'Priced',     desc: 'Show a fixed price to buyers.' },
+                  { key: 'lets_talk',      label: "Let's talk", desc: 'Open to offers — no fixed price.' },
+                  { key: 'trade_only',     label: 'Trade only', desc: 'Cards only — no cash.' },
+                  { key: 'not_for_sale',   label: 'Showcase',   desc: 'Off the trade board. Display only.' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => setIntentMutation.mutate(opt.key)}
+                    disabled={setIntentMutation.isPending}
+                    style={{
+                      paddingHorizontal: Spacing.md,
+                      paddingVertical: Spacing.sm,
+                      borderRadius: Radius.full,
+                      borderWidth: 1,
+                      borderColor: card.intent_signal === opt.key ? Colors.accent : Colors.border,
+                      backgroundColor: card.intent_signal === opt.key ? Colors.surface2 : Colors.surface,
+                      opacity: setIntentMutation.isPending ? 0.5 : 1,
+                    }}
+                  >
+                    <Text style={{
+                      color: card.intent_signal === opt.key ? Colors.accent : Colors.text,
+                      fontWeight: Typography.semibold,
+                      fontSize: Typography.sm,
+                    }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: Spacing.sm, lineHeight: 16, fontStyle: 'italic' }}>
+                {card.intent_signal === 'not_for_sale'
+                  ? 'Card is in your binder only — not on the trade board.'
+                  : 'Card is on the trade board.'}
+              </Text>
+            </View>
           ) : null}
 
           {/* Market snapshot — sold first (when available from the

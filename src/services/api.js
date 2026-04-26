@@ -442,6 +442,14 @@ export const setsApi = {
 export const moveCardToBinder = (cardId, binder_id) =>
   api.post(`/cards/${cardId}/move-to-binder`, { binder_id });
 
+// Set the binder-level intent_signal for an owned card (across all
+// of the user's binders that hold it). Returns { needs_listing } —
+// when true, the mobile UI should launch the CreateTradeListing
+// flow because the new intent is tradeable but no active listing
+// exists yet.
+export const setCardIntent = (cardId, intent_signal) =>
+  api.post(`/cards/${cardId}/intent`, { intent_signal });
+
 export const stickerOrdersApi = {
   list: () => api.get('/sticker-orders'),
   create: (data) => api.post('/sticker-orders', data),
