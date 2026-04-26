@@ -2037,8 +2037,8 @@ export const CardDetailScreen = ({ navigation, route }) => {
       return;
     }
     Alert.alert(
-      'Move to which binder?',
-      'Pick a binder to move this card into. The card leaves any other binder of yours it was in.',
+      'Add to which binder?',
+      'Pick a binder to add this card to. Cards can live in multiple binders — adding here keeps it in any others it\u2019s already in.',
       [
         ...myBinders.map((b) => ({
           text: b.name,

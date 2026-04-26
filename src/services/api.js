@@ -437,10 +437,16 @@ export const setsApi = {
   adminReject: (ids) => api.post('/sets/admin/reject', { ids }),
 };
 
-// Move a card between the caller's binders (one binder at a time).
-// Backed by POST /api/cards/:id/move-to-binder.
-export const moveCardToBinder = (cardId, binder_id) =>
-  api.post(`/cards/${cardId}/move-to-binder`, { binder_id });
+// Add a card to one of the caller's binders. Cards can live in
+// multiple binders simultaneously — backed by POST /cards/:id/
+// add-to-binder, which inserts a binder_card row without removing
+// the card from other binders.
+export const addCardToBinder = (cardId, binder_id) =>
+  api.post(`/cards/${cardId}/add-to-binder`, { binder_id });
+
+// Legacy alias kept so older code paths still work; server now
+// implements both endpoints with additive semantics.
+export const moveCardToBinder = addCardToBinder;
 
 // Set the binder-level intent_signal for an owned card (across all
 // of the user's binders that hold it). Returns { needs_listing } —
