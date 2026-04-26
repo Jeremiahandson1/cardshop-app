@@ -858,6 +858,50 @@ export const PublicBinderScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to unfollow'),
   });
 
+  // IMPORTANT: every hook must run on every render in the same
+  // order. The previous version put `if (isLoading) return …` on
+  // top of this block, which skipped the useCallback below on the
+  // loading render and brought it back on the loaded render —
+  // React's hook tracker compares hook counts between renders and
+  // hard-crashes ("Rendered more hooks than during the previous
+  // render"). This is what gave the user a gray screen + app close
+  // every time tapping a binder transitioned isLoading false.
+  // Fix: declare the useCallback up here, then early-return below.
+  const renderCard = useCallback(({ item, index }) => (
+    <TouchableOpacity
+      style={[styles.publicCard, {
+        width: CARD_WIDTH,
+        marginLeft: index % 2 === 0 ? 0 : COLUMN_GAP,
+        marginBottom: COLUMN_GAP,
+      }]}
+      onPress={() => navigation.navigate('BinderCardDetail', {
+        card: item,
+        binder,
+        linkToken,
+      })}
+      activeOpacity={0.85}
+    >
+      <View style={styles.publicCardImg}>
+        {item.front_image_url
+          ? <Image source={{ uri: item.front_image_url }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28 }}>🃏</Text></View>
+        }
+        <View style={styles.publicCardIntentOverlay}>
+          <IntentBadge signal={item.intent_signal} />
+        </View>
+      </View>
+      <View style={{ padding: Spacing.sm, gap: 3 }}>
+        <Text style={styles.publicCardPlayer} numberOfLines={1}>{item.player_name}</Text>
+        <Text style={styles.publicCardSet} numberOfLines={1}>{item.year} {item.set_name}</Text>
+        {item.asking_price && (
+          <Text style={styles.publicCardPrice}>${item.asking_price}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  ), [navigation, binder, linkToken]);
+
+  // Now safe to early-return — every hook above runs on every
+  // render, regardless of the binder being loaded or not.
   if (isLoading || !binder) return <LoadingScreen message="Loading binder..." />;
 
   const sections = binder.sections || [];
@@ -891,39 +935,6 @@ export const PublicBinderScreen = ({ navigation, route }) => {
   }
 
   const wantListMatches = binder.want_list_matches || [];
-
-  const renderCard = useCallback(({ item, index }) => (
-    <TouchableOpacity
-      style={[styles.publicCard, {
-        width: CARD_WIDTH,
-        marginLeft: index % 2 === 0 ? 0 : COLUMN_GAP,
-        marginBottom: COLUMN_GAP,
-      }]}
-      onPress={() => navigation.navigate('BinderCardDetail', {
-        card: item,
-        binder,
-        linkToken,
-      })}
-      activeOpacity={0.85}
-    >
-      <View style={styles.publicCardImg}>
-        {item.front_image_url
-          ? <Image source={{ uri: item.front_image_url }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28 }}>🃏</Text></View>
-        }
-        <View style={styles.publicCardIntentOverlay}>
-          <IntentBadge signal={item.intent_signal} />
-        </View>
-      </View>
-      <View style={{ padding: Spacing.sm, gap: 3 }}>
-        <Text style={styles.publicCardPlayer} numberOfLines={1}>{item.player_name}</Text>
-        <Text style={styles.publicCardSet} numberOfLines={1}>{item.year} {item.set_name}</Text>
-        {item.asking_price && (
-          <Text style={styles.publicCardPrice}>${item.asking_price}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  ), [navigation, binder, linkToken]);
 
   // Owner viewing their own binder gets an Edit gear in the header.
   // Compare against the resolved owner.id from the API response so we
