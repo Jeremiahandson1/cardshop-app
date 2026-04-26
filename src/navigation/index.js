@@ -127,13 +127,12 @@ const TabNavigator = () => {
           tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
         }}
       />
-      <Tab.Screen
-        name="Binders"
-        component={BinderStack}
-        options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />,
-        }}
-      />
+      {/* Binders is no longer a top-level tab — collections live in
+          Collection now (every card is in a binder by default; the
+          two concepts merged in migration 033). The BinderStack
+          screens are still reachable from Profile → Binders, and
+          all the binder routes (BinderEditor, PublicBinder, etc.)
+          continue to exist for navigation pushes. */}
       <Tab.Screen
         name="Scan"
         component={QRScannerScreen}
