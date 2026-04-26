@@ -2,7 +2,7 @@
   "expo": {
     "name": "Card Shop",
     "slug": "cardshop-twomiah",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.twomiah.cardshop",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
         "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
@@ -136,7 +136,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 4
+      "versionCode": 5
     },
     "plugins": [
       [
