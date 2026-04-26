@@ -2214,6 +2214,34 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Text style={styles.infoValue}>{card.transfer_count ?? 0} transfer{card.transfer_count !== 1 ? 's' : ''}</Text>
           </View>
 
+          {/* Owner-only CTA: actually publish to the trade board.
+              Setting status='lets_talk' on the card alone doesn't
+              expose it on the board — the board reads from
+              trade_listings (with visibility, photos, shipping pref).
+              This button bridges the data model so users don't end
+              up with a card marked "Let's talk" that nobody can find. */}
+          {card?.owner_id === currentUserId ? (
+            <TouchableOpacity
+              style={{
+                marginTop: Spacing.lg,
+                paddingVertical: Spacing.md,
+                paddingHorizontal: Spacing.lg,
+                borderRadius: Radius.md,
+                backgroundColor: Colors.accent,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: Spacing.sm,
+              }}
+              onPress={() => navigation.navigate('CreateTradeListing', { ownedCardId: cardId })}
+            >
+              <Ionicons name="swap-horizontal" size={18} color={Colors.bg} />
+              <Text style={{ color: Colors.bg, fontWeight: Typography.bold, fontSize: Typography.base }}>
+                List on Trade Board
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           {/* Market snapshot — sold first (when available from the
               Finding API), active asks second. We only count
               auction closes in the sold median because Fixed-Price
