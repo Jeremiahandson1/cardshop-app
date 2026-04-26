@@ -928,6 +928,17 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               <Ionicons name="settings-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>
           ) : null}
+          {/* Owner-only "+ Add card" — drops new cards into THIS
+              binder. Pre-fills the binder picker on RegisterCard so
+              the user doesn't have to pick again. */}
+          {isOwner ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id })}
+              accessibilityLabel="Add card to this binder"
+            >
+              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
             <Ionicons name="options-outline" size={22} color={Colors.accent} />
           </TouchableOpacity>

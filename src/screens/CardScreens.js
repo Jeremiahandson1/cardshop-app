@@ -17,7 +17,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi, ebayApi } from '../services/api';
+import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -335,7 +335,20 @@ const CascadePicker = ({
 export const RegisterCardScreen = ({ navigation, route }) => {
   const qrCode = route.params?.qrCode;
   const catalogId = route.params?.catalogId;
+  // Optional incoming binderId — pre-selects the destination binder
+  // when the user came from BinderEditor / BinderList "+ Add card".
+  const incomingBinderId = route.params?.binderId || null;
   const queryClient = useQueryClient();
+  // Selected destination binder. null = let the server auto-file
+  // into the user's Default binder. Binder picker UI below the
+  // catalog/parallel selection lets the user override.
+  const [pickedBinderId, setPickedBinderId] = React.useState(incomingBinderId);
+  // Pull the user's binders so the picker chips have real names.
+  const { data: bindersData } = useQuery({
+    queryKey: ['my-binders'],
+    queryFn: () => bindersApi.list().then((r) => r.data),
+  });
+  const myBinders = bindersData?.binders || [];
 
   // Default to manual entry. Search-first was forcing collectors
   // through a catalog lookup even when they knew exactly what card
@@ -714,6 +727,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         public_notes: form.public_notes || undefined,
         photo_urls: uploaded,
         video_url: videoDataUrl || undefined,
+        binder_id: pickedBinderId || undefined,
       });
     },
     onSuccess: (res) => {
@@ -1626,6 +1640,43 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
         </View>
+        {/* Binder picker — every card lives in a binder. Default to
+            the user's Default binder if no incoming binderId; let
+            them override before saving. */}
+        {myBinders.length > 0 ? (
+          <View style={{ marginTop: Spacing.lg }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.sm }}>
+              Goes in this binder
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {myBinders.map((b) => {
+                const active = pickedBinderId
+                  ? pickedBinderId === b.id
+                  : b.name === 'Default';
+                return (
+                  <TouchableOpacity
+                    key={b.id}
+                    onPress={() => setPickedBinderId(b.id)}
+                    style={{
+                      paddingHorizontal: Spacing.md,
+                      paddingVertical: Spacing.sm,
+                      borderRadius: Radius.full,
+                      borderWidth: 1,
+                      borderColor: active ? Colors.accent : Colors.border,
+                      backgroundColor: active ? Colors.surface2 : Colors.surface,
+                    }}
+                  >
+                    <Text style={{
+                      color: active ? Colors.accent : Colors.text,
+                      fontSize: Typography.sm,
+                      fontWeight: '600',
+                    }}>{b.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Submit */}
@@ -1855,6 +1906,45 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Update failed'),
   });
 
+  // Binder list for the move-to-binder action. Only fetched once
+  // we know the viewer owns the card (the "Move" CTA renders for
+  // owners only — see below).
+  const { data: bindersData } = useQuery({
+    queryKey: ['my-binders'],
+    queryFn: () => bindersApi.list().then((r) => r.data),
+    enabled: !!currentUserId && !!card && card.owner_id === currentUserId,
+  });
+  const myBinders = bindersData?.binders || [];
+
+  const moveBinder = useMutation({
+    mutationFn: (binderId) => moveCardToBinder(cardId, binderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-binders'] });
+      Alert.alert('Moved', 'Card moved to the new binder.');
+    },
+    onError: (err) => Alert.alert('Could not move card', err?.response?.data?.error || 'Try again.'),
+  });
+
+  const promptMoveToBinder = () => {
+    if (!myBinders.length) {
+      Alert.alert('No binders', 'Create a binder first from the Collection tab.');
+      return;
+    }
+    Alert.alert(
+      'Move to which binder?',
+      'Pick a binder to move this card into. The card leaves any other binder of yours it was in.',
+      [
+        ...myBinders.map((b) => ({
+          text: b.name,
+          onPress: () => moveBinder.mutate(b.id),
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true },
+    );
+  };
+
   const deleteMutation = useMutation({
     mutationFn: () => cardsApi.delete(cardId),
     onSuccess: () => {
@@ -1907,6 +1997,11 @@ export const CardDetailScreen = ({ navigation, route }) => {
           {card.player_name}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          {card?.owner_id === currentUserId ? (
+            <TouchableOpacity onPress={promptMoveToBinder} accessibilityLabel="Move to binder">
+              <Ionicons name="folder-open-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity onPress={() => navigation.navigate('EditCard', { cardId })}>
             <Ionicons name="create-outline" size={22} color={Colors.accent} />
           </TouchableOpacity>

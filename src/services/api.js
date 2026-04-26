@@ -437,6 +437,11 @@ export const setsApi = {
   adminReject: (ids) => api.post('/sets/admin/reject', { ids }),
 };
 
+// Move a card between the caller's binders (one binder at a time).
+// Backed by POST /api/cards/:id/move-to-binder.
+export const moveCardToBinder = (cardId, binder_id) =>
+  api.post(`/cards/${cardId}/move-to-binder`, { binder_id });
+
 export const stickerOrdersApi = {
   list: () => api.get('/sticker-orders'),
   create: (data) => api.post('/sticker-orders', data),
