@@ -101,10 +101,12 @@ export const SearchScreen = ({ navigation }) => {
         {/* Badges row */}
         <View style={styles.badgesRow}>
           {item.intent_signal && <IntentBadge signal={item.intent_signal} />}
-          {item.show_floor_active && (
+          {item.show_floor_live && (
             <View style={[styles.liveBadge]}>
               <View style={styles.liveDot} />
-              <Text style={styles.liveText}>Live</Text>
+              <Text style={styles.liveText}>
+                {item.show_floor_table_number ? `Live · Table ${item.show_floor_table_number}` : 'Live'}
+              </Text>
             </View>
           )}
           {item.want_list_match && (

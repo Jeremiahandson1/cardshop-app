@@ -130,7 +130,7 @@ export const BinderListScreen = ({ navigation }) => {
           <Text style={styles.binderMetaDot}> · </Text>
           <Text style={styles.binderMetaText}>{item.offer_count || 0} offers</Text>
         </View>
-        <BinderStatusBadge status={item.status} showFloorActive={item.show_floor_active} />
+        <BinderStatusBadge status={item.status} showFloorActive={item.show_floor_live} />
       </View>
       <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
     </TouchableOpacity>
@@ -206,6 +206,11 @@ export const BinderEditorScreen = ({ navigation, route }) => {
   // Show Floor mode is niche (only useful at card shows) — hide
   // behind an advanced toggle by default.
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showFloorForm, setShowFloorForm] = useState({
+    event_name: '',
+    table_number: '',
+    notes: '',
+  });
 
   React.useEffect(() => {
     if (existingBinder && !initialized) {
@@ -527,7 +532,7 @@ export const BinderEditorScreen = ({ navigation, route }) => {
             state below the toggle still surfaces unconditionally so
             anyone with a live show-floor binder can find the End
             button regardless of the advanced toggle state. */}
-        {isEditing && !existingBinder?.show_floor_active && (
+        {isEditing && !existingBinder?.show_floor_live && (
           <View>
             <Divider />
             <TouchableOpacity
@@ -550,27 +555,60 @@ export const BinderEditorScreen = ({ navigation, route }) => {
                 <Ionicons name="storefront" size={24} color={Colors.accent4} />
                 <Text style={styles.showFloorTitle}>Show Floor Mode</Text>
                 <Text style={styles.showFloorDesc}>
-                  Go live at card shows. Collectors nearby can discover your binder in real-time. Pro feature.
+                  Go live at card shows. Tell collectors at the venue exactly where to find you. Pro feature.
                 </Text>
+                <View style={{ alignSelf: 'stretch', marginTop: Spacing.md, gap: Spacing.sm }}>
+                  <Input
+                    label="Event name"
+                    placeholder="NSCC 2026"
+                    value={showFloorForm.event_name}
+                    onChangeText={(v) => setShowFloorForm((f) => ({ ...f, event_name: v }))}
+                  />
+                  <Input
+                    label="Table / booth number"
+                    placeholder="B-247"
+                    value={showFloorForm.table_number}
+                    onChangeText={(v) => setShowFloorForm((f) => ({ ...f, table_number: v }))}
+                  />
+                  <Input
+                    label="Notes (optional)"
+                    placeholder="Look for the orange Twomiah banner"
+                    value={showFloorForm.notes}
+                    onChangeText={(v) => setShowFloorForm((f) => ({ ...f, notes: v }))}
+                    multiline
+                  />
+                </View>
                 <Button
-                  title="Activate Show Floor"
+                  title="Go Live"
                   variant="ghost"
-                  onPress={() => Alert.alert('Activate Show Floor', 'Go live on the show floor?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Go Live', onPress: () => showFloorMutation.mutate({}) },
-                  ])}
+                  onPress={() => showFloorMutation.mutate({
+                    event_name: showFloorForm.event_name.trim() || undefined,
+                    table_number: showFloorForm.table_number.trim() || undefined,
+                    notes: showFloorForm.notes.trim() || undefined,
+                  })}
                   loading={showFloorMutation.isPending}
-                  style={{ marginTop: Spacing.md }}
+                  style={{ marginTop: Spacing.md, alignSelf: 'stretch' }}
                 />
               </View>
             ) : null}
           </View>
         )}
 
-        {isEditing && existingBinder?.show_floor_active && (
+        {isEditing && existingBinder?.show_floor_live && (
           <View style={[styles.showFloorCard, { borderColor: Colors.accent3 }]}>
             <View style={styles.liveDot} />
             <Text style={[styles.showFloorTitle, { color: Colors.accent3 }]}>Show Floor is LIVE</Text>
+            {existingBinder.show_floor_event_name ? (
+              <Text style={styles.showFloorDesc}>
+                {existingBinder.show_floor_event_name}
+                {existingBinder.show_floor_table_number ? ` · Table ${existingBinder.show_floor_table_number}` : ''}
+              </Text>
+            ) : null}
+            {existingBinder.show_floor_notes ? (
+              <Text style={[styles.showFloorDesc, { fontStyle: 'italic' }]}>
+                {existingBinder.show_floor_notes}
+              </Text>
+            ) : null}
             <Button
               title="End Show Floor"
               variant="danger"
@@ -1037,11 +1075,27 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               )}
             </View>
 
-            {/* Show floor badge */}
-            {binder.show_floor_active && (
+            {/* Show floor banner — physical findability at a card show.
+                Renders event + table prominently so a visitor walking
+                the floor knows exactly where to go. Notes (if any) sit
+                underneath in italic. Field is `show_floor_live` (the
+                actual column); the legacy `show_floor_active` name
+                never matched the API payload. */}
+            {binder.show_floor_live && (
               <View style={styles.showFloorLiveBanner}>
                 <View style={styles.liveDot} />
-                <Text style={styles.showFloorLiveText}>Show Floor is LIVE</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.showFloorLiveText}>
+                    LIVE
+                    {binder.show_floor_event_name ? ` at ${binder.show_floor_event_name}` : ''}
+                    {binder.show_floor_table_number ? ` · Table ${binder.show_floor_table_number}` : ''}
+                  </Text>
+                  {binder.show_floor_notes ? (
+                    <Text style={[styles.showFloorLiveText, { fontWeight: 'normal', fontStyle: 'italic', marginTop: 2 }]}>
+                      {binder.show_floor_notes}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             )}
 
