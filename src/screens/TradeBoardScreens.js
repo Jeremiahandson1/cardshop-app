@@ -1156,6 +1156,9 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
   const [selectedCardIds, setSelectedCardIds] = useState([]);
   const [message, setMessage] = useState('');
   const [cashAmount, setCashAmount] = useState('');
+  // Bundle picker is hidden by default — most offers are cash-only.
+  // Auto-open if we're editing and the existing offer had cards.
+  const [showBundle, setShowBundle] = useState(false);
 
   // In edit mode, load the existing offer and pre-fill the form so
   // the user can swap cards / adjust cash instead of starting over.
@@ -1171,6 +1174,10 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
       ? existingOffer.trade_card_ids : [];
     setSelectedCardIds(cardIds);
     if (existingOffer.offer_amount) setCashAmount(String(existingOffer.offer_amount));
+    // Auto-expand bundle disclosure when editing an offer that
+    // had cards — users shouldn't have to discover the existing
+    // selection is hidden behind a chevron.
+    if (cardIds.length > 0) setShowBundle(true);
   }, [existingOffer]);
 
   const { data: listing } = useQuery({
@@ -1241,6 +1248,13 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
 
   if (isLoading) return <LoadingScreen message="Loading your cards..." />;
 
+  // Default to cash-first. Most offers in practice are "I'll pay X
+  // cash" — making the user scroll through their collection to
+  // select bundle cards is friction for the common case. The
+  // bundle picker is now a disclosure below the cash field.
+  const cashEntered = !!cashAmount.trim() && parseFloat(cashAmount) > 0;
+  const canSubmit = cashEntered || selectedCardIds.length > 0;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
@@ -1254,34 +1268,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
       />
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 120 }}>
-        <SectionHeader title={`Select ${listing?.accepts_bundles ? 'cards' : 'a card'} to offer`} />
-
-        {eligibleCards.map((card) => {
-          const selected = selectedCardIds.includes(card.id);
-          return (
-            <TouchableOpacity
-              key={card.id}
-              style={[styles.offerCardRow, selected && styles.offerCardRowSelected]}
-              onPress={() => toggleCard(card.id)}
-            >
-              <Ionicons
-                name={selected ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={selected ? Colors.accent : Colors.textMuted}
-              />
-              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                <Text style={styles.pickRowTitle} numberOfLines={1}>
-                  {card.player_name || 'Card'} {card.year ? `· ${card.year}` : ''}
-                </Text>
-                <Text style={styles.pickRowSub} numberOfLines={1}>
-                  {card.set_name || ''} {card.parallel ? `· ${card.parallel}` : ''}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        <SectionHeader title="Cash on top (optional)" />
+        <SectionHeader title="Cash offer" />
         <Input
           value={cashAmount}
           onChangeText={setCashAmount}
@@ -1291,6 +1278,62 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
         <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: -Spacing.sm, marginBottom: Spacing.md, fontStyle: 'italic' }}>
           Off-platform IOU — cash, Venmo, Zelle at the meetup. Card Shop doesn't process payments.
         </Text>
+
+        {/* Bundle disclosure — most offers are cash-only; users who
+            want to bundle cards can expand this. */}
+        <TouchableOpacity
+          onPress={() => setShowBundle((v) => !v)}
+          style={{
+            paddingVertical: Spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text style={{ color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold }}>
+            {selectedCardIds.length > 0
+              ? `+ ${selectedCardIds.length} card${selectedCardIds.length === 1 ? '' : 's'} from my collection`
+              : '+ Add cards from my collection (optional)'}
+          </Text>
+          <Ionicons
+            name={showBundle ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={Colors.accent}
+          />
+        </TouchableOpacity>
+        {showBundle ? (
+          <View style={{ marginTop: Spacing.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+              {listing?.accepts_bundles
+                ? 'This listing accepts bundles — pick as many as you want.'
+                : 'This listing accepts one card at a time.'}
+            </Text>
+            {eligibleCards.map((card) => {
+              const selected = selectedCardIds.includes(card.id);
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  style={[styles.offerCardRow, selected && styles.offerCardRowSelected]}
+                  onPress={() => toggleCard(card.id)}
+                >
+                  <Ionicons
+                    name={selected ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={selected ? Colors.accent : Colors.textMuted}
+                  />
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <Text style={styles.pickRowTitle} numberOfLines={1}>
+                      {card.player_name || 'Card'} {card.year ? `· ${card.year}` : ''}
+                    </Text>
+                    <Text style={styles.pickRowSub} numberOfLines={1}>
+                      {card.set_name || ''} {card.parallel ? `· ${card.parallel}` : ''}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
 
         <SectionHeader title="Add a note (optional)" />
         <Input
@@ -1305,7 +1348,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
           title={isEditing ? 'Save changes' : 'Send offer'}
           onPress={() => createOffer.mutate()}
           loading={createOffer.isPending}
-          disabled={!selectedCardIds.length}
+          disabled={!canSubmit}
           style={{ marginTop: Spacing.lg }}
         />
       </ScrollView>

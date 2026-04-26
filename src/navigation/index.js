@@ -24,6 +24,9 @@ import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens
 import { StoreIntakeScreen } from '../screens/StoreIntakeScreen';
 import { RequestReprintScreen } from '../screens/RequestReprintScreen';
 import { OrderStickersScreen } from '../screens/OrderStickersScreen';
+import { OnboardingScreen, ONBOARDING_SEEN_KEY } from '../screens/OnboardingScreen';
+import { ListingDefaultsScreen } from '../screens/ListingDefaultsScreen';
+import * as SecureStore from 'expo-secure-store';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { SubscriptionManageScreen } from '../screens/SubscriptionManageScreen';
 import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
@@ -295,6 +298,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <ProfileStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
     <ProfileStackNav.Screen name="OrderStickers" component={OrderStickersScreen} />
+    <ProfileStackNav.Screen name="Onboarding" component={OnboardingScreen} options={{ presentation: 'modal' }} />
+    <ProfileStackNav.Screen name="ListingDefaults" component={ListingDefaultsScreen} />
     <ProfileStackNav.Screen name="Security" component={SecurityScreen} />
     <ProfileStackNav.Screen name="SubscriptionManage" component={SubscriptionManageScreen} />
     <ProfileStackNav.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
@@ -394,6 +399,29 @@ export const RootNavigator = () => {
     if (!isAuthenticated) return undefined;
     const unsubscribe = registerNotificationResponseHandler(navigationRef);
     return unsubscribe;
+  }, [isAuthenticated]);
+
+  // First-run onboarding — show the 3-card swipe once per device
+  // after the user signs in. Flag persists in SecureStore so a
+  // re-install resets but a sign-out doesn't.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const seen = await SecureStore.getItemAsync(ONBOARDING_SEEN_KEY);
+        if (cancelled || seen === '1') return;
+        // Wait a tick so the NavigationContainer has finished
+        // mounting before we push the modal screen onto the
+        // Profile stack.
+        setTimeout(() => {
+          try { navigationRef.current?.navigate('Profile', { screen: 'Onboarding' }); } catch {}
+        }, 800);
+      } catch {
+        // SecureStore failure is non-fatal — we just skip onboarding.
+      }
+    })();
+    return () => { cancelled = true; };
   }, [isAuthenticated]);
 
   return (

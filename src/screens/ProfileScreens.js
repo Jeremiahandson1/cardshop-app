@@ -102,6 +102,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
         { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
+        { icon: 'options-outline', label: 'Listing defaults', onPress: () => navigation.navigate('ListingDefaults') },
         { icon: 'card-outline', label: 'Manage subscription', onPress: () => navigation.navigate('SubscriptionManage') },
       ]
     },
