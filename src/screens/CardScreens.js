@@ -45,7 +45,7 @@ const useEbayStatus = () => {
 // any step drops the user into manual entry, pre-filled.
 // ============================================================
 const CascadePicker = ({
-  navigation, cascade, setCascade, cascadeDim, setCascadeDim,
+  navigation, cascade, setCascade, cascadeDim, setCascadeDim, onAddNewToSet,
   cascadeQuery, setCascadeQuery, cascadeOrder, cascadeLabel,
   onComplete, onManualFallback, onScan, onCertEntry,
 }) => {
@@ -240,11 +240,15 @@ const CascadePicker = ({
           // On identity dims (player / card #), always offer an
           // explicit "add new" escape so a user adding a second
           // card to a sparsely-seeded set isn't trapped picking
-          // the one existing entry. Routes to manual entry with
-          // the cascade picks pre-filled.
+          // the one existing entry. Distinct from onManualFallback
+          // (the generic "this card isn't in the catalog") because
+          // we have to CLEAR the current identity dim — otherwise
+          // the manual form pre-fills with the lingering cascade
+          // value (e.g. last picked McCaffrey) and the user creates
+          // a duplicate of the existing card.
           IDENTITY_DIMS.has(cascadeDim) && (options?.length ?? 0) > 0 ? (
             <TouchableOpacity
-              onPress={onManualFallback}
+              onPress={() => onAddNewToSet?.(cascadeDim)}
               style={{
                 paddingVertical: Spacing.md,
                 paddingHorizontal: Spacing.md,
@@ -1009,10 +1013,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           setStep('manual_entry');
         }}
         onManualFallback={() => {
-          // Pre-fill manual entry with whatever the user picked in
-          // the cascade — without this, hitting "Add a new player
-          // to this set" wipes the sport/year/manufacturer/set
-          // they already chose and forces them to type it all again.
+          // Generic "I can't find this card anywhere in the catalog"
+          // path — pre-fill manual entry with everything the user
+          // picked so far, including the current dim if any. The
+          // user is bailing out of cascade, not adding a sibling.
           setManualForm((f) => ({
             ...f,
             sport: cascade.sport || f.sport,
@@ -1023,6 +1027,33 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             player_name: cascade.player_name || f.player_name || '',
             card_number: cascade.card_number || f.card_number || '',
             parallel: cascade.parallel || f.parallel || '',
+          }));
+          setStep('manual_entry');
+        }}
+        onAddNewToSet={(currentDim) => {
+          // "+ Add a new player/card # to this set" — user is on an
+          // identity dim and wants to enter a NEW value, not pick
+          // from the existing options. Clear the current dim and
+          // every dim after it so a previously-picked McCaffrey
+          // doesn't bleed through and cause the manual entry to
+          // upsert into the existing catalog row.
+          const idx = CASCADE_ORDER.indexOf(currentDim);
+          const cleared = { ...cascade };
+          for (let i = idx; i < CASCADE_ORDER.length; i++) {
+            delete cleared[CASCADE_ORDER[i]];
+          }
+          setManualForm((f) => ({
+            ...f,
+            sport: cleared.sport || f.sport,
+            year: cleared.year ? String(cleared.year) : f.year,
+            manufacturer: cleared.manufacturer || '',
+            set_name: cleared.set_name || '',
+            subset_name: cleared.subset_name || '',
+            // The dim the user is overriding (and everything after
+            // it) gets blanked so they enter the new value fresh.
+            player_name: cleared.player_name || '',
+            card_number: cleared.card_number || '',
+            parallel: cleared.parallel || '',
           }));
           setStep('manual_entry');
         }}
