@@ -186,6 +186,25 @@ export const TradeBoardScreen = ({ navigation, route }) => {
           <Text style={styles.stolenBannerText}>REPORTED STOLEN — verify before trading</Text>
         </View>
       ) : null}
+      {!item.reported_stolen && item.catalog_watch_count > 0 ? (
+        <View style={styles.watchBanner}>
+          <Ionicons name="eye-outline" size={13} color="#e8c547" />
+          <Text style={styles.watchBannerText}>
+            Watch list: {item.catalog_watch_count} report{item.catalog_watch_count !== 1 ? 's' : ''} of this card stolen — compare details before trading
+          </Text>
+        </View>
+      ) : null}
+      {/* trust_score now == "days since signup" capped at 90.
+          A score under 7 means the account is genuinely brand new
+          (signed up this week) — that's the only case where the
+          "new seller" nudge fires. Casual long-time users with
+          low deal counts no longer get punished. */}
+      {!item.reported_stolen && (item.owner_trust_score ?? 100) < 7 ? (
+        <View style={styles.newSellerBanner}>
+          <Ionicons name="sparkles-outline" size={13} color="#7dd3fc" />
+          <Text style={styles.newSellerText}>New account — verify identity + photos before paying</Text>
+        </View>
+      ) : null}
       <View style={styles.listingCardRow}>
       <View style={styles.listingPhotoWrap}>
         {item.photo_front_url ? (
@@ -257,6 +276,12 @@ export const TradeBoardScreen = ({ navigation, route }) => {
           <Text style={styles.listingOwnerName} numberOfLines={1}>
             {item.owner_display_name || 'Trader'}
           </Text>
+          {item.owner_super_trader ? (
+            <View style={styles.superTraderBadge}>
+              <Ionicons name="star" size={10} color="#0a0a0f" />
+              <Text style={styles.superTraderText}>Super Trader</Text>
+            </View>
+          ) : null}
         </View>
       </View>
       </View>
@@ -1882,6 +1907,57 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  watchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: 'rgba(232,197,71,0.12)',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(232,197,71,0.4)',
+    marginBottom: Spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  watchBannerText: {
+    color: '#e8c547',
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  newSellerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 3,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: 'rgba(125,211,252,0.10)',
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  newSellerText: {
+    color: '#7dd3fc',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  superTraderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#e8c547',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    marginLeft: 6,
+  },
+  superTraderText: {
+    color: '#0a0a0f',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   listingPhotoWrap: {
     width: 80, height: 110,
