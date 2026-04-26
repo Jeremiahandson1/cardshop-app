@@ -176,10 +176,17 @@ export const TradeBoardScreen = ({ navigation, route }) => {
 
   const renderListing = ({ item }) => (
     <TouchableOpacity
-      style={styles.listingCard}
+      style={[styles.listingCardOuter, item.reported_stolen ? styles.listingStolen : null]}
       onPress={() => navigation.navigate('TradeListingDetail', { listingId: item.id })}
       activeOpacity={0.85}
     >
+      {item.reported_stolen ? (
+        <View style={styles.stolenBanner}>
+          <Ionicons name="warning" size={14} color="#fff" />
+          <Text style={styles.stolenBannerText}>REPORTED STOLEN — verify before trading</Text>
+        </View>
+      ) : null}
+      <View style={styles.listingCardRow}>
       <View style={styles.listingPhotoWrap}>
         {item.photo_front_url ? (
           <Image source={{ uri: item.photo_front_url }} style={styles.listingPhoto} resizeMode="cover" />
@@ -251,6 +258,7 @@ export const TradeBoardScreen = ({ navigation, route }) => {
             {item.owner_display_name || 'Trader'}
           </Text>
         </View>
+      </View>
       </View>
     </TouchableOpacity>
   );
@@ -475,6 +483,19 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
       />
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 100 }}>
+        {listing.reported_stolen ? (
+          <View style={styles.detailStolenBanner}>
+            <Ionicons name="warning" size={20} color="#fff" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.detailStolenBannerTitle}>Reported stolen</Text>
+              <Text style={styles.detailStolenBannerBody}>
+                A stolen-card report against this card was confirmed by Card Shop staff.
+                Do not pay before contacting support@twomiah.com.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* Photos — front + back from verification flow, fallback to owned_card photos */}
         {(listing.photo_front_url || listing.photo_back_url) ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.base }}>
@@ -1803,6 +1824,64 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     gap: Spacing.sm,
+  },
+  // Outer container — renders the optional stolen banner above the
+  // existing row content. Same surface treatment as listingCard but
+  // flexDirection column so banner sits on top.
+  listingCardOuter: {
+    flexDirection: 'column',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  listingCardRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  listingStolen: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239,68,68,0.06)',
+  },
+  detailStolenBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    marginBottom: Spacing.base,
+  },
+  detailStolenBannerTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  detailStolenBannerBody: {
+    color: '#fca5a5',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  stolenBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  stolenBannerText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   listingPhotoWrap: {
     width: 80, height: 110,
