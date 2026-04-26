@@ -77,57 +77,52 @@ export const ProfileScreen = ({ navigation }) => {
     ]);
   };
 
+  // Profile menu trim — was 28+ rows in 7 sections, which read as an
+  // app directory rather than a profile. Reorganized into 3 high-
+  // signal sections + a collapsible "More" for the long tail of
+  // links that exist but aren't daily-use.
   const MENU = [
     {
+      // Daily-use stuff: trades, conversations, the upgrade pitch.
+      section: 'Activity',
+      items: [
+        { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
+        { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
+        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
+        { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
+      ]
+    },
+    {
+      // Settings — the things a profile screen is FOR. Everything
+      // here changes how the account works, not what's in the
+      // collection.
       section: 'Account',
       items: [
-        // "Edit Profile" was a no-op; the individual settings below
-        // (Change Email, Security, Notifications) cover what would
-        // have been on a single edit-profile screen.
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
         { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
         { icon: 'card-outline', label: 'Manage subscription', onPress: () => navigation.navigate('SubscriptionManage') },
-        { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
-        { icon: 'trash-outline', label: 'Delete Account', onPress: () => navigation.navigate('DeleteAccount'), danger: true },
+      ]
+    },
+    {
+      // Long tail — exists, isn't deleted, but doesn't deserve a
+      // top-level row. Tapping "More" opens a separate screen with
+      // the full library + admin links.
+      section: 'More',
+      items: [
         { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
         { icon: 'swap-horizontal-outline', label: 'Transfer History', onPress: () => navigation.navigate('Transfers') },
-      ]
-    },
-    {
-      section: 'Trading',
-      items: [
-        { icon: 'swap-horizontal-outline', label: 'My trade offers (sent & received)', onPress: () => navigation.navigate('TradeOffersList') },
-        { icon: 'book-outline', label: 'My Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbox-ellipses-outline', label: 'Binder offers', onPress: () => navigation.navigate('OffersList') },
-        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
-      ]
-    },
-    {
-      section: 'Collection',
-      items: [
         { icon: 'grid-outline', label: 'Set completion', onPress: () => navigation.navigate('SetsList') },
         { icon: 'search-outline', label: 'Browse sets', onPress: () => navigation.navigate('BrowseSets') },
-      ]
-    },
-    {
-      section: 'Upgrade',
-      items: [
-        { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
-        { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
-      ]
-    },
-    {
-      section: 'Tools',
-      items: [
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
-        // "Receive via NFC" had no dedicated screen — NFC receive is
-        // already part of the Transfers flow. Removed to keep menu honest.
-        // "Messages" duplicated the Trading section row at line ~103.
         { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
+        { icon: 'link-outline', label: 'Integrations', onPress: () => navigation.navigate('Integrations') },
+        { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
+        { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
       ]
     },
     ...(['store_owner', 'store_staff', 'admin'].includes(user?.role) ? [{
@@ -154,17 +149,10 @@ export const ProfileScreen = ({ navigation }) => {
       ]
     }] : []),
     {
-      section: 'Connections',
-      items: [
-        { icon: 'link-outline', label: 'Integrations', onPress: () => navigation.navigate('Integrations') },
-      ]
-    },
-    {
       section: 'Support',
       items: [
-        // No in-app FAQ screen yet — route to support email so the
-        // button isn't a dead end. Replace with a real FAQ later.
         { icon: 'help-circle-outline', label: 'Help & FAQ', onPress: () => Linking.openURL('mailto:support@twomiah.com?subject=Card%20Shop%20question') },
+        { icon: 'trash-outline', label: 'Delete Account', onPress: () => navigation.navigate('DeleteAccount'), danger: true },
         { icon: 'log-out-outline', label: 'Sign Out', onPress: handleLogout, danger: true },
       ]
     }

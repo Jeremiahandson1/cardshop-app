@@ -193,6 +193,9 @@ export const BinderEditorScreen = ({ navigation, route }) => {
     min_offer_floor: '',
   });
   const [initialized, setInitialized] = useState(false);
+  // Show Floor mode is niche (only useful at card shows) — hide
+  // behind an advanced toggle by default.
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   React.useEffect(() => {
     if (existingBinder && !initialized) {
@@ -507,27 +510,50 @@ export const BinderEditorScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Activate Show Floor (editing only) */}
+        {/* Activate Show Floor (editing only) — niche feature, only
+            relevant at card shows. Hidden behind a "show advanced
+            options" toggle so it doesn't clutter the editor for
+            users who aren't running show-floor sessions. The active
+            state below the toggle still surfaces unconditionally so
+            anyone with a live show-floor binder can find the End
+            button regardless of the advanced toggle state. */}
         {isEditing && !existingBinder?.show_floor_active && (
           <View>
             <Divider />
-            <View style={styles.showFloorCard}>
-              <Ionicons name="storefront" size={24} color={Colors.accent4} />
-              <Text style={styles.showFloorTitle}>Show Floor Mode</Text>
-              <Text style={styles.showFloorDesc}>
-                Go live at card shows. Collectors nearby can discover your binder in real-time. Collector+ feature.
+            <TouchableOpacity
+              onPress={() => setShowAdvanced((v) => !v)}
+              style={{ paddingVertical: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              accessibilityRole="button"
+              accessibilityLabel={showAdvanced ? 'Hide advanced options' : 'Show advanced options'}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.semibold }}>
+                Advanced
               </Text>
-              <Button
-                title="Activate Show Floor"
-                variant="ghost"
-                onPress={() => Alert.alert('Activate Show Floor', 'Go live on the show floor?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Go Live', onPress: () => showFloorMutation.mutate({}) },
-                ])}
-                loading={showFloorMutation.isPending}
-                style={{ marginTop: Spacing.md }}
+              <Ionicons
+                name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={Colors.textMuted}
               />
-            </View>
+            </TouchableOpacity>
+            {showAdvanced ? (
+              <View style={styles.showFloorCard}>
+                <Ionicons name="storefront" size={24} color={Colors.accent4} />
+                <Text style={styles.showFloorTitle}>Show Floor Mode</Text>
+                <Text style={styles.showFloorDesc}>
+                  Go live at card shows. Collectors nearby can discover your binder in real-time. Pro feature.
+                </Text>
+                <Button
+                  title="Activate Show Floor"
+                  variant="ghost"
+                  onPress={() => Alert.alert('Activate Show Floor', 'Go live on the show floor?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Go Live', onPress: () => showFloorMutation.mutate({}) },
+                  ])}
+                  loading={showFloorMutation.isPending}
+                  style={{ marginTop: Spacing.md }}
+                />
+              </View>
+            ) : null}
           </View>
         )}
 

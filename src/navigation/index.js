@@ -156,13 +156,13 @@ const TabNavigator = () => {
           tabBarLabel: '',
         }}
       />
-      <Tab.Screen
-        name="Search"
-        component={SearchStack}
-        options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
-        }}
-      />
+      {/* The Search tab was a top-level tab that duplicated Trade
+          Board search and Binder browsing — three different search
+          UIs over the same data. Removed to keep the bottom bar
+          focused; the Trade Board's search field now covers the
+          discovery use case. SearchStack and SearchScreen still
+          exist and are reachable from a sub-stack push if we want
+          to deep-link in later. */}
       <Tab.Screen
         name="Trade"
         component={TradeStack}
