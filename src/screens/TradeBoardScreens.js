@@ -128,6 +128,10 @@ export const TradeBoardScreen = ({ navigation, route }) => {
       p.distance_miles = distanceMiles;
     }
     if (debouncedSearch) p.search = debouncedSearch;
+    // Surface local-shop inventory alongside collector listings on
+    // every public scope. 'Mine' and 'Group' don't include shops —
+    // shops aren't yours and don't sit in trading circles.
+    if (scope !== 'mine' && scope !== 'group') p.include_stores = 1;
     return p;
   }, [scope, groupId, debouncedSearch, nearbyLocation, distanceMiles]);
 
@@ -168,14 +172,77 @@ export const TradeBoardScreen = ({ navigation, route }) => {
     placeholderData: keepPreviousData,
   });
 
-  const listings = data?.listings || [];
+  const collectorListings = data?.listings || [];
+  const storeListings = data?.store_listings || [];
+  // Merge collector + store listings into one feed. Each item gets
+  // a result_type marker so the renderer knows whether to show the
+  // collector offer flow or a 'view shop' tap.
+  const listings = useMemo(() => [
+    ...collectorListings.map((l) => ({ ...l, result_type: l.result_type || 'collector_listing' })),
+    ...storeListings.map((l) => ({ ...l, result_type: 'store_listing' })),
+  ], [collectorListings, storeListings]);
 
   // Only show the full-screen loader on the very first load (no data
   // yet). After that we keep the tree mounted so the TextInput keeps
   // focus while search queries fire in the background.
   if (isLoading && !data) return <LoadingScreen message="Loading the trade board..." />;
 
-  const renderListing = ({ item }) => (
+  // Shop inventory is a different kind of result — no offer flow,
+  // no visibility scopes, no chain-of-custody. Render as a smaller
+  // tile with a 'Local Shop' badge and route taps to the shop's
+  // public detail page (LCS) where collectors can see address +
+  // hours + the rest of that shop's inventory.
+  const renderStoreListing = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.listingCardOuter, { borderColor: Colors.accent + '55' }]}
+      onPress={() => navigation.navigate('LCS', { screen: 'LCSShopDetail', params: { storeId: item.store_id } })}
+      activeOpacity={0.85}
+    >
+      <View style={{
+        position: 'absolute', top: 8, right: 8, zIndex: 2,
+        backgroundColor: Colors.accent + '22',
+        borderColor: Colors.accent + '55', borderWidth: 1,
+        paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+      }}>
+        <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+          LOCAL SHOP
+        </Text>
+      </View>
+      <View style={styles.listingTopRow}>
+        <View style={styles.listingThumbWrap}>
+          {(item.own_image_front || (Array.isArray(item.photo_urls) && item.photo_urls[0]) || item.front_image_url) ? (
+            <Image
+              source={{ uri: item.own_image_front || item.photo_urls?.[0] || item.front_image_url }}
+              style={styles.listingThumb}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.listingThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ fontSize: 22 }}>🏪</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flex: 1, paddingRight: 60 }}>
+          <Text style={styles.listingPlayer} numberOfLines={1}>{item.player_name || '—'}</Text>
+          <Text style={styles.listingSet} numberOfLines={1}>
+            {item.year} {item.set_name}{item.parallel ? ` · ${item.parallel}` : ''}
+          </Text>
+          <Text style={[styles.listingSet, { marginTop: 2, color: Colors.accent }]} numberOfLines={1}>
+            {item.store_name}{item.store_city ? ` · ${item.store_city}, ${item.store_state}` : ''}
+          </Text>
+          {item.asking_price ? (
+            <Text style={[styles.listingPlayer, { fontSize: 16, marginTop: 4 }]}>
+              ${Number(item.asking_price).toFixed(2)}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderListing = ({ item }) => {
+    if (item.result_type === 'store_listing') return renderStoreListing({ item });
+    return (
     <TouchableOpacity
       style={[styles.listingCardOuter, item.reported_stolen ? styles.listingStolen : null]}
       onPress={() => navigation.navigate('TradeListingDetail', { listingId: item.id })}
@@ -296,7 +363,8 @@ export const TradeBoardScreen = ({ navigation, route }) => {
       </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
@@ -399,7 +467,7 @@ export const TradeBoardScreen = ({ navigation, route }) => {
 
       <FlatList
         data={listings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => `${item.result_type || 'collector'}-${item.id}`}
         renderItem={renderListing}
         contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
