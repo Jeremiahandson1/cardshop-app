@@ -407,6 +407,12 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // when the user came from BinderEditor / BinderList "+ Add card".
   const incomingBinderId = route.params?.binderId || null;
   const queryClient = useQueryClient();
+  // Pull the user once so the scan handler can gate-check Pro
+  // status BEFORE asking for camera permission. Free users used
+  // to walk through camera permission + photo capture + upload
+  // before getting a 'Pro feature' rejection — that's a tease.
+  // Now we block at the entry point with a clean upgrade prompt.
+  const currentUser = useAuthStore((s) => s.user);
   // Selected destination binder. null = let the server auto-file
   // into the user's Default binder. Binder picker UI below the
   // catalog/parallel selection lets the user override.
@@ -933,6 +939,23 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         cascadeOrder={CASCADE_ORDER}
         cascadeLabel={CASCADE_LABEL}
         onScan={async () => {
+          // Pro gate FIRST — before camera permission, before
+          // taking the photo, before uploading. Tapping scan as
+          // a free user goes straight to an upgrade prompt; we
+          // never make them perform a doomed capture.
+          const tier = currentUser?.subscription_tier;
+          const isPro = tier === 'collector_pro' || tier === 'store_pro' || currentUser?.is_admin;
+          if (!isPro) {
+            Alert.alert(
+              'Card scanning is a Pro feature',
+              'Upgrade to Card Shop Pro to scan cards with the camera. You can still register cards manually using the cascade picker.',
+              [
+                { text: 'Maybe later', style: 'cancel' },
+                { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Upgrade' }) },
+              ],
+            );
+            return;
+          }
           // Quick-scan path: camera → OCR → match → pre-select
           // catalog row. If confidence is high, jump straight to
           // details/serial. If low, drop filters into the cascade
