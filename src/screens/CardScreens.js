@@ -51,8 +51,28 @@ const CascadePicker = ({
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
-  const { data: options, isLoading, isFetching, isError, refetch } = useQuery({
+  // Year is generated locally, not queried from the catalog. The
+  // catalog is sparse for vintage years (we don't have 1952 Topps
+  // seeded yet) — querying would clip the dropdown to "years that
+  // happen to be in the DB," which prevents users from registering
+  // a 1962 Mantle or a 1989 Upper Deck Griffey rookie. Sports
+  // cards started in the 1880s but tobacco era is rare; 1940 is a
+  // reasonable floor that covers Bowman / Topps / Leaf vintage.
+  const { data: yearOptions } = useQuery({
+    queryKey: ['cascade-years', cascadeQuery],
+    enabled: cascadeDim === 'year',
+    queryFn: () => {
+      const now = new Date().getFullYear();
+      const all = [];
+      for (let y = now + 1; y >= 1940; y--) all.push(String(y));
+      const q = (cascadeQuery || '').trim();
+      return q ? all.filter((y) => y.includes(q)) : all;
+    },
+  });
+
+  const { data: catalogOptions, isLoading: catalogLoading, isFetching: catalogFetching, isError, refetch } = useQuery({
     queryKey: ['catalog-filter', cascadeDim, cascade, cascadeQuery],
+    enabled: cascadeDim !== 'year',
     queryFn: () =>
       catalogApi
         .filterValues({ dimension: cascadeDim, ...cascade, q: cascadeQuery || undefined, limit: 200 })
@@ -67,6 +87,10 @@ const CascadePicker = ({
     retry: 1,
     keepPreviousData: true,
   });
+
+  const options = cascadeDim === 'year' ? yearOptions : catalogOptions;
+  const isLoading = cascadeDim === 'year' ? false : catalogLoading;
+  const isFetching = cascadeDim === 'year' ? false : catalogFetching;
 
   // Enriched rows for the parallel step — includes print_run so
   // the picker can show "Gold /10" instead of just "Gold". Only
