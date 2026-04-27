@@ -982,7 +982,16 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             }
           } catch (err) {
             const code = err?.response?.data?.code;
-            if (code === 'ocr_not_configured') {
+            if (code === 'subscription_required') {
+              Alert.alert(
+                'Card scanning is a Pro feature',
+                'Upgrade to Card Shop Pro to scan cards with the camera. You can still register cards manually using the cascade picker.',
+                [
+                  { text: 'Maybe later', style: 'cancel' },
+                  { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Upgrade' }) },
+                ],
+              );
+            } else if (code === 'ocr_not_configured') {
               Alert.alert('Scan coming soon', 'Cloud OCR isn\u2019t enabled yet. Use the cascade for now.');
             } else {
               Alert.alert('Scan failed', err?.response?.data?.error || err?.message || 'Try again.');
