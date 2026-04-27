@@ -19,11 +19,12 @@ import { stickerOrdersApi } from '../services/api';
 import { Button, Input, LoadingScreen, ScreenHeader } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
+// Paid packs are gated until the Stripe checkout flow is wired
+// — listing them with a "coming soon" alert is a tease. Only the
+// Pro allowance is offered for now; users who want more should
+// wait for the paid checkout flow (or email support).
 const PACKS = [
   { key: 'pro_allowance', label: 'Pro allowance — 25 stickers',  price: 'Included',   note: 'Free for active Pro members, once per calendar month.' },
-  { key: 'pack_25',       label: '+25 stickers',                  price: '$5',         note: '$0.20 / sticker. Best for occasional collectors.' },
-  { key: 'pack_100',      label: '+100 stickers',                 price: '$15',        note: '$0.15 / sticker. Best value for active traders.' },
-  { key: 'pack_400',      label: '+400 stickers',                 price: '$40',        note: '$0.10 / sticker. Bulk pricing for stores.' },
 ];
 
 export const OrderStickersScreen = ({ navigation }) => {
@@ -159,6 +160,13 @@ export const OrderStickersScreen = ({ navigation }) => {
             </TouchableOpacity>
           );
         })}
+
+        <Text style={{
+          color: Colors.textMuted, fontSize: 12, marginTop: Spacing.sm,
+          fontStyle: 'italic',
+        }}>
+          Larger packs are coming soon \u2014 email support@twomiah.com to be notified.
+        </Text>
 
         <Text style={[styles.sectionLabel, { marginTop: Spacing.lg }]}>Ship to</Text>
         <Input placeholder="Full name" value={shipName} onChangeText={setShipName} />

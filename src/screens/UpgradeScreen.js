@@ -123,7 +123,14 @@ export const UpgradeScreen = ({ navigation }) => {
     } catch (err) {
       const code = err?.response?.data?.code;
       if (code === 'billing_not_configured') {
-        Alert.alert('Coming soon', "Pro isn't live yet. We'll email you when it opens.");
+        // Should be unreachable in production — every prod build
+        // has either RevenueCat (mobile path) or Stripe (web path)
+        // wired. If the user lands here it's a server config gap;
+        // route them to support, don't tease 'coming soon'.
+        Alert.alert(
+          'Subscriptions unavailable',
+          'Hit a configuration issue on our end. Please email support@twomiah.com so we can get you set up.',
+        );
       } else {
         Alert.alert('Could not open checkout', err?.response?.data?.error || err?.message || 'Try again.');
       }

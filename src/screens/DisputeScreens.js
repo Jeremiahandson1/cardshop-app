@@ -207,23 +207,11 @@ export const DisputeDetailScreen = ({ navigation, route }) => {
               </View>
             )}
 
-            {/* Appeal option */}
-            {dispute.resolution && dispute.resolution !== 'pending' && !dispute.appeal_filed && (
-              <View style={styles.appealCard}>
-                <Ionicons name="megaphone-outline" size={20} color={Colors.info} />
-                <Text style={styles.appealTitle}>Not satisfied with the resolution?</Text>
-                <Text style={styles.appealDesc}>
-                  You can file an appeal within 7 days of the resolution.
-                </Text>
-                <Button
-                  title="File Appeal"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => Alert.alert('Appeal', 'Appeal feature coming soon.')}
-                  style={{ marginTop: Spacing.md }}
-                />
-              </View>
-            )}
+            {/* Appeal flow isn't built yet. Hide the card entirely
+                rather than showing a 'Coming soon' button — users
+                with an unsatisfying resolution shouldn't see a
+                false promise. They can email support@twomiah.com
+                directly while we build the in-app flow. */}
           </>
         )}
 

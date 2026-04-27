@@ -357,7 +357,6 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="Help" component={HelpScreen} />
     <TradeStackNav.Screen name="ReportStolen" component={ReportStolenScreen} />
     <TradeStackNav.Screen name="FirstTradeSafety" component={FirstTradeSafetyScreen} />
-    <TradeStackNav.Screen name="FirstTradeSafetyScreen" component={FirstTradeSafetyScreen} />
   </TradeStackNav.Navigator>
 );
 
@@ -427,10 +426,16 @@ export const RootNavigator = () => {
         // mounting before we push the modal screen onto the
         // Profile stack.
         setTimeout(() => {
-          try { navigationRef.current?.navigate('Profile', { screen: 'Onboarding' }); } catch {}
+          try {
+            navigationRef.current?.navigate('Profile', { screen: 'Onboarding' });
+          } catch (err) {
+            console.warn('[onboarding] navigate failed:', err?.message);
+          }
         }, 800);
-      } catch {
-        // SecureStore failure is non-fatal — we just skip onboarding.
+      } catch (err) {
+        // SecureStore failure is non-fatal — skip onboarding —
+        // but log it so we notice if it happens to many users.
+        console.warn('[onboarding] SecureStore read failed:', err?.message);
       }
     })();
     return () => { cancelled = true; };
