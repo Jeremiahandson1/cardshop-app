@@ -2070,6 +2070,13 @@ export const CardDetailScreen = ({ navigation, route }) => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
       queryClient.invalidateQueries({ queryKey: ['trade-listings'] });
+      // Per-binder views render the intent_signal as an image
+      // overlay ("Let's talk", "Priced", etc.). Invalidate them
+      // too — without this, the overlay keeps showing the old
+      // value until the binder is reopened from scratch.
+      queryClient.invalidateQueries({ predicate: (q) =>
+        q.queryKey?.[0] === 'binder' || q.queryKey?.[0] === 'public-binder'
+      });
       if (res?.data?.needs_listing) {
         navigation.navigate('CreateTradeListing', { ownedCardId: cardId });
       }
