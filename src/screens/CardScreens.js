@@ -1110,22 +1110,43 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               Grading Company
             </Text>
             <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-              {['psa', 'bgs', 'sgc', 'csg', 'hga'].map((g) => (
-                <TouchableOpacity
-                  key={g}
-                  onPress={() => setCertForm((f) => ({ ...f, company: g }))}
-                  style={[
-                    styles.toggleBtn,
-                    certForm.company === g && styles.toggleBtnActive,
-                  ]}
-                >
-                  <Text style={[
-                    styles.toggleText,
-                    certForm.company === g && styles.toggleTextActive,
-                  ]}>{g.toUpperCase()}</Text>
-                </TouchableOpacity>
-              ))}
+              {['psa', 'bgs', 'sgc', 'csg', 'hga'].map((g) => {
+                const autoFill = g === 'psa' || g === 'bgs';
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    onPress={() => setCertForm((f) => ({ ...f, company: g }))}
+                    style={[
+                      styles.toggleBtn,
+                      certForm.company === g && styles.toggleBtnActive,
+                      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.toggleText,
+                      certForm.company === g && styles.toggleTextActive,
+                    ]}>{g.toUpperCase()}</Text>
+                    {autoFill ? (
+                      <View style={{
+                        paddingHorizontal: 5,
+                        paddingVertical: 1,
+                        borderRadius: 4,
+                        backgroundColor: Colors.accent + '22',
+                        borderWidth: 1,
+                        borderColor: Colors.accent + '55',
+                      }}>
+                        <Text style={{ color: Colors.accent, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>
+                          AUTO
+                        </Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+            <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 6 }}>
+              AUTO = we pull the card data from the cert number for you
+            </Text>
           </View>
 
           <Input
@@ -1137,11 +1158,12 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             autoCorrect={false}
           />
 
-          {certForm.company !== 'psa' ? (
+          {certForm.company && !['psa', 'bgs'].includes(certForm.company) ? (
             <View style={{ padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
               <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 18 }}>
-                We only have a live data feed for PSA right now. For {certForm.company.toUpperCase()} cards,
-                we'll still check that the cert isn't already claimed and you can fill in the rest manually.
+                Auto-fill is only live for PSA and BGS right now. For {certForm.company.toUpperCase()} cards,
+                we'll still check that the cert isn't already claimed by another collector
+                and you can fill in the rest manually.
               </Text>
             </View>
           ) : null}
