@@ -981,15 +981,23 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           try {
             const res = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${b64}`);
             const cands = res.data?.candidates || [];
+            const distilled = res.data?.distilled || null;
             const best = cands[0];
+
+            // Always save the photo — the user just took it, don't
+            // make them retake. Photo carries forward whether we
+            // hit a catalog match or fall through to manual.
+            setPhotos((p) => [...p, asset.uri]);
+            setPhotoSources((s) => [...s, 'camera']);
+
             if (best && best.confidence >= 0.65) {
+              // High-confidence match — jump straight into details.
               setSelectedCatalog(best);
-              setPhotos((p) => [...p, asset.uri]);
-              setPhotoSources((s) => [...s, 'camera']);
               setStep(best.print_run ? 'serial' : 'details');
             } else if (cands.length) {
-              // Pre-fill cascade with the top candidate's set + player,
-              // let the user narrow from there.
+              // Some candidates but low confidence. Pre-fill the
+              // cascade with the top candidate's set + player; user
+              // confirms from there.
               setCascade({
                 sport: best.sport || undefined,
                 year: best.year || undefined,
@@ -998,10 +1006,38 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                 player_name: best.player_name || undefined,
               });
               setCascadeDim('card_number');
-              setPhotos((p) => [...p, asset.uri]);
-              setPhotoSources((s) => [...s, 'camera']);
+            } else if (distilled && (distilled.year || distilled.cardNumber || distilled.playerCandidates?.length)) {
+              // No catalog match BUT Vision did extract usable text
+              // (player candidates, year, card #). Drop into manual
+              // entry pre-filled so the OCR work isn't thrown away.
+              // distilled returns: { text, year, cardNumber,
+              // playerCandidates[] }. We pick the longest player
+              // candidate as the best guess; user can edit on
+              // the manual screen.
+              const bestPlayer = (distilled.playerCandidates || [])[0] || '';
+              setManualForm((f) => ({
+                ...f,
+                year: distilled.year ? String(distilled.year) : f.year,
+                player_name: bestPlayer || f.player_name || '',
+                card_number: distilled.cardNumber || f.card_number || '',
+              }));
+              Alert.alert(
+                'Couldn\u2019t auto-match this card',
+                'We pulled the player and year from the photo. Fill in the set and other details on the next screen.',
+              );
+              setStep('manual_entry');
             } else {
-              Alert.alert('Scan inconclusive', 'Could not match this card. Use the cascade to find it.');
+              // Truly inconclusive — Vision returned nothing usable.
+              // Photo's still saved; route to manual entry so the
+              // user keeps moving instead of starting over.
+              Alert.alert(
+                'Scan inconclusive',
+                'We couldn\u2019t read enough text from this photo. Try a brighter shot, or fill in the card details manually.',
+                [
+                  { text: 'Manual entry', onPress: () => setStep('manual_entry') },
+                  { text: 'Back to cascade', style: 'cancel' },
+                ],
+              );
             }
           } catch (err) {
             const code = err?.response?.data?.code;
