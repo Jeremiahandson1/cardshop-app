@@ -1,20 +1,18 @@
 // First-run onboarding — 3 swipeable cards covering the core
-// loops a new user can do in the app. Shown once per device
-// after first sign-in; the OS-level flag lives in SecureStore.
+// loops a new user can do in the app. Rendered as a top-level
+// Modal overlay (NOT a stack screen) so:
+//   - It can't accidentally persist in any tab's history
+//   - Skip + Get started are guaranteed to dismiss it
+//   - Tab switching never re-surfaces it
+//   - Navigation state restoration can't bring it back
 //
-// Three cards by design — each is a primary tab, so the user
-// learns the bottom-bar mental model in the same swipe:
-//
-//   Tag your cards (Scan tab) → permanent provenance
-//   List for trade (Trade tab) → meet collectors
-//   Local prices (LCS tab) → know before you buy
-//
-// Skippable any time. Tapping "Get started" on the last card or
-// "Skip" on any card sets the seen flag and pops back.
+// Driven by state in RootNavigator; SecureStore flag persists
+// across launches. Set the flag immediately on mount (defensive)
+// AND on finish so any failure path still dismisses for good.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Dimensions, FlatList,
+  View, Text, StyleSheet, TouchableOpacity, Dimensions, FlatList, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,13 +45,25 @@ const CARDS = [
   },
 ];
 
-export const OnboardingScreen = ({ navigation }) => {
+// New API: <OnboardingOverlay visible={...} onDone={...} />
+// Old <OnboardingScreen /> still exported below for back-compat
+// but is unused once the modal overlay is wired in RootNavigator.
+export const OnboardingOverlay = ({ visible, onDone }) => {
   const [index, setIndex] = useState(0);
   const listRef = useRef(null);
 
+  // Defensive flag-set on first show — if anything goes wrong
+  // mid-onboarding (force-close, JS error, navigation reset),
+  // the user has still been counted as having "seen" the
+  // onboarding and won't get re-prompted next launch.
+  useEffect(() => {
+    if (!visible) return;
+    SecureStore.setItemAsync(ONBOARDING_SEEN_KEY, '1').catch(() => {});
+  }, [visible]);
+
   const finish = async () => {
     try { await SecureStore.setItemAsync(ONBOARDING_SEEN_KEY, '1'); } catch {}
-    navigation.goBack();
+    onDone?.();
   };
 
   const next = () => {
@@ -83,43 +93,62 @@ export const OnboardingScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={finish} style={styles.skipBtn}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-      </View>
+    <Modal
+      visible={!!visible}
+      animationType="fade"
+      onRequestClose={finish}
+      // Hardware back on Android calls onRequestClose; we treat
+      // it as Skip so the modal can never get stuck.
+    >
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={finish} style={styles.skipBtn}>
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        </View>
 
-      <FlatList
-        ref={listRef}
-        data={CARDS}
-        keyExtractor={(c) => c.key}
-        renderItem={renderCard}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
-      />
-
-      <View style={styles.dots}>
-        {CARDS.map((_, i) => (
-          <View
-            key={i}
-            style={[styles.dot, i === index ? styles.dotActive : null]}
-          />
-        ))}
-      </View>
-
-      <View style={styles.bottomBar}>
-        <Button
-          title={index === CARDS.length - 1 ? 'Get started' : 'Next'}
-          onPress={next}
+        <FlatList
+          ref={listRef}
+          data={CARDS}
+          keyExtractor={(c) => c.key}
+          renderItem={renderCard}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
         />
-      </View>
-    </SafeAreaView>
+
+        <View style={styles.dots}>
+          {CARDS.map((_, i) => (
+            <View
+              key={i}
+              style={[styles.dot, i === index ? styles.dotActive : null]}
+            />
+          ))}
+        </View>
+
+        <View style={styles.bottomBar}>
+          <Button
+            title={index === CARDS.length - 1 ? 'Get started' : 'Next'}
+            onPress={next}
+          />
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
+};
+
+// Legacy stack-screen wrapper, no-op — the navigation registration
+// stays put for now in case any deep link references it. Visit
+// just dismisses immediately.
+export const OnboardingScreen = ({ navigation }) => {
+  useEffect(() => {
+    SecureStore.setItemAsync(ONBOARDING_SEEN_KEY, '1').catch(() => {});
+    navigation.goBack();
+  }, [navigation]);
+  return null;
 };
 
 const styles = StyleSheet.create({

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer } from '@react-navigation/native';
@@ -24,7 +24,7 @@ import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens
 import { StoreIntakeScreen } from '../screens/StoreIntakeScreen';
 import { RequestReprintScreen } from '../screens/RequestReprintScreen';
 import { OrderStickersScreen } from '../screens/OrderStickersScreen';
-import { OnboardingScreen, ONBOARDING_SEEN_KEY } from '../screens/OnboardingScreen';
+import { OnboardingScreen, OnboardingOverlay, ONBOARDING_SEEN_KEY } from '../screens/OnboardingScreen';
 import { ListingDefaultsScreen } from '../screens/ListingDefaultsScreen';
 import * as SecureStore from 'expo-secure-store';
 import { SecurityScreen } from '../screens/SecurityScreen';
@@ -403,6 +403,12 @@ const linkingConfig = {
 export const RootNavigator = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigationRef = useRef(null);
+  // Onboarding is a top-level Modal overlay, NOT a stack screen.
+  // Stack-screen onboarding lived in Profile and persisted in
+  // that tab's history — switching tabs and coming back showed
+  // it again. Driving it from state here means it appears once,
+  // dismisses cleanly, and never comes back.
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
 
   // Wire the notification-response handler once we have a nav container.
   // Handles deal_radar_match pushes → deep link to DealRadarFeed + open listing.
@@ -412,29 +418,23 @@ export const RootNavigator = () => {
     return unsubscribe;
   }, [isAuthenticated]);
 
-  // First-run onboarding — show the 3-card swipe once per device
-  // after the user signs in. Flag persists in SecureStore so a
-  // re-install resets but a sign-out doesn't.
+  // Read the seen-flag once after sign-in. If unset, surface the
+  // overlay. The overlay itself flips the flag on first show so
+  // a crashed app or background-kill mid-onboarding still counts
+  // as "seen" — better than nagging the user.
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setOnboardingVisible(false);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       try {
         const seen = await SecureStore.getItemAsync(ONBOARDING_SEEN_KEY);
-        if (cancelled || seen === '1') return;
-        // Wait a tick so the NavigationContainer has finished
-        // mounting before we push the modal screen onto the
-        // Profile stack.
-        setTimeout(() => {
-          try {
-            navigationRef.current?.navigate('Profile', { screen: 'Onboarding' });
-          } catch (err) {
-            console.warn('[onboarding] navigate failed:', err?.message);
-          }
-        }, 800);
+        if (!cancelled && seen !== '1') setOnboardingVisible(true);
       } catch (err) {
-        // SecureStore failure is non-fatal — skip onboarding —
-        // but log it so we notice if it happens to many users.
+        // SecureStore failure is non-fatal; default to NOT showing
+        // the modal so a keystore problem doesn't block the user.
         console.warn('[onboarding] SecureStore read failed:', err?.message);
       }
     })();
@@ -447,6 +447,10 @@ export const RootNavigator = () => {
       linking={isAuthenticated ? linkingConfig : undefined}
     >
       {isAuthenticated ? <TabNavigator /> : <AuthStack />}
+      <OnboardingOverlay
+        visible={onboardingVisible && isAuthenticated}
+        onDone={() => setOnboardingVisible(false)}
+      />
     </NavigationContainer>
   );
 };
