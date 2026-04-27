@@ -173,6 +173,16 @@ export const RegisterScreen = ({ navigation }) => {
     email: '', username: '', password: '', display_name: '', role: 'collector',
     date_of_birth: '',
   });
+  // DOB collected as three discrete fields so a US user can type
+  // 06 / 14 / 1992 in their natural mental order. The combined
+  // ISO date (YYYY-MM-DD) is what the API stores; we assemble it
+  // on submit.
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobDay, setDobDay] = useState('');
+  const [dobYear, setDobYear] = useState('');
+  const dobMonthRef = useRef();
+  const dobDayRef = useRef();
+  const dobYearRef = useRef();
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -197,13 +207,30 @@ export const RegisterScreen = ({ navigation }) => {
       setError('Password must be at least 8 characters');
       return;
     }
-    if (!form.date_of_birth) {
-      setError('Date of birth is required');
+    // Combine the three DOB fields into ISO YYYY-MM-DD. All three
+    // must be present and parse to a real calendar date — we
+    // catch "02/30/1990" type nonsense by round-tripping through
+    // Date and verifying the components survive.
+    const m = parseInt(dobMonth, 10);
+    const d = parseInt(dobDay, 10);
+    const y = parseInt(dobYear, 10);
+    if (!m || !d || !y) {
+      setError('Enter your full date of birth (month, day, and year)');
       return;
     }
-    const age = ageYearsFromDob(form.date_of_birth);
+    if (m < 1 || m > 12) { setError('Month must be 1\u201312'); return; }
+    if (d < 1 || d > 31) { setError('Day must be 1\u201331'); return; }
+    if (y < 1900 || y > new Date().getFullYear()) { setError('Year looks wrong'); return; }
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+      setError('That date doesn\u2019t exist on the calendar');
+      return;
+    }
+    const isoDob = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    form.date_of_birth = isoDob;
+    const age = ageYearsFromDob(isoDob);
     if (age == null) {
-      setError('Enter your date of birth as YYYY-MM-DD');
+      setError('Could not parse that date');
       return;
     }
     if (age < 13) {
@@ -256,7 +283,52 @@ export const RegisterScreen = ({ navigation }) => {
             <Input label="Username" value={form.username} onChangeText={set('username')} placeholder="cardkng99" />
             <Input label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" autoComplete="email" />
             <Input label="Password" value={form.password} onChangeText={set('password')} placeholder="8+ characters" secureTextEntry />
-            <Input label="Date of birth" value={form.date_of_birth} onChangeText={set('date_of_birth')} placeholder="YYYY-MM-DD" />
+            <Text style={{
+              fontSize: 13, color: Colors.textMuted, fontWeight: '600',
+              marginBottom: 6, letterSpacing: 0.5,
+            }}>
+              DATE OF BIRTH
+            </Text>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Input
+                  inputRef={dobMonthRef}
+                  label="Month"
+                  value={dobMonth}
+                  onChangeText={(v) => {
+                    const cleaned = v.replace(/\D/g, '').slice(0, 2);
+                    setDobMonth(cleaned);
+                    if (cleaned.length === 2) dobDayRef.current?.focus();
+                  }}
+                  placeholder="MM"
+                  keyboardType="number-pad"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input
+                  inputRef={dobDayRef}
+                  label="Day"
+                  value={dobDay}
+                  onChangeText={(v) => {
+                    const cleaned = v.replace(/\D/g, '').slice(0, 2);
+                    setDobDay(cleaned);
+                    if (cleaned.length === 2) dobYearRef.current?.focus();
+                  }}
+                  placeholder="DD"
+                  keyboardType="number-pad"
+                />
+              </View>
+              <View style={{ flex: 1.5 }}>
+                <Input
+                  inputRef={dobYearRef}
+                  label="Year"
+                  value={dobYear}
+                  onChangeText={(v) => setDobYear(v.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="YYYY"
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
 
             {/* Role selector */}
             <Text style={styles.roleLabel}>I AM A</Text>
