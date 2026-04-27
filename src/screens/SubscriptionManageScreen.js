@@ -1,44 +1,48 @@
-// "Manage subscription" = one-shot deep link to the Stripe Customer
-// Portal. Portal handles payment method, cancel, invoice history —
-// everything mobile otherwise can't do directly because Stripe-hosted
-// UI is the compliant path.
+// "Manage subscription" — platform-aware compliance screen.
 //
-// When Stripe isn't live (STRIPE_SECRET_KEY unset) or the user has
-// no stripe_customer_id yet, we show a friendly explanation and a
-// link to Pricing instead of a broken button.
+// iOS: subscriptions purchased through StoreKit MUST be managed
+//      via Apple's Settings app. Linking to Stripe's portal is
+//      a direct App Review rejection (Guideline 3.1.1).
+// Android: same rule, but via Play Store's subscription page.
+// Web (future): Stripe Customer Portal is the right path.
+//
+// We detect the platform and show the right CTA. The Stripe
+// portal path is deliberately hidden on iOS/Android.
 
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { billingApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, ScreenHeader } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+
+// Platform-specific subscription management URLs. Apple and
+// Google both expose deep-links that drop the user into the
+// right settings page for their account, no app-side billing
+// needed.
+const APPLE_MANAGE_SUBS = 'https://apps.apple.com/account/subscriptions';
+const PLAY_MANAGE_SUBS = 'https://play.google.com/store/account/subscriptions';
 
 export const SubscriptionManageScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const [loading, setLoading] = useState(false);
 
-  const openPortal = async () => {
+  const openSubscriptionSettings = async () => {
     setLoading(true);
     try {
-      const res = await billingApi.portalUrl();
-      const url = res.data?.url;
-      if (!url) throw new Error('No URL returned');
-      Linking.openURL(url);
+      const url = Platform.OS === 'ios' ? APPLE_MANAGE_SUBS : PLAY_MANAGE_SUBS;
+      await Linking.openURL(url);
     } catch (err) {
-      const code = err?.response?.data?.code;
-      if (code === 'billing_not_configured') {
-        Alert.alert('Billing not enabled yet', 'We\'ll email you when paid subscriptions go live.');
-      } else if (code === 'no_stripe_customer') {
-        Alert.alert('No subscription yet', 'You haven\'t started a Pro subscription yet. Open Pricing to upgrade.');
-      } else {
-        Alert.alert('Could not open portal', err?.response?.data?.error || err?.message || 'Try again.');
-      }
+      Alert.alert(
+        'Could not open settings',
+        Platform.OS === 'ios'
+          ? 'Open Settings \u203A Apple ID \u203A Subscriptions on your device.'
+          : 'Open the Play Store app \u203A Menu \u203A Subscriptions.',
+      );
     } finally {
       setLoading(false);
     }
@@ -46,6 +50,7 @@ export const SubscriptionManageScreen = ({ navigation }) => {
 
   const tier = user?.subscription_tier || 'free';
   const isPro = tier !== 'free';
+  const platformName = Platform.OS === 'ios' ? 'Apple' : 'Google Play';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -64,21 +69,21 @@ export const SubscriptionManageScreen = ({ navigation }) => {
           <Text style={styles.title}>Subscription & billing</Text>
           <Text style={styles.body}>
             {isPro
-              ? 'Update your payment method, download invoices, or cancel from Stripe\'s secure portal. Changes take effect immediately.'
-              : 'You\'re on the Free plan. Upgrade to Card Shop Pro ($4.99/mo) to unlock Collection Intelligence, Deal Radar, unlimited binders, and price history on your cards.'}
+              ? `Update payment method, see your renewal date, or cancel through ${platformName}. Changes take effect immediately.`
+              : 'You\u2019re on the Free plan. Upgrade to Card Shop Pro ($9.99/mo or $99/yr) to unlock 25 vinyl QR stickers monthly, Collection Intelligence, Deal Radar, and unlimited binders.'}
           </Text>
 
           {isPro ? (
             <Button
-              title={loading ? 'Opening…' : 'Open billing portal'}
-              onPress={openPortal}
+              title={loading ? 'Opening\u2026' : `Manage in ${platformName} Settings`}
+              onPress={openSubscriptionSettings}
               disabled={loading}
               style={{ marginTop: Spacing.lg }}
             />
           ) : (
             <Button
-              title="View pricing"
-              onPress={() => Linking.openURL('https://cardshop.twomiah.com/pricing')}
+              title="See Pro features"
+              onPress={() => navigation.navigate('Upgrade')}
               style={{ marginTop: Spacing.lg }}
             />
           )}
@@ -86,11 +91,11 @@ export const SubscriptionManageScreen = ({ navigation }) => {
 
         {isPro ? (
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>What you can do in the portal</Text>
+            <Text style={styles.infoTitle}>What you can do in {platformName} Settings</Text>
             <InfoRow icon="card-outline" text="Update payment method" />
-            <InfoRow icon="receipt-outline" text="Download invoices" />
-            <InfoRow icon="refresh-outline" text="Switch between monthly plans" />
-            <InfoRow icon="pause-circle-outline" text="Cancel or pause — effective immediately" />
+            <InfoRow icon="refresh-outline" text="Switch between monthly and annual" />
+            <InfoRow icon="pause-circle-outline" text="Cancel \u2014 effective at the end of the period" />
+            <InfoRow icon="receipt-outline" text="See receipts and renewal date" />
           </View>
         ) : null}
       </ScrollView>

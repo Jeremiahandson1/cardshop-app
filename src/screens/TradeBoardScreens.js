@@ -531,6 +531,25 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
     queryFn: () => tradeListingsApi.get(listingId).then((r) => r.data),
   });
 
+  // Generic content-report handler. Required by Apple guideline
+  // 1.2 — every UGC surface needs a flag mechanism. The server
+  // dedupes per (reporter, target) so spam-clicks are no-ops.
+  const doReport = async (reason) => {
+    try {
+      const res = await safetyApi.reportContent({
+        target_type: 'trade_listing',
+        target_id: listingId,
+        reason,
+      });
+      Alert.alert(
+        'Thanks',
+        res.data?.message || 'Our team will review this report.',
+      );
+    } catch (err) {
+      Alert.alert('Could not submit report', err?.response?.data?.error || 'Try again.');
+    }
+  };
+
   const { data: offersData } = useQuery({
     queryKey: ['trade-listing-offers', listingId],
     queryFn: () => offersApi.mine({
@@ -678,19 +697,73 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
         {/* Recent sold comps from eBay */}
         {listing.catalog_id ? <EbayCompsSection catalogId={listing.catalog_id} /> : null}
 
-        {/* Non-owner actions: report stolen */}
+        {/* Non-owner safety actions: report stolen, report
+            content, block user. Apple App Review (Guideline 1.2)
+            requires every UGC surface to expose a flag and a
+            block path; this row is the standard placement. */}
         {!isOwner ? (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('ReportStolen', {
-              tradeListingId: listingId,
-              cardName: formatCardTitle(listing),
-            })}
-            style={{ marginTop: Spacing.md, alignSelf: 'center', padding: Spacing.sm }}
-          >
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
-              🚩 Report stolen card
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginTop: Spacing.md, alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ReportStolen', {
+                tradeListingId: listingId,
+                cardName: formatCardTitle(listing),
+              })}
+              style={{ padding: Spacing.sm }}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+                Report this card as stolen
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Report this listing',
+                  'Why are you reporting this listing?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Spam', onPress: () => doReport('spam') },
+                    { text: 'Abusive / harassing', onPress: () => doReport('abuse') },
+                    { text: 'Fraud / misleading', onPress: () => doReport('fraud') },
+                    { text: 'Other', onPress: () => doReport('other') },
+                  ],
+                );
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+                Report this listing
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  `Block ${listing.owner_display_name || 'this user'}?`,
+                  "They won't see your listings, send you offers, or message you. You won't see theirs either. You can unblock later from Profile \u203A Help & Safety.",
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Block',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await safetyApi.blockUser(listing.user_id, 'Blocked from listing detail');
+                          Alert.alert('Blocked', `${listing.owner_display_name || 'User'} has been blocked.`);
+                          navigation.goBack();
+                        } catch (err) {
+                          Alert.alert('Could not block', err?.response?.data?.error || 'Try again.');
+                        }
+                      },
+                    },
+                  ],
+                );
+              }}
+              style={{ padding: Spacing.sm }}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+                Block this user
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
 
         {/* Offer button or owner actions */}

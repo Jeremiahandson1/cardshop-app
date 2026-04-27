@@ -405,6 +405,11 @@ export const safetyApi = {
   blockUser: (user_id, reason) => api.post('/safety/blocks', { user_id, reason }),
   unblockUser: (userId) => api.delete(`/safety/blocks/${userId}`),
   listBlocks: () => api.get('/safety/blocks'),
+  // Generic content report: target is anything UGC. The server
+  // dedupes by (reporter, target_type, target_id) so one user
+  // can't spam-report the same content.
+  reportContent: ({ target_type, target_id, reason, details }) =>
+    api.post('/safety/reports', { target_type, target_id, reason, details }),
   reportStolen: (data) => api.post('/safety/stolen-reports', data),
   submitSupportTicket: (data) => api.post('/safety/support', data),
 };

@@ -18,7 +18,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -152,11 +152,24 @@ export const UpgradeScreen = ({ navigation }) => {
   };
 
   const startCheckout = () => {
-    if (rcAvailable() && monthlyPkg) {
-      startNativePurchase();
-    } else {
-      startStripeCheckout();
+    // iOS / Android MUST go through StoreKit / Play Billing.
+    // Apple guideline 3.1.1 forbids any non-IAP purchase path on
+    // mobile, including a Stripe-hosted checkout fallback. If
+    // RevenueCat doesn't have a package available we tell the
+    // user to retry rather than silently routing them to Stripe.
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      if (rcAvailable() && monthlyPkg) {
+        startNativePurchase();
+      } else {
+        Alert.alert(
+          'Subscription unavailable',
+          'We could not load store products right now. Please close the app and try again, or contact support@twomiah.com if it keeps happening.',
+        );
+      }
+      return;
     }
+    // Web only — Stripe Checkout is the compliant path off-mobile.
+    startStripeCheckout();
   };
 
   const handleRestore = async () => {

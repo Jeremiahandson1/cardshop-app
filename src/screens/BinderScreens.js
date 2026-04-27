@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bindersApi, cardsApi, offersApi, cstxApi, followsApi } from '../services/api';
+import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
@@ -1073,6 +1073,51 @@ export const PublicBinderScreen = ({ navigation, route }) => {
                   </Text>
                 </TouchableOpacity>
               )}
+              {/* More menu — required by Apple guideline 1.2 to
+                  expose Block + Report on every UGC surface. The
+                  binder owner's own view doesn't get this menu
+                  (you can't block or report yourself). */}
+              {user && !isOwner && binder.owner?.id ? (
+                <TouchableOpacity
+                  style={[styles.followBtn, { marginLeft: Spacing.xs }]}
+                  onPress={() => Alert.alert(
+                    binder.owner?.display_name || 'This user',
+                    undefined,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Report this binder',
+                        onPress: () => Alert.alert(
+                          'Report this binder',
+                          'Why are you reporting this binder?',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Spam', onPress: () => safetyApi.reportContent({ target_type: 'binder', target_id: binder.id, reason: 'spam' }).then(() => Alert.alert('Thanks', 'Our team will review this report.')).catch((e) => Alert.alert('Error', e?.response?.data?.error || 'Try again.')) },
+                            { text: 'Abusive', onPress: () => safetyApi.reportContent({ target_type: 'binder', target_id: binder.id, reason: 'abuse' }).then(() => Alert.alert('Thanks', 'Our team will review this report.')).catch((e) => Alert.alert('Error', e?.response?.data?.error || 'Try again.')) },
+                            { text: 'Fraud', onPress: () => safetyApi.reportContent({ target_type: 'binder', target_id: binder.id, reason: 'fraud' }).then(() => Alert.alert('Thanks', 'Our team will review this report.')).catch((e) => Alert.alert('Error', e?.response?.data?.error || 'Try again.')) },
+                            { text: 'Other', onPress: () => safetyApi.reportContent({ target_type: 'binder', target_id: binder.id, reason: 'other' }).then(() => Alert.alert('Thanks', 'Our team will review this report.')).catch((e) => Alert.alert('Error', e?.response?.data?.error || 'Try again.')) },
+                          ],
+                        ),
+                      },
+                      {
+                        text: 'Block this user',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await safetyApi.blockUser(binder.owner.id, 'Blocked from public binder');
+                            Alert.alert('Blocked', 'This user has been blocked.');
+                            navigation.goBack();
+                          } catch (err) {
+                            Alert.alert('Could not block', err?.response?.data?.error || 'Try again.');
+                          }
+                        },
+                      },
+                    ],
+                  )}
+                >
+                  <Text style={styles.followBtnText}>{'\u22EF'}</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             {/* Show floor banner — physical findability at a card show.

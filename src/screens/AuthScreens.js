@@ -183,6 +183,10 @@ export const RegisterScreen = ({ navigation }) => {
   const dobMonthRef = useRef();
   const dobDayRef = useRef();
   const dobYearRef = useRef();
+  // Age confirmation — required for COPPA without forcing a
+  // specific DOB. Apple Review 5.1.1(v) flagged required DOB
+  // as a privacy violation, so we collect just the boolean.
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -207,32 +211,44 @@ export const RegisterScreen = ({ navigation }) => {
       setError('Password must be at least 8 characters');
       return;
     }
-    // Combine the three DOB fields into ISO YYYY-MM-DD. All three
-    // must be present and parse to a real calendar date — we
-    // catch "02/30/1990" type nonsense by round-tripping through
-    // Date and verifying the components survive.
-    const m = parseInt(dobMonth, 10);
-    const d = parseInt(dobDay, 10);
-    const y = parseInt(dobYear, 10);
-    if (!m || !d || !y) {
-      setError('Enter your full date of birth (month, day, and year)');
+    // Age verification only — no DOB collected. Apple flagged
+    // mandatory DOB as a 5.1.1(v) privacy violation since it
+    // isn't directly relevant to core functionality. We keep an
+    // age-confirm checkbox to satisfy COPPA without storing the
+    // user's actual birthday. Optional DOB field exists below
+    // for users who want birthday rewards later.
+    if (!ageConfirmed) {
+      setError('Please confirm you are at least 13 years old.');
       return;
     }
-    if (m < 1 || m > 12) { setError('Month must be 1\u201312'); return; }
-    if (d < 1 || d > 31) { setError('Day must be 1\u201331'); return; }
-    if (y < 1900 || y > new Date().getFullYear()) { setError('Year looks wrong'); return; }
-    const dt = new Date(y, m - 1, d);
-    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
-      setError('That date doesn\u2019t exist on the calendar');
-      return;
+    // Optional DOB: validate IF the user filled all three fields.
+    // Empty = skip entirely. Partial = treat as filled-in error.
+    let isoDob = null;
+    const anyDob = dobMonth || dobDay || dobYear;
+    if (anyDob) {
+      const m = parseInt(dobMonth, 10);
+      const d = parseInt(dobDay, 10);
+      const y = parseInt(dobYear, 10);
+      if (!m || !d || !y) {
+        setError('Date of birth is optional, but if you start it, fill all three fields.');
+        return;
+      }
+      if (m < 1 || m > 12) { setError('Month must be 1\u201312'); return; }
+      if (d < 1 || d > 31) { setError('Day must be 1\u201331'); return; }
+      if (y < 1900 || y > new Date().getFullYear()) { setError('Year looks wrong'); return; }
+      const dt = new Date(y, m - 1, d);
+      if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+        setError('That date doesn\u2019t exist on the calendar');
+        return;
+      }
+      isoDob = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const age = ageYearsFromDob(isoDob);
+      if (age != null && age < 13) {
+        setError('You must be at least 13 to use Card Shop.');
+        return;
+      }
     }
-    const isoDob = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     form.date_of_birth = isoDob;
-    const age = ageYearsFromDob(isoDob);
-    if (age == null) {
-      setError('Could not parse that date');
-      return;
-    }
     if (age < 13) {
       setError('You must be at least 13 years old to use Card Shop.');
       return;
@@ -248,6 +264,7 @@ export const RegisterScreen = ({ navigation }) => {
         ...form,
         email: form.email.toLowerCase().trim(),
         username: form.username.trim(),
+        age_confirmed: ageConfirmed,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
@@ -283,11 +300,31 @@ export const RegisterScreen = ({ navigation }) => {
             <Input label="Username" value={form.username} onChangeText={set('username')} placeholder="cardkng99" />
             <Input label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" autoComplete="email" />
             <Input label="Password" value={form.password} onChangeText={set('password')} placeholder="8+ characters" secureTextEntry />
+            {/* Age confirmation — required to comply with COPPA
+                without storing a specific DOB. Apple flagged
+                required DOB as 5.1.1(v) privacy violation. */}
+            <TouchableOpacity
+              style={styles.tosRow}
+              onPress={() => setAgeConfirmed((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.tosCheckbox, ageConfirmed && styles.tosCheckboxOn]}>
+                {ageConfirmed ? <Text style={styles.tosCheckboxMark}>{'\u2713'}</Text> : null}
+              </View>
+              <Text style={styles.tosText}>
+                I confirm I am at least 13 years old.
+              </Text>
+            </TouchableOpacity>
+
+            {/* Optional DOB — for birthday rewards / age-gated
+                features later. Skipping all three fields = no
+                DOB stored. Partial entry triggers a validation
+                hint at submit time. */}
             <Text style={{
               fontSize: 13, color: Colors.textMuted, fontWeight: '600',
-              marginBottom: 6, letterSpacing: 0.5,
+              marginBottom: 6, marginTop: Spacing.md, letterSpacing: 0.5,
             }}>
-              DATE OF BIRTH
+              DATE OF BIRTH (OPTIONAL)
             </Text>
             <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
               <View style={{ flex: 1 }}>

@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.twomiah.cardshop",
-      "buildNumber": "5",
+      "buildNumber": "9",
       "infoPlist": {
         "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
         "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
@@ -136,7 +136,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 5
+      "versionCode": 9
     },
     "plugins": [
       [
