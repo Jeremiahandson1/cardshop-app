@@ -7,6 +7,27 @@ export const useAuthStore = create((set, get) => ({
   isLoading: true,
   isAuthenticated: false,
 
+  // Optimistic patch of the user object — used after a Pro
+  // purchase clears StoreKit but before the RevenueCat webhook
+  // round-trips back to set our DB tier. Caller passes the new
+  // user shape (or partial); we shallow-merge so callers don't
+  // have to reconstruct the whole object.
+  setUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : patch })),
+
+  // Refresh the current user from /auth/me. Use this after a
+  // tier-flipping event (purchase, cancel) to converge with
+  // server state. Failures are swallowed — the next render path
+  // will eventually see the right tier.
+  refreshUser: async () => {
+    try {
+      const res = await authApi.me();
+      set({ user: res.data });
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
   // Called on app launch to restore session.
   // Only wipe tokens on a DEFINITIVE unauthenticated response (401).
   // Transient errors (cold-start timeout, 5xx, offline) must not log

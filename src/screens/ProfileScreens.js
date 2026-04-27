@@ -187,12 +187,34 @@ export const ProfileScreen = ({ navigation }) => {
               <Text style={styles.statLabel}>Rating</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={async () => {
+                // Manual subscription refresh — closes the race
+                // window where StoreKit confirmed but our DB row
+                // hasn't caught the RevenueCat webhook yet. Long-
+                // press / tap is intentionally on the Plan stat
+                // because that's where the user looks for "am I
+                // Pro yet?" verification.
+                const refreshed = await useAuthStore.getState().refreshUser();
+                if (refreshed) {
+                  showMessage({
+                    message: refreshed.subscription_tier && refreshed.subscription_tier !== 'free'
+                      ? 'Pro is active.'
+                      : 'Still on free plan.',
+                    type: 'info',
+                    icon: 'info',
+                    duration: 1800,
+                  });
+                }
+              }}
+            >
               <Text style={[styles.statValue, { color: Colors.accent }]}>
-                {user?.subscription_tier === 'free' ? 'Free' : 'Pro'}
+                {user?.subscription_tier === 'free' || !user?.subscription_tier ? 'Free' : 'Pro'}
               </Text>
               <Text style={styles.statLabel}>Plan</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

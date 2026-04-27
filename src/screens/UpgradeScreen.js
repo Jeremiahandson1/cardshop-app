@@ -96,11 +96,23 @@ export const UpgradeScreen = ({ navigation }) => {
     try {
       const res = await purchasePackage(monthlyPkg);
       if (res.ok) {
-        // Backend webhook from RevenueCat will flip subscription_tier.
-        // Refresh status query to pick it up; race-free because we
-        // wait a beat then refetch.
-        setTimeout(() => qc.invalidateQueries({ queryKey: ['billing-status'] }), 1500);
-        Alert.alert('Welcome to Pro 🎉', 'Your subscription is active. The app will refresh shortly.');
+        // RevenueCat webhook → backend → DB tier flip can lag 1-15s
+        // behind the StoreKit confirm. Without optimistic UI the
+        // user lands on a Pro feature, sees free state, and bounces.
+        // We invalidate auth-store so the user object reflects Pro
+        // immediately, then re-fetch billing status from the server
+        // a few times to converge with the webhook.
+        const auth = useAuthStore.getState();
+        if (auth?.user) {
+          auth.setUser?.({ ...auth.user, subscription_tier: 'collector_pro' });
+        }
+        // Stagger refetches: 1s, 4s, 10s. By the third hit the
+        // webhook should have fired even on the slowest path.
+        [1000, 4000, 10000].forEach((delay) => setTimeout(() => {
+          qc.invalidateQueries({ queryKey: ['billing-status'] });
+          qc.invalidateQueries({ queryKey: ['me'] });
+        }, delay));
+        Alert.alert('Welcome to Pro 🎉', 'Your subscription is active. Pro features are unlocked now.');
       } else if (res.reason !== 'cancelled') {
         Alert.alert('Purchase failed', res.reason || 'Try again.');
       }
