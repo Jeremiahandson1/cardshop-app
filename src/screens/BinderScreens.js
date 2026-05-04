@@ -2205,6 +2205,19 @@ export const TransactionScreen = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* Below-threshold dispute coverage notice (under $200, no video gate) */}
+        {videoStatus && !videoStatus.video_required && tx.deal_amount && Number(tx.deal_amount) > 0 && (
+          <View style={{
+            backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1,
+            borderRadius: Radius.md, padding: Spacing.sm,
+          }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, lineHeight: 17 }}>
+              <Text style={{ fontWeight: Typography.bold, color: Colors.text }}>Under $200 dispute coverage:</Text>{' '}
+              Pack-out and unpack videos are optional below $200. If a dispute is filed without videos, Card Shop reviews the chain of custody record on a best-effort basis — outcomes are less certain than on $200+ video-gated deals. Recording videos is still encouraged.
+            </Text>
+          </View>
+        )}
+
         {/* Video gate banner (Theme E2). Shown whenever video is required. */}
         {videoStatus?.video_required && (
           <View style={styles.videoGateCard}>
@@ -2262,6 +2275,21 @@ export const TransactionScreen = ({ navigation, route }) => {
         {/* Seller: add tracking (gated behind pack-out video if required) */}
         {isSeller && tx.status === 'payment_confirmed' && (videoStatus?.packout?.recorded || !videoStatus?.video_required || videoStatus?.waiver?.fully_waived) && (
           <View>
+            {/* E3 — signature confirmation recommendation for high-value
+                shipments. Stops "delivered = stolen porch" disputes. */}
+            {tx.deal_amount && Number(tx.deal_amount) >= 200 && (
+              <View style={{
+                backgroundColor: Colors.accent + '15', borderColor: Colors.accent, borderWidth: 1,
+                borderRadius: Radius.md, padding: Spacing.sm, marginBottom: Spacing.sm,
+              }}>
+                <Text style={{ color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.bold }}>
+                  ✉ Use signature confirmation
+                </Text>
+                <Text style={{ color: Colors.text, fontSize: Typography.xs, lineHeight: 17, marginTop: 4 }}>
+                  This deal is $${Number(tx.deal_amount).toFixed(0)}. We strongly recommend signature-required shipping (USPS Signature Confirmation, UPS Adult Signature, FedEx Direct Signature). Without it, "delivered but never received" disputes are hard to resolve in your favor.
+                </Text>
+              </View>
+            )}
             <Input
               label="Tracking Number"
               value={trackingNumber}
