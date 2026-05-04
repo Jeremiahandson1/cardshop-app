@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { showFloorApi, cardsApi } from '../services/api';
+import { showFloorApi, cardsApi, bindersApi } from '../services/api';
 import { Button, Input, LoadingScreen, EmptyState } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -208,13 +208,25 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [hours, setHours] = useState('48');
-  const [bulkLive, setBulkLive] = useState(true);
+  // Three modes: 'binders' (pick which binders), 'all' (all cards), 'none' (just check in)
+  const [mode, setMode] = useState('binders');
+  const [selectedBinderIds, setSelectedBinderIds] = useState([]);
+
+  const { data: bindersData } = useQuery({
+    queryKey: ['my-binders-check-in'],
+    queryFn: () => bindersApi.list().then((r) => r.data),
+  });
+  const binders = bindersData?.binders || [];
 
   const { data: cardsData } = useQuery({
     queryKey: ['my-cards-show-floor'],
     queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
-    enabled: bulkLive,
+    enabled: mode === 'all',
   });
+
+  const toggleBinder = (id) => {
+    setSelectedBinderIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
 
   const checkInMut = useMutation({
     mutationFn: () => showFloorApi.checkIn({
@@ -224,7 +236,8 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
       venue_state: state.trim() || undefined,
       table_number: tableNumber.trim() || undefined,
       hours: parseInt(hours, 10) || 48,
-      go_live_card_ids: bulkLive ? (cardsData?.cards || []).map((c) => c.id) : undefined,
+      go_live_binder_ids: mode === 'binders' && selectedBinderIds.length ? selectedBinderIds : undefined,
+      go_live_card_ids: mode === 'all' ? (cardsData?.cards || []).map((c) => c.id) : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['show-floor-me'] });
@@ -286,20 +299,96 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
           keyboardType="number-pad"
         />
 
-        <TouchableOpacity
-          style={[styles.toggle, bulkLive && styles.toggleOn]}
-          onPress={() => setBulkLive(!bulkLive)}
-        >
-          <Ionicons name={bulkLive ? 'checkbox' : 'square-outline'} size={20} color={bulkLive ? Colors.accent : Colors.textMuted} />
-          <Text style={styles.toggleText}>
-            Put all my cards on the show floor ({cardsData?.cards?.length || 0} cards)
-          </Text>
-        </TouchableOpacity>
+        <Text style={[styles.intro, { marginTop: Spacing.md, marginBottom: Spacing.xs, fontWeight: Typography.bold, color: Colors.text }]}>
+          What's on the show floor?
+        </Text>
+
+        <View style={{ flexDirection: 'row', gap: Spacing.xs, marginBottom: Spacing.sm }}>
+          {[
+            { k: 'binders', l: 'Pick binders' },
+            { k: 'all',     l: 'All my cards' },
+            { k: 'none',    l: 'Just check in' },
+          ].map((m) => (
+            <TouchableOpacity
+              key={m.k}
+              style={[styles.tab, mode === m.k && styles.tabActive]}
+              onPress={() => setMode(m.k)}
+            >
+              <Text style={[styles.tabText, mode === m.k && styles.tabTextActive]}>{m.l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {mode === 'binders' && (
+          <View style={{ gap: 4 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 4 }}>
+              Tap to select which binders you're bringing. Every card in those binders goes live.
+            </Text>
+            {binders.length === 0 && (
+              <Text style={{ color: Colors.textMuted, fontStyle: 'italic', fontSize: Typography.sm }}>
+                You don't have any binders yet.
+              </Text>
+            )}
+            {binders.map((b) => {
+              const selected = selectedBinderIds.includes(b.id);
+              return (
+                <TouchableOpacity
+                  key={b.id}
+                  style={[styles.binderRow, selected && styles.binderRowSelected]}
+                  onPress={() => toggleBinder(b.id)}
+                >
+                  <Ionicons
+                    name={selected ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={selected ? Colors.accent : Colors.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.binderName}>{b.name}</Text>
+                    <Text style={styles.binderMeta}>
+                      {b.card_count != null ? `${b.card_count} cards` : ''}
+                      {b.is_public ? ' · public' : ''}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            {selectedBinderIds.length > 0 && (
+              <Text style={{ color: Colors.accent, fontSize: Typography.sm, marginTop: 4, fontWeight: Typography.semibold }}>
+                {selectedBinderIds.length} binder{selectedBinderIds.length === 1 ? '' : 's'} selected
+              </Text>
+            )}
+          </View>
+        )}
+
+        {mode === 'all' && (
+          <View style={[styles.binderRow, styles.binderRowSelected]}>
+            <Ionicons name="library" size={20} color={Colors.accent} />
+            <Text style={[styles.binderName, { flex: 1 }]}>
+              All {cardsData?.cards?.length || 0} of your cards
+            </Text>
+          </View>
+        )}
+
+        {mode === 'none' && (
+          <View style={[styles.binderRow]}>
+            <Ionicons name="information-circle-outline" size={20} color={Colors.textMuted} />
+            <Text style={[styles.binderMeta, { flex: 1 }]}>
+              Just check in — nothing on the show floor yet. You can mark binders or cards live later.
+            </Text>
+          </View>
+        )}
 
         <Button
           title="Check in"
           onPress={() => {
             if (!eventName.trim()) return Alert.alert('Required', 'Event name is required.');
+            if (mode === 'binders' && selectedBinderIds.length === 0) {
+              Alert.alert(
+                'No binders selected',
+                'Pick at least one binder, choose "All my cards", or switch to "Just check in".',
+              );
+              return;
+            }
             checkInMut.mutate();
           }}
           loading={checkInMut.isPending}
@@ -588,6 +677,15 @@ const styles = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.sm, marginTop: Spacing.sm },
   toggleOn: {},
   toggleText: { color: Colors.text, fontSize: Typography.sm, flex: 1 },
+
+  binderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: Spacing.sm, borderRadius: Radius.md,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
+  binderRowSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + '10' },
+  binderName: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
+  binderMeta: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 },
 
   eventHeader: { padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border },
   eventHeaderText: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
