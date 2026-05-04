@@ -399,6 +399,15 @@ export const cardChainApi = {
 };
 
 // ============================================================
+// STOLEN MATCH CANDIDATES (Theme F1) — eBay scan results
+// ============================================================
+export const stolenMatchesApi = {
+  mine: () => api.get('/stolen-matches/mine'),
+  ownerConfirm: (id, notes) => api.post(`/stolen-matches/${id}/owner-confirm`, { notes }),
+  ownerDismiss: (id, notes) => api.post(`/stolen-matches/${id}/owner-dismiss`, { notes }),
+};
+
+// ============================================================
 // FOLLOWS
 // ============================================================
 export const followsApi = {

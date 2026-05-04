@@ -69,6 +69,7 @@ import { TransferVideoScreen } from '../screens/TransferVideoScreen';
 import { StalledTransferReportScreen } from '../screens/StalledTransferReportScreen';
 import { CaseModeScreen } from '../screens/CaseModeScreen';
 import { CardChainScreen } from '../screens/CardChainScreen';
+import { StolenMatchReviewScreen } from '../screens/StolenMatchReviewScreen';
 import { SetsListScreen, SetCompletionScreen, BrowseSetsScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
@@ -296,6 +297,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="StalledTransferReport" component={StalledTransferReportScreen} />
     <ProfileStackNav.Screen name="CaseMode" component={CaseModeScreen} />
     <ProfileStackNav.Screen name="CardChain" component={CardChainScreen} />
+    <ProfileStackNav.Screen name="StolenMatchReview" component={StolenMatchReviewScreen} />
     <ProfileStackNav.Screen name="DisputeList" component={DisputeListScreen} />
     <ProfileStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
     <ProfileStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
