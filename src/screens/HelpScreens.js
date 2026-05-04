@@ -14,6 +14,77 @@ import {
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
+// FAQ — common questions, especially around CoC, video gate, SLA.
+// Inline accordion: tap to expand. Static content; no API needed.
+// ============================================================
+const FAQ_ITEMS = [
+  {
+    q: 'How does the chain of custody work?',
+    a: 'Every transfer of every card is signed and timestamped. When you receive a card, that becomes a new link in its chain. The chain stays with the card across owners — so 5 transfers from now, the new owner can still see who had it before. Tap "View chain of custody" on any card detail.',
+  },
+  {
+    q: "What's the $200 video rule?",
+    a: 'For any shipment of $200 or more, both parties record a short video — the seller a "pack-out" before sealing the package, the buyer an "unpack" before opening it. Without your own video, you can\'t open a dispute on that side of the deal. Your video protects you, not the other party — they have their own.',
+  },
+  {
+    q: 'Can we waive the video requirement?',
+    a: 'Yes. Both parties can affirmatively opt out (long trade history, established trust, etc). Both have to waive — one party can\'t force it. If you waive, dispute resolution falls back to the chain-of-custody record only.',
+  },
+  {
+    q: 'How long does the seller have to ship?',
+    a: '5 days. We send reminders on day 2 and day 4. After day 5 the seller is marked overdue. After day 6 the buyer can file a "stalled transfer" report. After day 9 admin reviews — and if the seller has clearly abandoned the deal, we transfer the card to the buyer using our chain-of-custody record.',
+  },
+  {
+    q: 'Why does the app not auto-track packages?',
+    a: 'We deliberately don\'t integrate with carrier tracking. Carrier scans can be faked or delayed; pack-out/unpack videos can\'t. The video is the trust mechanism, not the carrier scan. You can paste a tracking number and we\'ll link out to the carrier site, but it\'s informational.',
+  },
+  {
+    q: 'What if my card is reported stolen?',
+    a: "If admin confirms a stolen-card report and you've supplied proof of acquisition (on-platform purchase, receipt, police case number, or insurance schedule), it appears on the public stolen registry at cardshop.twomiah.com/stolen and our cron job scans eBay hourly looking for it. Match candidates land in admin review, then you confirm or dismiss.",
+  },
+  {
+    q: 'How do I go live at a card show?',
+    a: 'Profile → Show Floor — live now → Check in. Pick the event from the catalog (or type a custom one), set your table number, and choose which binders go live. Followers get a push, and your cards appear in everyone\'s "Live now" feed at that event.',
+  },
+  {
+    q: 'What\'s the difference between Free and Collector Pro?',
+    a: 'Free works for cataloging, scanning, and viewing chains. Collector Pro unlocks Case Mode (per-card show floor), Show Floor check-ins, unlimited binders/cards, and analytics. Manage your subscription from Profile → Manage subscription.',
+  },
+];
+
+const FaqList = () => {
+  const [open, setOpen] = useState(null);
+  return (
+    <View>
+      {FAQ_ITEMS.map((item, i) => {
+        const expanded = open === i;
+        return (
+          <TouchableOpacity
+            key={i}
+            style={styles.faqRow}
+            onPress={() => setOpen(expanded ? null : i)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Ionicons
+                name={expanded ? 'chevron-down' : 'chevron-forward'}
+                size={16}
+                color={Colors.accent}
+                style={{ marginTop: 2 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.faqQ}>{item.q}</Text>
+                {expanded && <Text style={styles.faqA}>{item.a}</Text>}
+              </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
+// ============================================================
 // HELP / SUPPORT SCREEN
 // First stop for anything wrong — bug report, account issue, safety
 // concern. Creates a support ticket on the backend.
@@ -81,6 +152,9 @@ export const HelpScreen = ({ navigation }) => {
           <Text style={styles.quickText}>support@twomiah.com</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
+
+        <SectionHeader title="Frequently asked" />
+        <FaqList />
 
         <SectionHeader title="Or file a ticket" />
 
@@ -276,6 +350,17 @@ export const FirstTradeSafetyScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+  faqRow: {
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 6,
+  },
+  faqQ: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold, lineHeight: 20 },
+  faqA: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 20, marginTop: 8 },
+
   quickRow: {
     flexDirection: 'row',
     alignItems: 'center',
