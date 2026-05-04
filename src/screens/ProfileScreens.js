@@ -90,7 +90,8 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
-        { icon: 'storefront-outline', label: 'Case Mode (show floor)', onPress: () => navigation.navigate('CaseMode') },
+        { icon: 'flash-outline', label: 'Show Floor — live now', onPress: () => navigation.navigate('ShowFloorHub') },
+        { icon: 'storefront-outline', label: 'Case Mode (per card)', onPress: () => navigation.navigate('CaseMode') },
         { icon: 'pricetag-outline', label: 'Order stickers', onPress: () => navigation.navigate('OrderStickers') },
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
       ]

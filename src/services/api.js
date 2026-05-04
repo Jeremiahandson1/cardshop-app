@@ -408,6 +408,19 @@ export const stolenMatchesApi = {
 };
 
 // ============================================================
+// SHOW FLOOR (Phase 1.5)
+// ============================================================
+export const showFloorApi = {
+  me: () => api.get('/show-floor/me'),
+  checkIn: (body) => api.post('/show-floor/check-in', body),
+  checkOut: () => api.post('/show-floor/check-out'),
+  live: (params) => api.get('/show-floor/live', { params }),
+  event: (slug) => api.get(`/show-floor/event/${encodeURIComponent(slug)}`),
+  eventInventory: (slug, params) => api.get(`/show-floor/event/${encodeURIComponent(slug)}/inventory`, { params }),
+  user: (username) => api.get(`/show-floor/user/${encodeURIComponent(username)}`),
+};
+
+// ============================================================
 // FOLLOWS
 // ============================================================
 export const followsApi = {

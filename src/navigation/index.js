@@ -70,6 +70,9 @@ import { StalledTransferReportScreen } from '../screens/StalledTransferReportScr
 import { CaseModeScreen } from '../screens/CaseModeScreen';
 import { CardChainScreen } from '../screens/CardChainScreen';
 import { StolenMatchReviewScreen } from '../screens/StolenMatchReviewScreen';
+import {
+  ShowFloorHubScreen, ShowFloorCheckInScreen, ShowFloorEventScreen, ShowFloorUserScreen,
+} from '../screens/ShowFloorScreens';
 import { SetsListScreen, SetCompletionScreen, BrowseSetsScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
@@ -298,6 +301,10 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="CaseMode" component={CaseModeScreen} />
     <ProfileStackNav.Screen name="CardChain" component={CardChainScreen} />
     <ProfileStackNav.Screen name="StolenMatchReview" component={StolenMatchReviewScreen} />
+    <ProfileStackNav.Screen name="ShowFloorHub" component={ShowFloorHubScreen} />
+    <ProfileStackNav.Screen name="ShowFloorCheckIn" component={ShowFloorCheckInScreen} />
+    <ProfileStackNav.Screen name="ShowFloorEvent" component={ShowFloorEventScreen} />
+    <ProfileStackNav.Screen name="ShowFloorUser" component={ShowFloorUserScreen} />
     <ProfileStackNav.Screen name="DisputeList" component={DisputeListScreen} />
     <ProfileStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
     <ProfileStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
