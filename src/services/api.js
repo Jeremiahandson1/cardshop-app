@@ -140,7 +140,11 @@ export const catalogApi = {
   // Returns 503 + code='ocr_not_configured' when GOOGLE_VISION_API_KEY
   // isn't set on the API — the Scan button stays visible but
   // raises an alert explaining it's coming soon.
-  ocrSuggest: (image_base64) => api.post('/catalog/ocr-suggest', { image_base64 }, { timeout: 30_000 }),
+  ocrSuggest: (image_base64) => api.post('/catalog/ocr-suggest', { image_base64 }, { timeout: 60_000 }),
+  // Claude vision-based scan — preferred over ocrSuggest. Returns
+  // { fields, candidates } where fields is structured metadata
+  // extracted directly from the image (no regex distillation).
+  scanVision: (image_base64) => api.post('/catalog/scan-vision', { image_base64 }, { timeout: 30_000 }),
   // Cert lookup for graded slabs. Always returns already_claimed
   // status regardless of whether PSA is configured; slab metadata
   // + images populate only when PSA_API_TOKEN is set upstream.
@@ -360,6 +364,38 @@ export const cstxApi = {
   addTracking: (id, data) => api.post(`/transactions/${id}/add-tracking`, data),
   confirmDelivery: (id) => api.post(`/transactions/${id}/confirm-delivery`),
   dispute: (id, data) => api.post(`/transactions/${id}/dispute`, data),
+  // Theme E2 — pack-out / unpack video gate
+  videoStatus: (id) => api.get(`/transactions/${id}/video-status`),
+  videoChallenge: (id, phase) => api.post(`/transactions/${id}/video/challenge`, { phase }),
+  submitVideo: (id, phase, video_url) => api.post(`/transactions/${id}/video`, { phase, video_url }),
+  waiveVideo: (id) => api.post(`/transactions/${id}/video/waive`),
+  // Theme E1 — carrier tracking link-out
+  trackingUrl: (id) => api.get(`/transactions/${id}/tracking-url`),
+};
+
+// ============================================================
+// STALLED TRANSFER REPORTS (Theme E5)
+// ============================================================
+export const stalledTransfersApi = {
+  file: (data) => api.post('/stalled-transfers', data),
+  mine: () => api.get('/stalled-transfers/mine'),
+  sellerRespond: (id, response) => api.post(`/stalled-transfers/${id}/seller-respond`, { response }),
+};
+
+// ============================================================
+// CASE MODE (Theme C)
+// ============================================================
+export const caseModeApi = {
+  toggle: (cardId, body) => api.patch(`/cards/${cardId}/display-mode`, body),
+  startSession: (card_ids, hours = 48) => api.post('/cards/display-mode/session', { card_ids, hours }),
+  endSession: () => api.post('/cards/display-mode/session/end'),
+};
+
+// ============================================================
+// CARD CHAIN (Theme B) — public timeline
+// ============================================================
+export const cardChainApi = {
+  get: (cardId) => api.get(`/cards/${cardId}/chain`),
 };
 
 // ============================================================

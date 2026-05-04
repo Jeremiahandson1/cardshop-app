@@ -25,19 +25,21 @@ Paste these into:
 ### Description (max 4,000 chars)
 
 ```
-Every card you own has a fingerprint. Card Shop remembers it.
+Every card has a Carfax. Card Shop is the chain.
 
-Card theft is a weekly problem in this hobby. Mail intercepts, table swipes at shows, "buyer claims it never arrived" insurance fraud — collectors lose hundreds of dollars a month and recover almost none of it. Card Shop changes that.
+Card theft, mail fraud, and "buyer claims it never arrived" disputes are weekly problems in this hobby. Card Shop solves them with provenance, not promises.
 
-Three ways every card in your collection gets a permanent identity:
+How the chain works:
 
-• QR sticker — Apply a vinyl Card Shop sticker to any card. Even a base common is now traceable. Every scan, transfer, and ownership change is logged forever.
+• Permanent ownership log — Every transfer is signed and timestamped. Sales, trades, gifts. The chain follows the card across owners, forever.
 
-• Serial number — Numbered parallels (07/99, 1/1, etc.) are universally unique without modifying the card. Card Shop reads the serial via AI scan and ties it to your account.
+• Pack-out and unpack videos — Required on every shipment $200+. Both parties record. If something goes wrong, the video is the referee — not he-said/she-said.
 
-• PSA / BGS cert — Slabbed cards have an immutable cert number. Card Shop verifies it against PSA and Beckett directly.
+• 5-day shipping SLA — Sellers ship within 5 days or face stalled-transfer review. If a seller takes your money and disappears, we transfer the card to you anyway. We have the receipts.
 
-If any card you own surfaces somewhere it shouldn't, the next person who scans it sees that it's flagged stolen — and you get a notification with where it was scanned.
+• Card identity at every level — Numbered parallels via serial number. Slabbed cards via PSA/BGS/SGC cert. Raw cards via AI-scan descriptors and photos. QR stickers tie any card to its chain in your app.
+
+If any card you own surfaces somewhere it shouldn't, you'll know — and the chain is your proof.
 
 WHAT ELSE CARD SHOP DOES
 

@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ScrollView, Switch, Alert, Modal,
-  Image, TextInput, Dimensions, Share, ActivityIndicator
+  Image, TextInput, Dimensions, Share, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -1948,6 +1948,30 @@ export const TransactionScreen = ({ navigation, route }) => {
     queryFn: () => cstxApi.get(transactionId).then((r) => r.data),
   });
 
+  // Video gate status (Theme E2). Re-fetched whenever the user
+  // returns to this screen so a freshly-recorded video lights up
+  // the right banners without a manual reload.
+  const { data: videoStatus } = useQuery({
+    queryKey: ['cstx-video-status', transactionId],
+    queryFn: () => cstxApi.videoStatus(transactionId).then((r) => r.data),
+    refetchOnMount: true,
+  });
+
+  const { data: tracking } = useQuery({
+    queryKey: ['cstx-tracking-url', transactionId],
+    queryFn: () => cstxApi.trackingUrl(transactionId).then((r) => r.data),
+    enabled: !!tx?.tracking_number,
+  });
+
+  const waiveVideoMutation = useMutation({
+    mutationFn: () => cstxApi.waiveVideo(transactionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cstx-video-status', transactionId] });
+      Alert.alert('Waiver recorded', 'The other party must also waive for the video requirement to be lifted on this deal.');
+    },
+    onError: (err) => Alert.alert('Could not waive', err.response?.data?.error || err.message),
+  });
+
   const submitPaymentMutation = useMutation({
     mutationFn: (data) => cstxApi.submitPayment(transactionId, data),
     onSuccess: () => {
@@ -2130,8 +2154,62 @@ export const TransactionScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Seller: add tracking */}
-        {isSeller && tx.status === 'payment_confirmed' && (
+        {/* Video gate banner (Theme E2). Shown whenever video is required. */}
+        {videoStatus?.video_required && (
+          <View style={styles.videoGateCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="videocam" size={18} color={Colors.accent} />
+              <Text style={styles.videoGateTitle}>
+                {videoStatus.waiver?.fully_waived ? 'Video waived' : 'Video required'}
+              </Text>
+            </View>
+            <Text style={styles.videoGateBody}>
+              {videoStatus.waiver?.fully_waived
+                ? 'Both parties opted out. Disputes fall back to chain-of-custody record only.'
+                : `This deal is $${tx.deal_amount} — pack-out and unpack videos are required for any dispute. Your video protects YOU specifically.`}
+            </Text>
+            {!videoStatus.waiver?.fully_waived && (
+              <View style={{ marginTop: Spacing.xs }}>
+                <Text style={styles.videoStatusLine}>
+                  • Pack-out (seller): {videoStatus.packout?.recorded ? '✓ recorded' : '— not yet'}
+                </Text>
+                <Text style={styles.videoStatusLine}>
+                  • Unpack (buyer): {videoStatus.unpack?.recorded ? '✓ recorded' : '— not yet'}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Seller: record pack-out before adding tracking */}
+        {isSeller && tx.status === 'payment_confirmed' && videoStatus?.video_required && !videoStatus.packout?.recorded && !videoStatus.waiver?.fully_waived && (
+          <View style={styles.gateActionCard}>
+            <Text style={styles.gateActionTitle}>Step 1: Record pack-out video</Text>
+            <Text style={styles.gateActionBody}>
+              Record the card going into its holder, the envelope/box, the address label, and the seal. The challenge phrase will appear on screen — keep it visible during recording.
+            </Text>
+            <Button
+              title="Record pack-out video"
+              onPress={() => navigation.navigate('TransferVideo', { transactionId, phase: 'packout' })}
+            />
+            <Button
+              title="Skip — waive video for this deal"
+              variant="secondary"
+              onPress={() => Alert.alert(
+                'Waive video?',
+                'You won\'t be able to open a dispute on this deal unless the buyer also waives. Continue?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Waive', style: 'destructive', onPress: () => waiveVideoMutation.mutate() },
+                ]
+              )}
+              style={{ marginTop: Spacing.xs }}
+            />
+          </View>
+        )}
+
+        {/* Seller: add tracking (gated behind pack-out video if required) */}
+        {isSeller && tx.status === 'payment_confirmed' && (videoStatus?.packout?.recorded || !videoStatus?.video_required || videoStatus?.waiver?.fully_waived) && (
           <View>
             <Input
               label="Tracking Number"
@@ -2153,7 +2231,7 @@ export const TransactionScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Tracking info display */}
+        {/* Tracking info display + carrier link-out (Theme E1) */}
         {tx.tracking_number && (
           <View style={styles.offerDetailCard}>
             <View style={styles.infoRow}>
@@ -2165,11 +2243,47 @@ export const TransactionScreen = ({ navigation, route }) => {
                 </View>
               </TouchableOpacity>
             </View>
+            {tracking?.tracking?.url && (
+              <TouchableOpacity
+                style={styles.trackBtn}
+                onPress={() => Linking.openURL(tracking.tracking.url)}
+              >
+                <Ionicons name="open-outline" size={14} color={Colors.accent} />
+                <Text style={styles.trackBtnText}>Track on {(tracking.tracking.carrier || 'carrier').toUpperCase()}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
-        {/* Buyer: confirm delivery */}
-        {isBuyer && (tx.status === 'shipped' || tx.status === 'delivered') && (
+        {/* Buyer: record unpack video before confirming delivery */}
+        {isBuyer && (tx.status === 'shipped' || tx.status === 'delivered') && videoStatus?.video_required && !videoStatus.unpack?.recorded && !videoStatus.waiver?.fully_waived && (
+          <View style={styles.gateActionCard}>
+            <Text style={styles.gateActionTitle}>Don't open the package yet</Text>
+            <Text style={styles.gateActionBody}>
+              Start the unpack video FIRST, then open the package on camera. Show the label, the unboxing, and the card emerging from its holder. This is your dispute coverage.
+            </Text>
+            <Button
+              title="Record unpack video"
+              onPress={() => navigation.navigate('TransferVideo', { transactionId, phase: 'unpack' })}
+            />
+            <Button
+              title="Skip — waive video for this deal"
+              variant="secondary"
+              onPress={() => Alert.alert(
+                'Waive video?',
+                'You won\'t be able to open a dispute on this deal unless the seller also waives. Continue?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Waive', style: 'destructive', onPress: () => waiveVideoMutation.mutate() },
+                ]
+              )}
+              style={{ marginTop: Spacing.xs }}
+            />
+          </View>
+        )}
+
+        {/* Buyer: confirm delivery (gated behind unpack video if required) */}
+        {isBuyer && (tx.status === 'shipped' || tx.status === 'delivered') && (videoStatus?.unpack?.recorded || !videoStatus?.video_required || videoStatus?.waiver?.fully_waived) && (
           <Button
             title="Confirm Delivery"
             onPress={() => Alert.alert('Confirm Delivery', 'Confirm you received the card?', [
@@ -2180,11 +2294,42 @@ export const TransactionScreen = ({ navigation, route }) => {
           />
         )}
 
-        {/* Report problem */}
+        {/* Buyer: file stalled-transfer report after SLA breach */}
+        {isBuyer && tx.status === 'payment_confirmed' && (() => {
+          const ageMs = Date.now() - new Date(tx.created_at).getTime();
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          if (ageDays < 5) return null;
+          return (
+            <TouchableOpacity
+              style={styles.stalledBtn}
+              onPress={() => navigation.navigate('StalledTransferReport', { transactionId })}
+            >
+              <Ionicons name="time-outline" size={16} color={Colors.accent3} />
+              <Text style={styles.stalledBtnText}>Seller hasn't shipped — file stalled report</Text>
+            </TouchableOpacity>
+          );
+        })()}
+
+        {/* Report problem — with video-gate disclaimer if applicable */}
         {tx.status !== 'complete' && tx.status !== 'disputed' && (
           <TouchableOpacity
             style={styles.reportBtn}
-            onPress={() => navigation.navigate('DisputeDetail', { transactionId })}
+            onPress={() => {
+              const role = isBuyer ? 'buyer' : 'seller';
+              const myVideo = role === 'buyer' ? videoStatus?.unpack?.recorded : videoStatus?.packout?.recorded;
+              if (videoStatus?.video_required && !myVideo && !videoStatus?.waiver?.fully_waived) {
+                Alert.alert(
+                  'Video required',
+                  `This deal is $${tx.deal_amount} — to open a dispute you need your own ${role === 'buyer' ? 'unpack' : 'pack-out'} video. The other party's video status doesn't affect your case.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Record video', onPress: () => navigation.navigate('TransferVideo', { transactionId, phase: role === 'buyer' ? 'unpack' : 'packout' }) },
+                  ]
+                );
+                return;
+              }
+              navigation.navigate('DisputeDetail', { transactionId });
+            }}
           >
             <Ionicons name="warning-outline" size={16} color={Colors.accent3} />
             <Text style={styles.reportBtnText}>Report a Problem</Text>
@@ -2679,6 +2824,41 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent3 + '10',
   },
   reportBtnText: { color: Colors.accent3, fontSize: Typography.sm, fontWeight: Typography.semibold },
+
+  // Chain-of-custody video gate (Theme E2)
+  videoGateCard: {
+    backgroundColor: Colors.surface, borderColor: Colors.accent, borderWidth: 1,
+    borderRadius: Radius.md, padding: Spacing.md,
+  },
+  videoGateTitle: { color: Colors.text, fontSize: Typography.md, fontWeight: Typography.bold },
+  videoGateBody: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 18, marginTop: 4 },
+  videoStatusLine: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 18 },
+
+  gateActionCard: {
+    backgroundColor: Colors.accent + '10', borderColor: Colors.accent, borderWidth: 1,
+    borderRadius: Radius.md, padding: Spacing.md, gap: Spacing.sm,
+  },
+  gateActionTitle: { color: Colors.text, fontSize: Typography.md, fontWeight: Typography.bold },
+  gateActionBody: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 18 },
+
+  // Carrier tracking link-out (Theme E1)
+  trackBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: 10, borderRadius: Radius.sm,
+    borderWidth: 1, borderColor: Colors.accent + '40',
+    backgroundColor: Colors.accent + '10',
+    marginTop: Spacing.xs,
+  },
+  trackBtnText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
+
+  // Stalled transfer report (Theme E5)
+  stalledBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm,
+    padding: Spacing.md, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.accent3 + '60',
+    backgroundColor: Colors.accent3 + '20',
+  },
+  stalledBtnText: { color: Colors.accent3, fontSize: Typography.sm, fontWeight: Typography.semibold },
 
   // Analytics
   premiumBadge: {

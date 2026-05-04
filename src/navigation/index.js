@@ -65,6 +65,10 @@ import {
   TradeGroupManageScreen, JoinTradeGroupScreen,
 } from '../screens/TradeGroupsScreens';
 import { TradeCameraScreen } from '../screens/TradeCameraScreen';
+import { TransferVideoScreen } from '../screens/TransferVideoScreen';
+import { StalledTransferReportScreen } from '../screens/StalledTransferReportScreen';
+import { CaseModeScreen } from '../screens/CaseModeScreen';
+import { CardChainScreen } from '../screens/CardChainScreen';
 import { SetsListScreen, SetCompletionScreen, BrowseSetsScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
@@ -288,6 +292,10 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="OffersList" component={OffersListScreen} />
     <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
     <ProfileStackNav.Screen name="Transaction" component={TransactionScreen} />
+    <ProfileStackNav.Screen name="TransferVideo" component={TransferVideoScreen} />
+    <ProfileStackNav.Screen name="StalledTransferReport" component={StalledTransferReportScreen} />
+    <ProfileStackNav.Screen name="CaseMode" component={CaseModeScreen} />
+    <ProfileStackNav.Screen name="CardChain" component={CardChainScreen} />
     <ProfileStackNav.Screen name="DisputeList" component={DisputeListScreen} />
     <ProfileStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
     <ProfileStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
