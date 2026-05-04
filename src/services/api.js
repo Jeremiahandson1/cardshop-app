@@ -420,6 +420,11 @@ export const showFloorApi = {
   user: (username) => api.get(`/show-floor/user/${encodeURIComponent(username)}`),
 };
 
+// Show-events catalog — used by check-in autocomplete
+export const showEventsApi = {
+  list: (params) => api.get('/show-events', { params }),
+};
+
 // ============================================================
 // FOLLOWS
 // ============================================================

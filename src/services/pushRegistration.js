@@ -85,6 +85,23 @@ export function registerNotificationResponseHandler(navigationRef) {
         return;
       }
 
+      // Followed user went live at a show. Land on the show floor
+      // hub; "By event" view will surface their event automatically.
+      if (data?.type === 'show_floor_live') {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: data.event_slug ? 'ShowFloorEvent' : 'ShowFloorHub',
+            params: data.event_slug ? { slug: data.event_slug } : undefined,
+          });
+        }
+        return;
+      }
+      // Your own session is ending — open the hub so you can extend.
+      if (data?.type === 'show_floor_ending') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'ShowFloorHub' });
+        return;
+      }
+
       // Stalled transfer report resolved by admin — surface the deal.
       if (data?.type === 'stalled_transfer_resolved' || data?.type === 'stalled_transfer_report' ||
           data?.type === 'stalled_transfer_response') {

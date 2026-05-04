@@ -6,15 +6,16 @@
 //   ShowFloorCheckInScreen  — declare event/venue/table/end time
 //   ShowFloorEventScreen    — single event view: collectors + browseable inventory
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
-  TextInput, Alert, Image, RefreshControl,
+  TextInput, Alert, Image, RefreshControl, Share as RNShare,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { showFloorApi, cardsApi, bindersApi } from '../services/api';
+import { showFloorApi, cardsApi, bindersApi, showEventsApi, caseModeApi } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import { Button, Input, LoadingScreen, EmptyState } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -23,8 +24,10 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 // ============================================================
 
 export const ShowFloorHubScreen = ({ navigation }) => {
-  const [tab, setTab] = useState('live'); // 'live' | 'mine'
+  const [tab, setTab] = useState('events'); // 'events' | 'live'
+  const [stateFilter, setStateFilter] = useState(''); // '' = nationwide
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
 
   const { data: meData, refetch: refetchMe } = useQuery({
     queryKey: ['show-floor-me'],
@@ -32,8 +35,14 @@ export const ShowFloorHubScreen = ({ navigation }) => {
   });
 
   const { data: liveData, isLoading: liveLoading, refetch: refetchLive } = useQuery({
-    queryKey: ['show-floor-live'],
-    queryFn: () => showFloorApi.live().then((r) => r.data),
+    queryKey: ['show-floor-live', stateFilter],
+    queryFn: () => showFloorApi.live(stateFilter ? { state: stateFilter } : {}).then((r) => r.data),
+  });
+
+  const { data: myLiveCards } = useQuery({
+    queryKey: ['my-live-cards', meData?.check_in?.id],
+    queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
+    enabled: !!meData?.check_in,
   });
 
   const checkOutMut = useMutation({
@@ -47,6 +56,25 @@ export const ShowFloorHubScreen = ({ navigation }) => {
 
   const me = meData?.check_in;
   const checkIns = liveData?.check_ins || [];
+
+  // Cards already in display mode — what's actually live for the
+  // active session. We use this for the inline "X cards live"
+  // counter and the toggle list.
+  const liveCardCount = useMemo(() => {
+    if (!myLiveCards?.cards) return 0;
+    return myLiveCards.cards.filter((c) => c.display_mode_enabled).length;
+  }, [myLiveCards]);
+
+  const shareSession = async () => {
+    if (!user?.username) return;
+    const url = `https://cardshop.twomiah.com/show-floor/${user.username}`;
+    try {
+      await RNShare.share({
+        message: `I'm live at ${me?.event_name} on Card Shop — ${url}`,
+        url,
+      });
+    } catch {}
+  };
 
   // Group active check-ins by event_slug for the "By event" view
   const eventGroups = useMemo(() => {
@@ -85,11 +113,28 @@ export const ShowFloorHubScreen = ({ navigation }) => {
               {me.table_number ? `Table ${me.table_number} · ` : ''}
               ends {new Date(me.ends_at).toLocaleString()}
             </Text>
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+            <Text style={[styles.meMeta, { color: Colors.accent, fontWeight: Typography.semibold, marginTop: 4 }]}>
+              {liveCardCount} card{liveCardCount === 1 ? '' : 's'} on the floor
+            </Text>
+            <View style={{ flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.sm, flexWrap: 'wrap' }}>
               <Button
                 title="View my session"
                 variant="secondary"
-                onPress={() => navigation.navigate('ShowFloorEvent', { slug: me.event_slug })}
+                onPress={() => navigation.navigate('ShowFloorUser', { username: user?.username })}
+                style={{ flex: 1, minWidth: 120 }}
+              />
+              <Button
+                title="Manage cards"
+                variant="secondary"
+                onPress={() => navigation.navigate('CaseMode')}
+                style={{ flex: 1, minWidth: 120 }}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.xs }}>
+              <Button
+                title="Share session"
+                variant="ghost"
+                onPress={shareSession}
                 style={{ flex: 1 }}
               />
               <Button
@@ -115,10 +160,30 @@ export const ShowFloorHubScreen = ({ navigation }) => {
         )}
       </View>
 
+      {/* Geo filter — empty = everywhere */}
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>Show:</Text>
+        <TouchableOpacity
+          style={[styles.filterChip, !stateFilter && styles.filterChipOn]}
+          onPress={() => setStateFilter('')}
+        >
+          <Text style={[styles.filterChipText, !stateFilter && styles.filterChipTextOn]}>Everywhere</Text>
+        </TouchableOpacity>
+        <TextInput
+          style={[styles.filterChip, { paddingHorizontal: 10, paddingVertical: 6, minWidth: 80, color: Colors.text }]}
+          value={stateFilter}
+          onChangeText={(v) => setStateFilter(v.toUpperCase().slice(0, 2))}
+          placeholder="State (e.g. MA)"
+          placeholderTextColor={Colors.textMuted}
+          autoCapitalize="characters"
+          maxLength={2}
+        />
+      </View>
+
       <View style={styles.tabs}>
         {[
-          { k: 'live', l: 'Live now' },
           { k: 'events', l: 'By event' },
+          { k: 'live', l: 'All collectors' },
         ].map((t) => (
           <TouchableOpacity
             key={t.k}
@@ -200,17 +265,37 @@ export const ShowFloorHubScreen = ({ navigation }) => {
 // CHECK-IN SCREEN
 // ============================================================
 
+// Hours quick-presets for the check-in length
+const HOUR_PRESETS = [
+  { label: '4h',         hours: 4 },
+  { label: 'Today (12h)', hours: 12 },
+  { label: 'Weekend (48h)', hours: 48 },
+  { label: '4 days',     hours: 96 },
+];
+
 export const ShowFloorCheckInScreen = ({ navigation }) => {
   const qc = useQueryClient();
-  const [eventName, setEventName] = useState('');
+  // Catalog event picker — null means "type a custom event"
+  const [pickedEvent, setPickedEvent] = useState(null);
+  const [eventQuery, setEventQuery] = useState('');
+  const [eventNameCustom, setEventNameCustom] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [venueName, setVenueName] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
-  const [hours, setHours] = useState('48');
-  // Three modes: 'binders' (pick which binders), 'all' (all cards), 'none' (just check in)
+  const [hours, setHours] = useState(48);
   const [mode, setMode] = useState('binders');
   const [selectedBinderIds, setSelectedBinderIds] = useState([]);
+
+  // Autocomplete query — debounce to avoid spamming
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => { const t = setTimeout(() => setDebouncedQ(eventQuery), 250); return () => clearTimeout(t); }, [eventQuery]);
+
+  const { data: eventSuggestions } = useQuery({
+    queryKey: ['show-events-suggest', debouncedQ],
+    queryFn: () => showEventsApi.list({ q: debouncedQ || undefined, upcoming: true, limit: 10 }).then((r) => r.data),
+    enabled: !pickedEvent && debouncedQ.length >= 2,
+  });
 
   const { data: bindersData } = useQuery({
     queryKey: ['my-binders-check-in'],
@@ -221,21 +306,35 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
   const { data: cardsData } = useQuery({
     queryKey: ['my-cards-show-floor'],
     queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
-    enabled: mode === 'all',
   });
 
   const toggleBinder = (id) => {
     setSelectedBinderIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
+  // Card count preview based on selected mode + selected binders
+  const previewCount = useMemo(() => {
+    if (mode === 'all') return cardsData?.cards?.length || 0;
+    if (mode === 'binders') {
+      // We don't have card_count on binder rows in all responses; if
+      // missing, sum from cards filtered by binder. Otherwise use the
+      // server-side count.
+      return binders
+        .filter((b) => selectedBinderIds.includes(b.id))
+        .reduce((s, b) => s + (b.card_count || 0), 0);
+    }
+    return 0;
+  }, [mode, cardsData, binders, selectedBinderIds]);
+
   const checkInMut = useMutation({
     mutationFn: () => showFloorApi.checkIn({
-      event_name: eventName.trim(),
-      venue_name: venueName.trim() || undefined,
-      venue_city: city.trim() || undefined,
-      venue_state: state.trim() || undefined,
+      show_event_id: pickedEvent?.id,
+      event_name: pickedEvent ? undefined : eventNameCustom.trim(),
+      venue_name: !pickedEvent && venueName.trim() ? venueName.trim() : undefined,
+      venue_city: !pickedEvent && city.trim() ? city.trim() : undefined,
+      venue_state: !pickedEvent && state.trim() ? state.trim() : undefined,
       table_number: tableNumber.trim() || undefined,
-      hours: parseInt(hours, 10) || 48,
+      hours,
       go_live_binder_ids: mode === 'binders' && selectedBinderIds.length ? selectedBinderIds : undefined,
       go_live_card_ids: mode === 'all' ? (cardsData?.cards || []).map((c) => c.id) : undefined,
     }),
@@ -260,44 +359,103 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}>
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.intro}>
-          Tell collectors where you are. Followers get a push, and your check-in shows up in
-          everyone's "Live now" feed at this event.
+          Tell collectors where you are. Followers get a push.
         </Text>
 
-        <Input
-          label="Event name *"
-          value={eventName}
-          onChangeText={setEventName}
-          placeholder="NSCC 2026 Boston"
-        />
-        <Input
-          label="Venue (optional)"
-          value={venueName}
-          onChangeText={setVenueName}
-          placeholder="Boston Convention Center"
-        />
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <View style={{ flex: 2 }}>
-            <Input label="City" value={city} onChangeText={setCity} placeholder="Boston" />
+        {/* Event picker — autocomplete from catalog, fallback to custom */}
+        {pickedEvent ? (
+          <View style={[styles.binderRow, styles.binderRowSelected, { marginBottom: Spacing.sm }]}>
+            <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.binderName}>{pickedEvent.name}</Text>
+              <Text style={styles.binderMeta}>
+                {[pickedEvent.city, pickedEvent.state].filter(Boolean).join(', ') || pickedEvent.venue_name || ''}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => { setPickedEvent(null); setEventQuery(''); }}>
+              <Ionicons name="close-circle" size={20} color={Colors.textMuted} />
+            </TouchableOpacity>
           </View>
-          <View style={{ flex: 1 }}>
-            <Input label="State" value={state} onChangeText={setState} placeholder="MA" autoCapitalize="characters" />
-          </View>
-        </View>
+        ) : (
+          <>
+            <Input
+              label="Event"
+              value={eventQuery}
+              onChangeText={(t) => { setEventQuery(t); setEventNameCustom(t); }}
+              placeholder="Start typing — NSCC, Strongsville..."
+              autoCapitalize="words"
+            />
+            {Array.isArray(eventSuggestions?.events) && eventSuggestions.events.length > 0 && (
+              <View style={{ marginTop: -8, marginBottom: Spacing.sm, gap: 4 }}>
+                {eventSuggestions.events.slice(0, 8).map((e) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    style={styles.suggestRow}
+                    onPress={() => {
+                      setPickedEvent(e);
+                      setEventQuery(e.name);
+                      setVenueName(e.venue_name || '');
+                      setCity(e.city || '');
+                      setState(e.state || '');
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color={Colors.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestName}>{e.name}</Text>
+                      <Text style={styles.suggestMeta}>
+                        {[e.city, e.state].filter(Boolean).join(', ')}
+                        {e.starts_on ? ` · ${new Date(e.starts_on).toLocaleDateString()}` : ''}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {/* If user types something unique and we want to allow it as freeform */}
+            {debouncedQ.length >= 2 && eventSuggestions?.events?.length === 0 && (
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: -8, marginBottom: Spacing.sm }}>
+                No catalog match — we'll create this as a custom event.
+              </Text>
+            )}
+          </>
+        )}
+
+        {/* Venue/city/state only shown when typing a custom event */}
+        {!pickedEvent && (
+          <>
+            <Input label="Venue (optional)" value={venueName} onChangeText={setVenueName} placeholder="Boston Convention Center" />
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <View style={{ flex: 2 }}>
+                <Input label="City" value={city} onChangeText={setCity} placeholder="Boston" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input label="State" value={state} onChangeText={setState} placeholder="MA" autoCapitalize="characters" />
+              </View>
+            </View>
+          </>
+        )}
+
         <Input
           label="Table / booth (optional)"
           value={tableNumber}
           onChangeText={setTableNumber}
           placeholder="12B"
         />
-        <Input
-          label="Session length (hours)"
-          value={hours}
-          onChangeText={setHours}
-          keyboardType="number-pad"
-        />
+
+        <Text style={[styles.label, { marginTop: 4 }]}>Session length</Text>
+        <View style={{ flexDirection: 'row', gap: 6, marginBottom: Spacing.sm, flexWrap: 'wrap' }}>
+          {HOUR_PRESETS.map((p) => (
+            <TouchableOpacity
+              key={p.hours}
+              style={[styles.tab, hours === p.hours && styles.tabActive]}
+              onPress={() => setHours(p.hours)}
+            >
+              <Text style={[styles.tabText, hours === p.hours && styles.tabTextActive]}>{p.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Text style={[styles.intro, { marginTop: Spacing.md, marginBottom: Spacing.xs, fontWeight: Typography.bold, color: Colors.text }]}>
           What's on the show floor?
@@ -378,10 +536,21 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
           </View>
         )}
 
+        {/* Live count preview */}
+        {mode !== 'none' && (
+          <View style={{ marginTop: Spacing.sm, padding: Spacing.sm, borderRadius: Radius.md, backgroundColor: Colors.accent + '15', borderColor: Colors.accent + '40', borderWidth: 1 }}>
+            <Text style={{ color: Colors.accent, fontWeight: Typography.semibold, fontSize: Typography.sm }}>
+              {previewCount} card{previewCount === 1 ? '' : 's'} will go live when you check in
+            </Text>
+          </View>
+        )}
+
         <Button
           title="Check in"
           onPress={() => {
-            if (!eventName.trim()) return Alert.alert('Required', 'Event name is required.');
+            if (!pickedEvent && !eventNameCustom.trim()) {
+              return Alert.alert('Required', 'Pick an event or type a name.');
+            }
             if (mode === 'binders' && selectedBinderIds.length === 0) {
               Alert.alert(
                 'No binders selected',
@@ -479,7 +648,10 @@ export const ShowFloorEventScreen = ({ navigation, route }) => {
               contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
               ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
               renderItem={({ item }) => (
-                <View style={styles.cardRow}>
+                <TouchableOpacity
+                  style={styles.cardRow}
+                  onPress={() => navigation.navigate('CardDetail', { cardId: item.id })}
+                >
                   {item.image_front_url || item.catalog_image ? (
                     <Image source={{ uri: item.image_front_url || item.catalog_image }} style={styles.cardThumb} resizeMode="contain" />
                   ) : (
@@ -506,8 +678,9 @@ export const ShowFloorEventScreen = ({ navigation, route }) => {
                     {item.display_trade_only && (
                       <Text style={styles.tradeOnly}>trade only</Text>
                     )}
+                    <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} style={{ marginTop: 4 }} />
                   </View>
-                </View>
+                </TouchableOpacity>
               )}
               ListEmptyComponent={() => (
                 <EmptyState icon="search" title="Nothing matches" message="Try a different search or browse collectors." />
@@ -597,7 +770,10 @@ export const ShowFloorUserScreen = ({ navigation, route }) => {
         contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
         renderItem={({ item }) => (
-          <View style={styles.cardRow}>
+          <TouchableOpacity
+            style={styles.cardRow}
+            onPress={() => navigation.navigate('CardDetail', { cardId: item.id })}
+          >
             {item.image_front_url || item.catalog_image ? (
               <Image source={{ uri: item.image_front_url || item.catalog_image }} style={styles.cardThumb} resizeMode="contain" />
             ) : (
@@ -620,11 +796,12 @@ export const ShowFloorUserScreen = ({ navigation, route }) => {
               {item.display_trade_only && (
                 <Text style={styles.tradeOnly}>trade only</Text>
               )}
+              <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} style={{ marginTop: 4 }} />
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={() => (
-          <EmptyState icon="storefront-outline" title="No cards on the floor" message="@{user.username} doesn't have cards in display mode." />
+          <EmptyState icon="storefront-outline" title="No cards on the floor" message={`@${user?.username || 'user'} doesn't have cards in display mode.`} />
         )}
       />
     </SafeAreaView>
@@ -686,6 +863,27 @@ const styles = StyleSheet.create({
   binderRowSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + '10' },
   binderName: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
   binderMeta: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 },
+
+  // Geo filter on Hub
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.base, marginBottom: Spacing.xs },
+  filterLabel: { color: Colors.textMuted, fontSize: Typography.xs },
+  filterChip: {
+    paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
+  },
+  filterChipOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  filterChipText: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold },
+  filterChipTextOn: { color: Colors.bg },
+
+  // Event autocomplete suggestions
+  suggestRow: {
+    flexDirection: 'row', gap: 8, alignItems: 'center',
+    padding: Spacing.sm, borderRadius: Radius.md,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
+  suggestName: { color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.semibold },
+  suggestMeta: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 },
+  label: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, marginBottom: 4 },
 
   eventHeader: { padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border },
   eventHeaderText: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
