@@ -457,6 +457,7 @@ export const safetyApi = {
     api.post('/safety/reports', { target_type, target_id, reason, details }),
   reportStolen: (data) => api.post('/safety/stolen-reports', data),
   submitSupportTicket: (data) => api.post('/safety/support', data),
+  trustFlags: (username) => api.get(`/safety/trust-flags/${encodeURIComponent(username)}`),
 };
 
 // ============================================================

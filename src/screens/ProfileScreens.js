@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { showMessage } from 'react-native-flash-message';
+import * as Updates from 'expo-updates';
 import { wantListApi, authApi, notificationsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, EmptyState, LoadingScreen } from '../components/ui';
@@ -89,6 +90,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
+        { icon: 'storefront-outline', label: 'Case Mode (show floor)', onPress: () => navigation.navigate('CaseMode') },
         { icon: 'pricetag-outline', label: 'Order stickers', onPress: () => navigation.navigate('OrderStickers') },
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
       ]
@@ -118,6 +120,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'chatbox-ellipses-outline', label: 'Binder offers', onPress: () => navigation.navigate('OffersList') },
         { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
+        { icon: 'shield-half-outline', label: 'Stolen-card match review', onPress: () => navigation.navigate('StolenMatchReview') },
         { icon: 'grid-outline', label: 'Set completion', onPress: () => navigation.navigate('SetsList') },
         { icon: 'search-outline', label: 'Browse sets', onPress: () => navigation.navigate('BrowseSets') },
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
@@ -125,6 +128,47 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'link-outline', label: 'Integrations', onPress: () => navigation.navigate('Integrations') },
         { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
+        {
+          icon: 'cloud-download-outline',
+          label: 'Check for app updates',
+          onPress: async () => {
+            try {
+              if (__DEV__) {
+                Alert.alert('Dev build', 'OTA updates only apply to production/preview builds.');
+                return;
+              }
+              const check = await Updates.checkForUpdateAsync();
+              if (!check.isAvailable) {
+                Alert.alert('Up to date', 'You\'re running the latest version.');
+                return;
+              }
+              await Updates.fetchUpdateAsync();
+              Alert.alert(
+                'Update ready',
+                'A new version downloaded. Restart now to apply?',
+                [
+                  { text: 'Later', style: 'cancel' },
+                  { text: 'Restart now', onPress: () => Updates.reloadAsync() },
+                ],
+              );
+            } catch (err) {
+              Alert.alert('Update check failed', err?.message || 'Try again with a stronger connection.');
+            }
+          },
+        },
+        {
+          icon: 'information-circle-outline',
+          label: 'About / version',
+          onPress: () => {
+            const updateId = Updates.updateId || '(embedded)';
+            const channel = Updates.channel || '(default)';
+            const runtime = Updates.runtimeVersion || '(unset)';
+            Alert.alert(
+              'Card Shop',
+              `Channel: ${channel}\nRuntime: ${runtime}\nBundle: ${String(updateId).slice(0, 8)}…\nNative build: 1.0.1`,
+            );
+          },
+        },
       ]
     },
     ...(['store_owner', 'store_staff', 'admin'].includes(user?.role) ? [{

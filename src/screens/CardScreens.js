@@ -10,6 +10,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { showMessage } from 'react-native-flash-message';
 // Expo SDK 55 moved the classic readAsStringAsync API to
 // expo-file-system/legacy; the default export is now a
 // File/Directory class API with no readAsStringAsync. Importing
@@ -47,7 +48,7 @@ const useEbayStatus = () => {
 const CascadePicker = ({
   navigation, cascade, setCascade, cascadeDim, setCascadeDim, onAddNewToSet,
   cascadeQuery, setCascadeQuery, cascadeOrder, cascadeLabel,
-  onComplete, onManualFallback, onScan, onCertEntry,
+  onComplete, onManualFallback, onScan, onCertEntry, scanDebug,
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
@@ -233,6 +234,12 @@ const CascadePicker = ({
           <Text style={{ fontSize: 11, color: Colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' }}>
             {picked.map((d) => cascade[d]).join(' · ')}
           </Text>
+        </View>
+      ) : null}
+
+      {scanDebug ? (
+        <View style={{ marginHorizontal: Spacing.base, marginBottom: Spacing.sm, padding: 10, backgroundColor: '#ff9500', borderRadius: 8 }}>
+          <Text style={{ fontSize: 12, color: '#000', fontWeight: '700' }}>SCAN: {scanDebug}</Text>
         </View>
       ) : null}
 
@@ -464,6 +471,12 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [parallels, setParallels] = useState([]);
+  const [scanDebug, setScanDebug] = useState('');
+  // Two-step scan: back first (text), then optional front (image).
+  // scanReview holds OCR result + photo URIs so the user can review
+  // and edit fields before committing to the cascade or manual entry.
+  const [scanReview, setScanReview] = useState(null);
+  // { player_name, year, card_number, candidates: [], backUri, frontUri }
 
   // If a catalogId was passed, fetch and pre-select it
   const { data: preselectedCatalog } = useQuery({
@@ -530,6 +543,115 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       // search failed silently
     }
     setSearching(false);
+  };
+
+  // Shared camera+resize helper. Returns { uri, b64 } or null on
+  // cancel/no-asset. Used by both the back-text scan and the
+  // optional front-image follow-up.
+  const captureAndResize = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera needed', 'Enable camera to scan a card.');
+      return null;
+    }
+    const pick = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.75,
+      base64: true,
+    });
+    if (!pick.assets?.length) return null;
+    const asset = pick.assets[0];
+    let b64 = asset.base64;
+    let uri = asset.uri;
+    try {
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      b64 = resized.base64;
+      uri = resized.uri;
+    } catch {
+      // resize failed — fall back to original
+    }
+    return { uri, b64 };
+  };
+
+  // Back-of-card scan via Claude vision. Sends the photo to
+  // /scan-vision which returns structured metadata directly (no
+  // brittle regex distillation). Falls back to /ocr-suggest if
+  // ANTHROPIC_API_KEY isn't configured on the server.
+  const runBackScan = async () => {
+    setScanDebug('photo OK • analyzing with Claude…');
+    const captured = await captureAndResize();
+    if (!captured) {
+      setScanDebug('cancelled');
+      return;
+    }
+    try {
+      const res = await catalogApi.scanVision(`data:image/jpeg;base64,${captured.b64}`);
+      const fields = res.data?.fields || {};
+      const cands = res.data?.candidates || [];
+      setScanReview({
+        backUri: captured.uri,
+        frontUri: null,
+        player_name: fields.player_name || '',
+        year: fields.year ? String(fields.year) : '',
+        card_number: fields.card_number ? String(fields.card_number) : '',
+        set_name: fields.set_name || '',
+        manufacturer: fields.manufacturer || '',
+        team: fields.team || '',
+        sport: fields.sport || '',
+        is_rookie: !!fields.is_rookie,
+        is_autograph: !!fields.is_autograph,
+        parallel: fields.parallel || '',
+        parallel_evidence: fields.parallel_evidence || '',
+        print_run: fields.print_run || null,
+        serial_number: fields.serial_number || '',
+        candidates: cands,
+        confidence: fields.confidence ?? 0,
+      });
+      setStep('scan_review');
+      setScanDebug(`vision ok • ${cands.length} cands • ${fields.player_name || '?'} ${fields.year || '?'} #${fields.card_number || '?'}`);
+    } catch (err) {
+      const code = err?.response?.data?.code;
+      const errMsg = err?.response?.data?.error || err?.message || 'unknown';
+      const status = err?.response?.status;
+      setScanDebug(`SCAN FAILED • status=${status || 'NONE'} • ${errMsg}`);
+      // If Claude isn't configured yet, fall back to legacy OCR.
+      if (code === 'vision_not_configured') {
+        try {
+          const fallback = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${captured.b64}`);
+          const cands = fallback.data?.candidates || [];
+          const distilled = fallback.data?.distilled || null;
+          const bestPlayer = (distilled?.playerCandidates || [])[0] || '';
+          setScanReview({
+            backUri: captured.uri,
+            frontUri: null,
+            player_name: bestPlayer,
+            year: distilled?.year ? String(distilled.year) : '',
+            card_number: distilled?.cardNumber || '',
+            set_name: '',
+            manufacturer: '',
+            candidates: cands,
+          });
+          setStep('scan_review');
+          return;
+        } catch { /* fall through to error alert */ }
+      }
+      Alert.alert('Scan failed', `${errMsg}\n\nYou can fill in the card details manually.`, [
+        { text: 'Manual entry', onPress: () => setStep('manual_entry') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  // Optional second photo: front of card, used as the listing image.
+  // Doesn't go through OCR — just gets stored alongside.
+  const runFrontScan = async () => {
+    const captured = await captureAndResize();
+    if (!captured) return;
+    setScanReview((s) => (s ? { ...s, frontUri: captured.uri } : s));
   };
 
   // Photos captured in-app go into state with source='camera' — the
@@ -923,12 +1045,219 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     );
   }
 
-  // Step 1.5: Manual catalog entry — used when the card isn't in the
-  // catalog, or when the user skips search entirely.
+  // Scan review — user has photographed the back of a card and
+  // OCR has run. Show extracted fields editable, top catalog
+  // candidates, optional front photo capture, then route to the
+  // chosen path (catalog match / cascade / manual entry).
+  if (step === 'scan_review' && scanReview) {
+    const updateField = (key) => (val) =>
+      setScanReview((s) => (s ? { ...s, [key]: val } : s));
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => { setScanReview(null); setStep('cascade'); }}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Review scan</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+            We pulled these fields from the back of the card. Edit anything that's wrong before continuing.
+          </Text>
+
+          {/* Back photo thumbnail */}
+          {scanReview.backUri ? (
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <Image source={{ uri: scanReview.backUri }} style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: Colors.surface2 }} />
+              {scanReview.frontUri ? (
+                <Image source={{ uri: scanReview.frontUri }} style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: Colors.surface2 }} />
+              ) : (
+                <TouchableOpacity
+                  onPress={runFrontScan}
+                  style={{
+                    width: 80, height: 110, borderRadius: 8,
+                    backgroundColor: Colors.surface2,
+                    alignItems: 'center', justifyContent: 'center',
+                    borderWidth: 1, borderColor: Colors.accent, borderStyle: 'dashed',
+                  }}
+                >
+                  <Ionicons name="camera" size={24} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontSize: 11, marginTop: 4 }}>Front photo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+
+          <Input label="Player" value={scanReview.player_name} onChangeText={updateField('player_name')} />
+          <Input label="Year" value={scanReview.year} onChangeText={updateField('year')} keyboardType="number-pad" />
+          <Input label="Card #" value={scanReview.card_number} onChangeText={updateField('card_number')} />
+          <Input label="Set name (optional)" value={scanReview.set_name} onChangeText={updateField('set_name')} />
+          <Input label="Manufacturer (optional)" value={scanReview.manufacturer} onChangeText={updateField('manufacturer')} />
+          <Input label="Parallel / variant" value={scanReview.parallel} onChangeText={updateField('parallel')} />
+          {scanReview.parallel_evidence ? (
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, marginTop: -8 }}>
+              ↑ {scanReview.parallel_evidence}
+            </Text>
+          ) : null}
+          {scanReview.print_run ? (
+            <Input
+              label={`Numbered: ${scanReview.serial_number || '?'} / ${scanReview.print_run}`}
+              value={scanReview.serial_number || ''}
+              onChangeText={updateField('serial_number')}
+              keyboardType="number-pad"
+            />
+          ) : null}
+
+          {/* Catalog candidates from OCR — let the user pick if any matched */}
+          {scanReview.candidates?.length ? (
+            <View style={{ gap: Spacing.xs }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Catalog matches
+              </Text>
+              {scanReview.candidates.slice(0, 5).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => {
+                    if (scanReview.frontUri) {
+                      setPhotos((p) => [...p, scanReview.frontUri]);
+                      setPhotoSources((src) => [...src, 'camera']);
+                    } else if (scanReview.backUri) {
+                      setPhotos((p) => [...p, scanReview.backUri]);
+                      setPhotoSources((src) => [...src, 'camera']);
+                    }
+                    setSelectedCatalog(c);
+                    setStep(c.print_run ? 'serial' : 'details');
+                  }}
+                  style={{
+                    padding: Spacing.sm,
+                    backgroundColor: Colors.surface2,
+                    borderRadius: Radius.md,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                  }}
+                >
+                  <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
+                    {c.player_name} {c.year} {c.set_name}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+                    {c.manufacturer ? `${c.manufacturer} · ` : ''}#{c.card_number || '?'} · {Math.round((c.confidence || 0) * 100)}% match
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+        </ScrollView>
+
+        <View style={{ padding: Spacing.base, gap: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border }}>
+          <Button
+            title="Continue with these values"
+            onPress={async () => {
+              if (scanReview.frontUri) {
+                setPhotos((p) => [...p, scanReview.frontUri]);
+                setPhotoSources((src) => [...src, 'camera']);
+              } else if (scanReview.backUri) {
+                setPhotos((p) => [...p, scanReview.backUri]);
+                setPhotoSources((src) => [...src, 'camera']);
+              }
+              const newCascade = {
+                sport: scanReview.sport || cascade.sport,
+                year: scanReview.year ? Number(scanReview.year) || scanReview.year : cascade.year,
+                manufacturer: scanReview.manufacturer || cascade.manufacturer,
+                set_name: scanReview.set_name || cascade.set_name,
+                subset_name: cascade.subset_name,
+                player_name: scanReview.player_name || cascade.player_name,
+                card_number: scanReview.card_number || cascade.card_number,
+                parallel: scanReview.parallel || cascade.parallel,
+              };
+              setCascade(newCascade);
+              setScanReview(null);
+              // If we have the discriminating fields (player + year +
+              // card #), search the catalog directly and skip the
+              // cascade entirely. Cascade is only needed when the
+              // user has to pick a missing dimension.
+              if (newCascade.player_name && newCascade.year && newCascade.card_number) {
+                try {
+                  const r = await catalogApi.search({
+                    sport: newCascade.sport,
+                    year: newCascade.year,
+                    manufacturer: newCascade.manufacturer,
+                    set_name: newCascade.set_name,
+                    player_name: newCascade.player_name,
+                    parallel: newCascade.parallel,
+                    limit: 5,
+                  });
+                  const hits = r.data?.cards || [];
+                  const exact = hits.find((c) =>
+                    String(c.card_number || '') === String(newCascade.card_number || ''),
+                  );
+                  if (exact) {
+                    setSelectedCatalog(exact);
+                    setStep(exact.print_run ? 'serial' : 'details');
+                    return;
+                  }
+                } catch { /* fall through to manual entry */ }
+                // Catalog miss → manual entry pre-filled. We have
+                // enough data that the cascade picker would be
+                // empty-handed at every step.
+                setManualForm((f) => ({
+                  ...f,
+                  sport: newCascade.sport || f.sport,
+                  year: newCascade.year ? String(newCascade.year) : f.year,
+                  manufacturer: newCascade.manufacturer || f.manufacturer,
+                  set_name: newCascade.set_name || f.set_name,
+                  player_name: newCascade.player_name || f.player_name,
+                  card_number: newCascade.card_number || f.card_number,
+                  parallel: newCascade.parallel || f.parallel,
+                  team: scanReview.team || f.team,
+                  is_rookie: scanReview.is_rookie || f.is_rookie,
+                  is_autograph: scanReview.is_autograph || f.is_autograph,
+                  print_run: scanReview.print_run ? String(scanReview.print_run) : f.print_run,
+                }));
+                setStep('manual_entry');
+                return;
+              }
+              // Missing one of the key fields — fall back to cascade
+              // and land on the first actually-missing required dim.
+              const required = ['sport','year','manufacturer','set_name','player_name','card_number'];
+              const firstMissing = required.find((d) => !newCascade[d]) || 'parallel';
+              setCascadeDim(firstMissing);
+              setStep('cascade');
+            }}
+          />
+          <Button
+            title="Skip catalog — manual entry"
+            variant="secondary"
+            onPress={() => {
+              if (scanReview.frontUri) {
+                setPhotos((p) => [...p, scanReview.frontUri]);
+                setPhotoSources((src) => [...src, 'camera']);
+              } else if (scanReview.backUri) {
+                setPhotos((p) => [...p, scanReview.backUri]);
+                setPhotoSources((src) => [...src, 'camera']);
+              }
+              setManualForm((f) => ({
+                ...f,
+                year: scanReview.year || f.year,
+                player_name: scanReview.player_name || f.player_name,
+                card_number: scanReview.card_number || f.card_number,
+                set_name: scanReview.set_name || f.set_name,
+                manufacturer: scanReview.manufacturer || f.manufacturer,
+              }));
+              setStep('manual_entry');
+              setScanReview(null);
+            }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // --- Cascade step: sport → year → mfr → set → subset → player → card# → parallel ---
   if (step === 'cascade') {
     return (
       <CascadePicker
+        scanDebug={scanDebug}
         navigation={navigation}
         cascade={cascade}
         setCascade={setCascade}
@@ -940,9 +1269,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         cascadeLabel={CASCADE_LABEL}
         onScan={async () => {
           // Pro gate FIRST — before camera permission, before
-          // taking the photo, before uploading. Tapping scan as
-          // a free user goes straight to an upgrade prompt; we
-          // never make them perform a doomed capture.
+          // taking the photo, before uploading.
           const tier = currentUser?.subscription_tier;
           const isPro = tier === 'collector_pro' || tier === 'store_pro' || currentUser?.is_admin;
           if (!isPro) {
@@ -956,106 +1283,21 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             );
             return;
           }
-          // Quick-scan path: camera → OCR → match → pre-select
-          // catalog row. If confidence is high, jump straight to
-          // details/serial. If low, drop filters into the cascade
-          // so the user confirms the player/set and moves on.
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert('Camera needed', 'Enable camera to scan a card.');
-            return;
-          }
-          const pick = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.75,
-            allowsEditing: true,
-            aspect: [3, 4],
-            base64: true,
-          });
-          if (pick.canceled || !pick.assets?.length) return;
-          const asset = pick.assets[0];
-          const b64 = asset.base64
-            || await FileSystem.readAsStringAsync(asset.uri, {
-                 encoding: FileSystem.EncodingType.Base64,
-               });
-          try {
-            const res = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${b64}`);
-            const cands = res.data?.candidates || [];
-            const distilled = res.data?.distilled || null;
-            const best = cands[0];
-
-            // Always save the photo — the user just took it, don't
-            // make them retake. Photo carries forward whether we
-            // hit a catalog match or fall through to manual.
-            setPhotos((p) => [...p, asset.uri]);
-            setPhotoSources((s) => [...s, 'camera']);
-
-            if (best && best.confidence >= 0.65) {
-              // High-confidence match — jump straight into details.
-              setSelectedCatalog(best);
-              setStep(best.print_run ? 'serial' : 'details');
-            } else if (cands.length) {
-              // Some candidates but low confidence. Pre-fill the
-              // cascade with the top candidate's set + player; user
-              // confirms from there.
-              setCascade({
-                sport: best.sport || undefined,
-                year: best.year || undefined,
-                manufacturer: best.manufacturer || undefined,
-                set_name: best.set_name || undefined,
-                player_name: best.player_name || undefined,
-              });
-              setCascadeDim('card_number');
-            } else if (distilled && (distilled.year || distilled.cardNumber || distilled.playerCandidates?.length)) {
-              // No catalog match BUT Vision did extract usable text
-              // (player candidates, year, card #). Drop into manual
-              // entry pre-filled so the OCR work isn't thrown away.
-              // distilled returns: { text, year, cardNumber,
-              // playerCandidates[] }. We pick the longest player
-              // candidate as the best guess; user can edit on
-              // the manual screen.
-              const bestPlayer = (distilled.playerCandidates || [])[0] || '';
-              setManualForm((f) => ({
-                ...f,
-                year: distilled.year ? String(distilled.year) : f.year,
-                player_name: bestPlayer || f.player_name || '',
-                card_number: distilled.cardNumber || f.card_number || '',
-              }));
-              Alert.alert(
-                'Couldn\u2019t auto-match this card',
-                'We pulled the player and year from the photo. Fill in the set and other details on the next screen.',
-              );
-              setStep('manual_entry');
-            } else {
-              // Truly inconclusive — Vision returned nothing usable.
-              // Photo's still saved; route to manual entry so the
-              // user keeps moving instead of starting over.
-              Alert.alert(
-                'Scan inconclusive',
-                'We couldn\u2019t read enough text from this photo. Try a brighter shot, or fill in the card details manually.',
-                [
-                  { text: 'Manual entry', onPress: () => setStep('manual_entry') },
-                  { text: 'Back to cascade', style: 'cancel' },
-                ],
-              );
-            }
-          } catch (err) {
-            const code = err?.response?.data?.code;
-            if (code === 'subscription_required') {
-              Alert.alert(
-                'Card scanning is a Pro feature',
-                'Upgrade to Card Shop Pro to scan cards with the camera. You can still register cards manually using the cascade picker.',
-                [
-                  { text: 'Maybe later', style: 'cancel' },
-                  { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Upgrade' }) },
-                ],
-              );
-            } else if (code === 'ocr_not_configured') {
-              Alert.alert('Scan coming soon', 'Cloud OCR isn\u2019t enabled yet. Use the cascade for now.');
-            } else {
-              Alert.alert('Scan failed', err?.response?.data?.error || err?.message || 'Try again.');
-            }
-          }
+          // Two-step flow: tell the user upfront we want the BACK
+          // first. Backs have machine-printed metadata (year,
+          // card #, set name, copyright) that OCR reads cleanly;
+          // fronts have stylized graphics that confuse Vision.
+          // After OCR, we land on a review screen where the user
+          // can confirm/edit fields and optionally add a front
+          // photo for the listing image.
+          Alert.alert(
+            'Scan the BACK of the card',
+            'Card backs have the printed text (year, set, card #) we use to identify the card. Hold the back flat and well-lit.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Take photo', onPress: () => runBackScan() },
+            ],
+          );
         }}
         onComplete={async (filters) => {
           // Resolve to one catalog row and advance. If we find it,
@@ -2123,9 +2365,12 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
-      Alert.alert('Moved', 'Card moved to the new binder.');
+      // Server semantics are additive — card stays in any binders
+      // it was already in and is now ALSO in this one. Wording
+      // matches that so users don't think it's an exclusive move.
+      Alert.alert('Added', 'This card is now in the selected binder. It also stays in any binders you already had it in.');
     },
-    onError: (err) => Alert.alert('Could not move card', err?.response?.data?.error || 'Try again.'),
+    onError: (err) => Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.'),
   });
 
   // Setting the binder-level intent IS the trade-board switch.
@@ -2224,7 +2469,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
           {card?.owner_id === currentUserId ? (
-            <TouchableOpacity onPress={promptMoveToBinder} accessibilityLabel="Move to binder">
+            <TouchableOpacity onPress={promptMoveToBinder} accessibilityLabel="Add to binder">
               <Ionicons name="folder-open-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>
           ) : null}
@@ -2602,6 +2847,30 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
           <Divider />
 
+          {/* Chain of custody — Carfax view of every owner, transfer,
+              video, and stolen flag in this card's life. The
+              differentiator's storefront. */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CardChain', { cardId })}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              padding: 14, marginVertical: 8,
+              borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent + '60',
+              backgroundColor: Colors.accent + '10',
+            }}
+          >
+            <Ionicons name="git-network-outline" size={18} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold }}>
+                View chain of custody
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                Every transfer, photo, and video on this card. Shareable.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+
           {/* Transfer history */}
           {history && history.length > 0 && (
             <View>
@@ -2621,29 +2890,49 @@ export const CardDetailScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Request new sticker — owner only. Reprint replaces the
-              physical QR on a card when it peels, gets damaged, or
-              goes missing. Owner is the only role that can request
-              one (fraud prevention — someone else can't invalidate
-              your sticker). */}
+          {/* QR sticker actions — owner only. Two paths:
+              - No sticker yet: show "Attach QR sticker" → scans an
+                unregistered sticker and binds it to this card via PATCH.
+              - Sticker present: show "Request new sticker" reprint flow
+                (fraud-prevented; only owner can invalidate). */}
           {card.owner_id && currentUserId && card.owner_id === currentUserId ? (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('RequestReprint', {
-                cardId: card.id,
-                cardTitle: [card.year, card.set_name, card.player_name].filter(Boolean).join(' · '),
-              })}
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
-                borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
-                backgroundColor: Colors.surface,
-              }}
-            >
-              <Ionicons name="refresh-outline" size={18} color={Colors.accent} />
-              <Text style={{ color: Colors.text, fontWeight: '600' }}>
-                Request new sticker
-              </Text>
-            </TouchableOpacity>
+            card.qr_insert_id ? (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RequestReprint', {
+                  cardId: card.id,
+                  cardTitle: [card.year, card.set_name, card.player_name].filter(Boolean).join(' · '),
+                })}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                  borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+                  backgroundColor: Colors.surface,
+                }}
+              >
+                <Ionicons name="refresh-outline" size={18} color={Colors.accent} />
+                <Text style={{ color: Colors.text, fontWeight: '600' }}>
+                  Request new sticker
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('QRScanner', {
+                  mode: 'attach',
+                  cardId: card.id,
+                })}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                  borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+                  backgroundColor: Colors.accent + '11',
+                }}
+              >
+                <Ionicons name="qr-code-outline" size={18} color={Colors.accent} />
+                <Text style={{ color: Colors.accent, fontWeight: '700' }}>
+                  Attach QR sticker
+                </Text>
+              </TouchableOpacity>
+            )
           ) : null}
 
           {/* Message Owner — only when a non-owner is viewing

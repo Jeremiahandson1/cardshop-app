@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { transfersApi, cardsApi } from '../services/api';
+import { transfersApi, cardsApi, safetyApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -27,6 +27,16 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const { data: card } = useQuery({
     queryKey: ['card', cardId],
     queryFn: () => cardsApi.get(cardId).then((r) => r.data),
+  });
+
+  // Trust flags on the recipient. Look up after the user types a
+  // username; debounce a tick so we don't spam on every keystroke.
+  const trimmedRecipient = recipientUsername.trim();
+  const { data: trustFlags } = useQuery({
+    queryKey: ['trust-flags', trimmedRecipient],
+    queryFn: () => safetyApi.trustFlags(trimmedRecipient).then((r) => r.data),
+    enabled: trimmedRecipient.length >= 3,
+    retry: false,
   });
 
   // Check NFC availability
@@ -115,12 +125,29 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       Alert.alert('Required', 'Please enter the recipient username');
       return;
     }
-    transferMutation.mutate({
+    const numericPrice = price ? parseFloat(price) : undefined;
+    const payload = {
       owned_card_id: cardId,
       to_username: recipientUsername.trim(),
       method: 'in_person',
-      sale_price: price ? parseFloat(price) : undefined,
-    });
+      sale_price: numericPrice,
+    };
+
+    // Video gate disclaimer (Theme E2). For $200+ shipped transfers,
+    // both parties have to record video; the user needs to know
+    // before initiating.
+    if (numericPrice && numericPrice >= 200) {
+      Alert.alert(
+        'Heads up — videos required at $200+',
+        `This transfer is $${numericPrice.toFixed(0)}. Both you and the recipient will need to record pack-out and unpack videos. You can't open a dispute without yours.\n\nContinue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: () => transferMutation.mutate(payload) },
+        ]
+      );
+      return;
+    }
+    transferMutation.mutate(payload);
   };
 
   if (!card) return <LoadingScreen />;
@@ -191,6 +218,26 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
               placeholder="their_username"
               autoCapitalize="none"
             />
+            {/* Bad-actor flag warning (Theme E5) */}
+            {trustFlags?.flag_count_recent_90d > 0 && (
+              <View style={{
+                backgroundColor: Colors.accent3 + '20',
+                borderColor: Colors.accent3, borderWidth: 1,
+                borderRadius: Radius.md, padding: Spacing.sm,
+                marginVertical: Spacing.sm,
+              }}>
+                <Text style={{ color: Colors.accent3, fontWeight: Typography.bold, fontSize: Typography.sm }}>
+                  ⚠ Caution — flagged user
+                </Text>
+                <Text style={{ color: Colors.text, fontSize: Typography.xs, marginTop: 4, lineHeight: 17 }}>
+                  This recipient has {trustFlags.flag_count_recent_90d} unresolved issue
+                  {trustFlags.flag_count_recent_90d === 1 ? '' : 's'} in the last 90 days
+                  {Object.keys(trustFlags.reason_counts || {}).length > 0
+                    ? ` (${Object.keys(trustFlags.reason_counts).join(', ').replace(/_/g, ' ')})`
+                    : ''}. Proceed with caution.
+                </Text>
+              </View>
+            )}
             <Button
               title="Send Transfer Request"
               onPress={handleStandardTransfer}

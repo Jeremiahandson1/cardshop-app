@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi } from '../services/api';
+import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
@@ -1359,6 +1359,14 @@ export const MakeOfferScreen = ({ navigation, route }) => {
   });
   const myCards = myCardsData?.cards || [];
 
+  // Trust flags on the seller — surface bad-actor flags before the
+  // buyer commits to an offer.
+  const { data: trustFlags } = useQuery({
+    queryKey: ['trust-flags', binderOwnerId],
+    queryFn: () => safetyApi.trustFlags(binderOwnerId).then((r) => r.data),
+    enabled: !!binderOwnerId,
+  });
+
   const createOfferMutation = useMutation({
     mutationFn: (data) => offersApi.create(data),
     onSuccess: () => {
@@ -1371,16 +1379,33 @@ export const MakeOfferScreen = ({ navigation, route }) => {
   });
 
   const handleSubmit = () => {
+    const numericAmount = ['single', 'bundle', 'trade_plus_cash'].includes(offerType) && amount
+      ? parseFloat(amount) : undefined;
+
     const payload = {
       binder_id: binderId,
       to_user_id: binderOwnerId,
       offer_type: offerType,
       card_ids: offerCards.map((c) => c.id),
-      amount: ['single', 'bundle', 'trade_plus_cash'].includes(offerType) && amount
-        ? parseFloat(amount) : undefined,
+      amount: numericAmount,
       trade_card_ids: ['trade', 'trade_plus_cash'].includes(offerType) ? tradeCards.map((c) => c.id) : undefined,
       message: message.trim() || undefined,
     };
+
+    // Video gate disclaimer (Theme E2). If the deal value is $200+,
+    // the buyer needs to know up-front that pack-out and unpack
+    // videos will be required to file any future dispute.
+    if (numericAmount && numericAmount >= 200) {
+      Alert.alert(
+        'Heads up — videos required',
+        `This offer is $${numericAmount.toFixed(0)}. If accepted, both you and the seller will need to record pack-out and unpack videos. You can't open a dispute on this deal without yours.\n\nContinue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: () => createOfferMutation.mutate(payload) },
+        ]
+      );
+      return;
+    }
     createOfferMutation.mutate(payload);
   };
 
@@ -1402,6 +1427,32 @@ export const MakeOfferScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 120 }}>
+        {/* Bad-actor flag warning (Theme E5). Surfaces unresolved
+            issues on the seller account before the buyer commits. */}
+        {trustFlags?.flag_count_recent_90d > 0 && (
+          <View style={{
+            backgroundColor: Colors.accent3 + '20',
+            borderColor: Colors.accent3, borderWidth: 1,
+            borderRadius: Radius.md, padding: Spacing.md,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="warning" size={18} color={Colors.accent3} />
+              <Text style={{ color: Colors.accent3, fontSize: Typography.md, fontWeight: Typography.bold }}>
+                Caution — flagged seller
+              </Text>
+            </View>
+            <Text style={{ color: Colors.text, fontSize: Typography.sm, marginTop: 6, lineHeight: 19 }}>
+              This seller has {trustFlags.flag_count_recent_90d} unresolved issue
+              {trustFlags.flag_count_recent_90d === 1 ? '' : 's'} in the last 90 days
+              {Object.keys(trustFlags.reason_counts || {}).length > 0
+                ? ` (${Object.keys(trustFlags.reason_counts).join(', ').replace(/_/g, ' ')})`
+                : ''}.
+              Trade with extra caution. Card Shop's chain of custody and video gate
+              still apply, but proceed at your own discretion.
+            </Text>
+          </View>
+        )}
+
         {/* Cards being offered on */}
         <View>
           <SectionHeader title="Card(s)" />
