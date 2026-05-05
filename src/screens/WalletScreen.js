@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, Alert, Linking, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -288,13 +289,19 @@ export const TopupScreen = ({ navigation }) => {
 
   const topupMut = useMutation({
     mutationFn: ({ cents }) => walletApi.topup({ amount_cents: cents }),
-    onSuccess: (out) => {
-      Alert.alert(
-        'Top-up created',
-        `Confirm with your card. ${usd(net)} will land in your wallet after Stripe's processing fee of ${usd(stripeFee)}.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
-      );
-      // TODO: integrate Stripe PaymentSheet to complete the PI
+    onSuccess: async (out) => {
+      if (!out.checkoutUrl) {
+        Alert.alert('Top-up error', 'No checkout URL returned.');
+        return;
+      }
+      try {
+        await WebBrowser.openBrowserAsync(out.checkoutUrl);
+      } catch (e) {
+        try { await Linking.openURL(out.checkoutUrl); }
+        catch { Alert.alert('Could not open checkout', e.message); return; }
+      }
+      // Refetch summary on return — webhook usually lands within seconds.
+      setTimeout(() => navigation.goBack(), 800);
     },
     onError: (err) => Alert.alert('Top-up failed', err.response?.data?.error || err.message),
   });

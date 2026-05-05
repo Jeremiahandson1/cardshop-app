@@ -311,42 +311,102 @@ export const CreateListingScreen = ({ navigation, route }) => {
   );
 };
 
-// Photo picker — for now uses Cloudinary URL strings (camera capture
-// integrates with the existing TradeCameraScreen pattern in a follow-up).
-const PhotoPicker = ({ photos, onChange }) => (
-  <View style={styles.photoGrid}>
-    {photos.map((url, i) => (
-      <View key={i} style={styles.photoTile}>
-        <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} />
+// Photo picker — opens the device camera or photo library, captures a
+// base64 data URL, and appends it to the photos array. Backend
+// (uploadIfBase64) detects the data: prefix and uploads to Cloudinary.
+const PhotoPicker = ({ photos, onChange }) => {
+  const addFromCamera = async () => {
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Camera permission needed', 'Enable camera access in Settings to capture listing photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.7,
+        base64: true,
+        allowsEditing: false,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (result.canceled || !result.assets?.[0]?.base64) return;
+      const dataUrl = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      onChange([...photos, dataUrl]);
+    } catch (e) {
+      Alert.alert('Camera error', e.message);
+    }
+  };
+
+  const addFromLibrary = async () => {
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Photo library access needed', 'Enable photo access in Settings to attach existing pictures.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.7,
+        base64: true,
+        allowsEditing: false,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (result.canceled || !result.assets?.[0]?.base64) return;
+      const dataUrl = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      onChange([...photos, dataUrl]);
+    } catch (e) {
+      Alert.alert('Photo library error', e.message);
+    }
+  };
+
+  const openPicker = () => {
+    Alert.alert(
+      'Add photo',
+      photos.length === 0
+        ? 'Front of card first — back of card next.'
+        : photos.length === 1
+        ? 'Now the back of the card.'
+        : 'Add another angle (corners, edges, slab label).',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Take photo', onPress: addFromCamera },
+        { text: 'Choose from library', onPress: addFromLibrary },
+      ],
+    );
+  };
+
+  return (
+    <View style={styles.photoGrid}>
+      {photos.map((urlOrDataUrl, i) => (
+        <View key={i} style={styles.photoTile}>
+          <Image source={{ uri: urlOrDataUrl }} style={{ width: '100%', height: '100%' }} />
+          <TouchableOpacity
+            style={styles.photoRemove}
+            onPress={() => onChange(photos.filter((_, idx) => idx !== i))}
+          >
+            <Ionicons name="close-circle" size={20} color={Colors.accent3} />
+          </TouchableOpacity>
+          {i === 0 && (
+            <View style={styles.photoCoverPill}>
+              <Text style={styles.photoCoverPillText}>COVER</Text>
+            </View>
+          )}
+        </View>
+      ))}
+      {photos.length < 8 && (
         <TouchableOpacity
-          style={styles.photoRemove}
-          onPress={() => onChange(photos.filter((_, idx) => idx !== i))}
+          style={[styles.photoTile, styles.photoAdd]}
+          onPress={openPicker}
         >
-          <Ionicons name="close-circle" size={20} color={Colors.accent3} />
+          <Ionicons name="camera" size={28} color={Colors.textMuted} />
+          <Text style={styles.photoAddText}>
+            {photos.length === 0 ? 'Front' : photos.length === 1 ? 'Back' : 'More'}
+          </Text>
         </TouchableOpacity>
-      </View>
-    ))}
-    {photos.length < 8 && (
-      <TouchableOpacity
-        style={[styles.photoTile, styles.photoAdd]}
-        onPress={() => Alert.alert(
-          'Add photo',
-          'Camera capture coming next session — for now paste a Cloudinary URL.',
-          [
-            { text: 'Cancel' },
-            { text: 'Paste URL', onPress: () => {
-              // TODO: replace with proper image picker that uploads via uploadIfBase64
-              const fakeUrl = `https://res.cloudinary.com/placeholder/${Date.now()}.jpg`;
-              onChange([...photos, fakeUrl]);
-            }},
-          ],
-        )}
-      >
-        <Ionicons name="camera" size={28} color={Colors.textMuted} />
-      </TouchableOpacity>
-    )}
-  </View>
-);
+      )}
+    </View>
+  );
+};
 
 const ShipOptionsPicker = ({ value, onChange, highValue }) => {
   const tiers = [
@@ -680,8 +740,14 @@ const styles = StyleSheet.create({
 
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.md },
   photoTile: { width: 90, height: 90, borderRadius: Radius.sm, backgroundColor: Colors.surface, position: 'relative', overflow: 'hidden' },
-  photoAdd: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  photoAdd: { justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed', gap: 4 },
+  photoAddText: { color: Colors.textMuted, fontSize: 11 },
   photoRemove: { position: 'absolute', top: 2, right: 2 },
+  photoCoverPill: {
+    position: 'absolute', bottom: 4, left: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+  },
+  photoCoverPillText: { color: Colors.text, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 
   shipPick: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,

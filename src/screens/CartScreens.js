@@ -7,11 +7,12 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  ScrollView, Alert, TextInput, RefreshControl,
+  ScrollView, Alert, TextInput, RefreshControl, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as WebBrowser from 'expo-web-browser';
 import { cartApi, checkoutApi, walletApi } from '../services/api';
 import { Button, ScreenHeader, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -190,16 +191,33 @@ export const CheckoutScreen = ({ navigation, route }) => {
       payment_method: paymentMethod,
       ship_to: shipTo,
     }),
-    onSuccess: (out) => {
-      // Card flow: out has client_secret — would integrate Stripe PaymentSheet here.
-      // For now we surface a success message and route to OrderDetail.
-      Alert.alert(
-        paymentMethod === 'wallet' ? 'Order placed!' : 'Order created — confirm payment',
-        paymentMethod === 'wallet'
-          ? 'Funds transferred. The seller has 5 days to ship.'
-          : 'Confirm your card to complete the purchase.',
-        [{ text: 'OK', onPress: () => navigation.navigate('OrderDetail', { id: out.order_id }) }],
-      );
+    onSuccess: async (out) => {
+      if (paymentMethod === 'wallet') {
+        Alert.alert(
+          'Order placed!',
+          'Funds transferred from your wallet. The seller has 5 days to ship.',
+          [{ text: 'OK', onPress: () => navigation.replace('OrderDetail', { id: out.order_id }) }],
+        );
+        return;
+      }
+      // Card flow: open Stripe Checkout in an in-app browser. Stripe
+      // returns to cardshop://orders/success?order_id=X (deep link)
+      // and the webhook handles status flipping server-side.
+      if (!out.checkout_url) {
+        Alert.alert('Checkout error', 'No payment URL returned.');
+        return;
+      }
+      try {
+        await WebBrowser.openBrowserAsync(out.checkout_url);
+      } catch (e) {
+        // Fallback for devices without an in-app browser.
+        try { await Linking.openURL(out.checkout_url); }
+        catch { Alert.alert('Could not open checkout', e.message); return; }
+      }
+      // After the user returns we route to OrderDetail. The webhook may
+      // not have fired yet so the screen will say "pending payment"
+      // until checkout.session.completed lands.
+      navigation.replace('OrderDetail', { id: out.order_id });
     },
     onError: (err) => Alert.alert('Checkout failed', err.response?.data?.error || err.message),
   });
