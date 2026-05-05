@@ -716,6 +716,7 @@ export const listingsApi = {
   report: (id, body) => api.post(`/listings/${id}/report`, body).then((r) => r.data),
   publishDrafts: (ids) =>
     api.post('/listings/mine/publish-drafts', ids ? { ids } : {}).then((r) => r.data),
+  myAnalytics: () => api.get('/listings/mine/analytics').then((r) => r.data),
 };
 
 // Marketplace bootstrap (M-H)

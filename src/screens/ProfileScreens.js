@@ -92,6 +92,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'list-outline', label: 'My listings', onPress: () => navigation.navigate('MyListings') },
         { icon: 'receipt-outline', label: 'Orders', onPress: () => navigation.navigate('MyOrders') },
         { icon: 'pricetags-outline', label: 'Offers', onPress: () => navigation.navigate('MyOffers') },
+        { icon: 'stats-chart-outline', label: 'Seller analytics', onPress: () => navigation.navigate('SellerAnalytics') },
         { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },

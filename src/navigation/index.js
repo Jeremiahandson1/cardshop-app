@@ -93,6 +93,7 @@ import {
 import {
   BulkListInventoryScreen, EbayCsvImportScreen, DraftsReviewScreen,
 } from '../screens/BootstrapScreens';
+import { SellerAnalyticsScreen } from '../screens/SellerAnalyticsScreen';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -375,6 +376,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="BulkListInventory" component={BulkListInventoryScreen} />
     <ProfileStackNav.Screen name="EbayCsvImport" component={EbayCsvImportScreen} />
     <ProfileStackNav.Screen name="DraftsReview" component={DraftsReviewScreen} />
+    <ProfileStackNav.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
   </ProfileStackNav.Navigator>
 );
 
