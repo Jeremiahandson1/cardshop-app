@@ -654,6 +654,20 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     setScanReview((s) => (s ? { ...s, frontUri: captured.uri } : s));
   };
 
+  // When committing scan results into the photos array, add the FRONT
+  // first (so it becomes the cover at index 0) then the BACK. Both
+  // are saved when both exist; if only one exists, that one gets
+  // added. The user can reorder later via the photo grid (move-up /
+  // make-cover buttons in the rendered photos block below).
+  const commitScanPhotos = () => {
+    const additions = [];
+    if (scanReview?.frontUri) additions.push(scanReview.frontUri);
+    if (scanReview?.backUri)  additions.push(scanReview.backUri);
+    if (!additions.length) return;
+    setPhotos((p) => [...p, ...additions]);
+    setPhotoSources((src) => [...src, ...additions.map(() => 'camera')]);
+  };
+
   // Photos captured in-app go into state with source='camera' — the
   // server can then mark the owned_card as camera-captured for
   // verification purposes. Gallery uploads are source='gallery'.
@@ -670,16 +684,19 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       );
       return;
     }
-    // allowsEditing surfaces the OS-native crop + rotate UI right
-    // after capture. aspect [3, 4] matches standard trading-card
-    // portrait so the default crop frame fits the card; users can
-    // still resize and rotate. No native-module install needed.
+    // allowsEditing surfaces the OS-native crop + rotate UI. We
+    // intentionally DON'T set `aspect` — locking it to [3, 4] gave
+    // the iOS picker only one drag direction (you could shrink the
+    // frame but not change its proportions). Free-form crop gives 4
+    // corner + 4 edge handles so the user can pull from any side.
+    // Most cards will still end up roughly portrait — the default
+    // capture orientation handles that — but oddball items (sticker
+    // books, panoramic cards, autograph cuts) crop cleanly now.
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.85,
       cameraType: ImagePicker.CameraType.back,
       allowsEditing: true,
-      aspect: [3, 4],
     });
     if (!result.canceled && result.assets?.length) {
       setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
@@ -692,7 +709,8 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: true,
-      aspect: [3, 4],
+      // No aspect lock — see takePhoto for the rationale (free-form
+      // crop gives 8 handles instead of 1).
       // allowsMultipleSelection can't combine with allowsEditing —
       // the OS only gives a crop UI for single picks. Stick with
       // single-pick here so the edit UI is available; power users
@@ -1119,13 +1137,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   key={c.id}
                   onPress={() => {
-                    if (scanReview.frontUri) {
-                      setPhotos((p) => [...p, scanReview.frontUri]);
-                      setPhotoSources((src) => [...src, 'camera']);
-                    } else if (scanReview.backUri) {
-                      setPhotos((p) => [...p, scanReview.backUri]);
-                      setPhotoSources((src) => [...src, 'camera']);
-                    }
+                    commitScanPhotos();
                     setSelectedCatalog(c);
                     setStep(c.print_run ? 'serial' : 'details');
                   }}
@@ -1153,13 +1165,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <Button
             title="Continue with these values"
             onPress={async () => {
-              if (scanReview.frontUri) {
-                setPhotos((p) => [...p, scanReview.frontUri]);
-                setPhotoSources((src) => [...src, 'camera']);
-              } else if (scanReview.backUri) {
-                setPhotos((p) => [...p, scanReview.backUri]);
-                setPhotoSources((src) => [...src, 'camera']);
-              }
+              commitScanPhotos();
               const newCascade = {
                 sport: scanReview.sport || cascade.sport,
                 year: scanReview.year ? Number(scanReview.year) || scanReview.year : cascade.year,
@@ -1229,13 +1235,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             title="Skip catalog — manual entry"
             variant="secondary"
             onPress={() => {
-              if (scanReview.frontUri) {
-                setPhotos((p) => [...p, scanReview.frontUri]);
-                setPhotoSources((src) => [...src, 'camera']);
-              } else if (scanReview.backUri) {
-                setPhotos((p) => [...p, scanReview.backUri]);
-                setPhotoSources((src) => [...src, 'camera']);
-              }
+              commitScanPhotos();
               setManualForm((f) => ({
                 ...f,
                 year: scanReview.year || f.year,
@@ -2022,6 +2022,17 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             {photos.map((uri, i) => (
               <View key={i} style={styles.photoThumb}>
                 <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                {i === 0 ? (
+                  <View style={{
+                    position: 'absolute', top: 4, left: 4,
+                    backgroundColor: Colors.accent,
+                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                  }}>
+                    <Text style={{ color: Colors.bg, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>
+                      COVER
+                    </Text>
+                  </View>
+                ) : null}
                 {photoSources[i] === 'camera' ? (
                   <View style={{
                     position: 'absolute',
@@ -2041,6 +2052,62 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                     </Text>
                   </View>
                 ) : null}
+                {/* Reorder controls. Left arrow swaps with previous;
+                    right arrow swaps with next. The cover (index 0)
+                    has no left arrow; the last photo has no right
+                    arrow. Long-press would be nicer but adds gesture
+                    handler scope; explicit buttons are cheaper. */}
+                <View style={{
+                  position: 'absolute', bottom: 4, right: 4,
+                  flexDirection: 'row', gap: 2,
+                }}>
+                  {i > 0 ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPhotos((p) => {
+                          const next = [...p];
+                          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                          return next;
+                        });
+                        setPhotoSources((s) => {
+                          const next = [...s];
+                          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                          return next;
+                        });
+                      }}
+                      style={{
+                        width: 22, height: 22, borderRadius: 11,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        justifyContent: 'center', alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons name="chevron-back" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                  {i < photos.length - 1 ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPhotos((p) => {
+                          const next = [...p];
+                          [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                          return next;
+                        });
+                        setPhotoSources((s) => {
+                          const next = [...s];
+                          [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                          return next;
+                        });
+                      }}
+                      style={{
+                        width: 22, height: 22, borderRadius: 11,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        justifyContent: 'center', alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons name="chevron-forward" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
                 <TouchableOpacity
                   style={styles.photoRemove}
                   onPress={() => {
@@ -3141,7 +3208,7 @@ export const EditCardScreen = ({ navigation, route }) => {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85,
-      allowsEditing: true, aspect: [3, 4],
+      allowsEditing: true,
     });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
@@ -3150,7 +3217,7 @@ export const EditCardScreen = ({ navigation, route }) => {
   const pickFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8,
-      allowsEditing: true, aspect: [3, 4],
+      allowsEditing: true,
     });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);

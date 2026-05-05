@@ -355,7 +355,10 @@ const PhotoPicker = ({ photos, onChange }) => {
       const result = await ImagePicker.launchCameraAsync({
         quality: 0.7,
         base64: true,
-        allowsEditing: false,
+        // Show OS crop UI after capture. No aspect lock — gives the
+        // user free-form 8-handle crop rather than a single fixed
+        // rectangle.
+        allowsEditing: true,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
       if (result.canceled || !result.assets?.[0]?.base64) return;
@@ -377,7 +380,7 @@ const PhotoPicker = ({ photos, onChange }) => {
       const result = await ImagePicker.launchImageLibraryAsync({
         quality: 0.7,
         base64: true,
-        allowsEditing: false,
+        allowsEditing: true,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
       if (result.canceled || !result.assets?.[0]?.base64) return;
@@ -404,6 +407,16 @@ const PhotoPicker = ({ photos, onChange }) => {
     );
   };
 
+  // Swap two photos in the array. Used by the left/right reorder
+  // buttons on each tile so the user can promote a photo to cover
+  // (move to index 0) without re-uploading.
+  const swap = (a, b) => {
+    if (a < 0 || b < 0 || a >= photos.length || b >= photos.length) return;
+    const next = [...photos];
+    [next[a], next[b]] = [next[b], next[a]];
+    onChange(next);
+  };
+
   return (
     <View style={styles.photoGrid}>
       {photos.map((urlOrDataUrl, i) => (
@@ -420,6 +433,20 @@ const PhotoPicker = ({ photos, onChange }) => {
               <Text style={styles.photoCoverPillText}>COVER</Text>
             </View>
           )}
+          {/* Reorder controls. Left swaps with previous, right with
+              next. Hidden when at the edges. */}
+          <View style={styles.photoReorderRow}>
+            {i > 0 && (
+              <TouchableOpacity style={styles.photoArrow} onPress={() => swap(i, i - 1)}>
+                <Ionicons name="chevron-back" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {i < photos.length - 1 && (
+              <TouchableOpacity style={styles.photoArrow} onPress={() => swap(i, i + 1)}>
+                <Ionicons name="chevron-forward" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ))}
       {photos.length < 8 && (
@@ -826,10 +853,18 @@ const styles = StyleSheet.create({
   photoAddText: { color: Colors.textMuted, fontSize: 11 },
   photoRemove: { position: 'absolute', top: 2, right: 2 },
   photoCoverPill: {
-    position: 'absolute', bottom: 4, left: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    position: 'absolute', top: 4, left: 4,
+    backgroundColor: Colors.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
-  photoCoverPillText: { color: Colors.text, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  photoCoverPillText: { color: Colors.bg, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  photoReorderRow: {
+    position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', gap: 2,
+  },
+  photoArrow: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center', alignItems: 'center',
+  },
 
   shipPick: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
