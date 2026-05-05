@@ -768,3 +768,17 @@ export const marketplaceApi = {
   deleteSavedSearch: (id) =>
     api.delete(`/marketplace/saved-searches/${id}`).then((r) => r.data),
 };
+
+// Best Offer + offers-on-cart (Phase 2B / M-J).
+export const listingOffersApi = {
+  list: (params = {}) =>
+    api.get('/listing-offers', { params }).then((r) => r.data),
+  get: (id) => api.get(`/listing-offers/${id}`).then((r) => r.data),
+  open: (body) => api.post('/listing-offers', body).then((r) => r.data),
+  counter: (id, amount_cents) =>
+    api.post(`/listing-offers/${id}/counter`, { amount_cents }).then((r) => r.data),
+  accept: (id) => api.post(`/listing-offers/${id}/accept`).then((r) => r.data),
+  reject: (id, reason) =>
+    api.post(`/listing-offers/${id}/reject`, { reason }).then((r) => r.data),
+  withdraw: (id) => api.post(`/listing-offers/${id}/withdraw`).then((r) => r.data),
+};

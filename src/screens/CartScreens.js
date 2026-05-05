@@ -146,10 +146,17 @@ export const CartDetailScreen = ({ navigation, route }) => {
 
       <View style={styles.ctaBar}>
         <Button
+          title="Make offer"
+          variant="ghost"
+          onPress={() => navigation.navigate('MakeListingOffer', { cart_id: cartId })}
+          disabled={!activeItems.length}
+          style={{ flex: 1 }}
+        />
+        <Button
           title={`Check out · ${usd(subtotal_cents)}`}
           onPress={() => navigation.navigate('Checkout', { cart_id: cartId })}
           disabled={!activeItems.length}
-          style={{ flex: 1 }}
+          style={{ flex: 1.4 }}
         />
       </View>
     </SafeAreaView>

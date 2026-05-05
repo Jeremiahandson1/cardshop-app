@@ -87,6 +87,9 @@ import {
   MyListingsScreen, CreateListingScreen, MyOrdersScreen,
   OrderDetailScreen, FileOrderDisputeScreen,
 } from '../screens/SellerScreens';
+import {
+  MakeListingOfferScreen, MyOffersScreen, OfferDetailScreen,
+} from '../screens/OfferScreens';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -363,6 +366,9 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="MyOrders" component={MyOrdersScreen} />
     <ProfileStackNav.Screen name="OrderDetail" component={OrderDetailScreen} />
     <ProfileStackNav.Screen name="FileOrderDispute" component={FileOrderDisputeScreen} />
+    <ProfileStackNav.Screen name="MakeListingOffer" component={MakeListingOfferScreen} options={{ presentation: 'modal' }} />
+    <ProfileStackNav.Screen name="MyOffers" component={MyOffersScreen} />
+    <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
   </ProfileStackNav.Navigator>
 );
 

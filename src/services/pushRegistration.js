@@ -134,6 +134,39 @@ export function registerNotificationResponseHandler(navigationRef) {
         }
         return;
       }
+
+      // Marketplace offer events. Notification.data.offer_id always set.
+      if (data?.type === 'offer_received'
+          || data?.type === 'offer_countered'
+          || data?.type === 'offer_accepted'
+          || data?.type === 'offer_rejected') {
+        if (navReady && data.offer_id) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'OfferDetail', params: { id: data.offer_id },
+          });
+        }
+        return;
+      }
+
+      // Saved-search match — open the matching listing detail.
+      if (data?.type === 'saved_search_match') {
+        if (navReady && data.listing_id) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'ListingDetail', params: { id: data.listing_id },
+          });
+        }
+        return;
+      }
+
+      // Marketplace order dispute opened — seller deep-link.
+      if (data?.type === 'order_dispute_opened' && data.order_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'OrderDetail', params: { id: data.order_id },
+          });
+        }
+        return;
+      }
     } catch (err) {
       console.warn('notification response handler error', err?.message);
     }

@@ -313,6 +313,14 @@ export const ListingDetailScreen = ({ navigation, route }) => {
 
       {!isOwner && isActive && (
         <View style={styles.ctaBar}>
+          {listing.accepts_offers && (
+            <Button
+              title="Offer"
+              variant="ghost"
+              onPress={() => navigation.navigate('MakeListingOffer', { listing_id: id })}
+              style={{ flex: 1 }}
+            />
+          )}
           <Button
             title="Add to cart"
             variant="ghost"
@@ -321,9 +329,9 @@ export const ListingDetailScreen = ({ navigation, route }) => {
             style={{ flex: 1 }}
           />
           <Button
-            title={`Buy for ${usd(listing.asking_price_cents)}`}
+            title={`Buy ${usd(listing.asking_price_cents)}`}
             onPress={() => navigation.navigate('Checkout', { listing_id: id })}
-            style={{ flex: 1.5 }}
+            style={{ flex: 1.4 }}
           />
         </View>
       )}
