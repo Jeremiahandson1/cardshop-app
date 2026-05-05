@@ -87,6 +87,10 @@ export const ProfileScreen = ({ navigation }) => {
       // Daily-use stuff: trades, conversations, the upgrade pitch.
       section: 'Activity',
       items: [
+        { icon: 'cart-outline', label: 'Marketplace', onPress: () => navigation.navigate('MarketplaceHome') },
+        { icon: 'wallet-outline', label: 'Wallet', onPress: () => navigation.navigate('Wallet') },
+        { icon: 'list-outline', label: 'My listings', onPress: () => navigation.navigate('MyListings') },
+        { icon: 'receipt-outline', label: 'Orders', onPress: () => navigation.navigate('MyOrders') },
         { icon: 'swap-horizontal-outline', label: 'Trade offers', onPress: () => navigation.navigate('TradeOffersList') },
         { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
         { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },

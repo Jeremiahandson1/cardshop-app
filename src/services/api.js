@@ -684,3 +684,87 @@ export const lcsArbitrageApi = {
   list: ({ zip }) =>
     api.get('/lcs-arbitrage', { params: { zip } }).then((r) => r.data),
 };
+
+// ============================================================
+// MARKETPLACE — Phase 2A (Wallet, Listings, Cart, Checkout, Shipping, Disputes, Browse)
+// ============================================================
+
+export const walletApi = {
+  summary: () => api.get('/wallet').then((r) => r.data),
+  balance: ({ fresh = false } = {}) =>
+    api.get('/wallet/balance', { params: { fresh } }).then((r) => r.data),
+  history: ({ limit = 50, before = null } = {}) =>
+    api.get('/wallet/history', { params: { limit, before } }).then((r) => r.data),
+  startOnboarding: ({ return_url, refresh_url } = {}) =>
+    api.post('/wallet/connect/onboard', { return_url, refresh_url }).then((r) => r.data),
+  refreshConnectStatus: () => api.get('/wallet/connect/status').then((r) => r.data),
+  openDashboard: () => api.post('/wallet/connect/dashboard').then((r) => r.data),
+  payout: ({ amount_cents, method = 'standard' }) =>
+    api.post('/wallet/payout', { amount_cents, method }).then((r) => r.data),
+  topup: ({ amount_cents }) =>
+    api.post('/wallet/topup', { amount_cents }).then((r) => r.data),
+};
+
+export const listingsApi = {
+  mine: () => api.get('/listings/mine').then((r) => r.data),
+  get: (id) => api.get(`/listings/${id}`).then((r) => r.data),
+  create: (payload) => api.post('/listings', payload).then((r) => r.data),
+  update: (id, payload) => api.patch(`/listings/${id}`, payload).then((r) => r.data),
+  cancel: (id) => api.delete(`/listings/${id}`).then((r) => r.data),
+  watch: (id) => api.post(`/listings/${id}/watch`).then((r) => r.data),
+  unwatch: (id) => api.delete(`/listings/${id}/watch`).then((r) => r.data),
+  report: (id, body) => api.post(`/listings/${id}/report`, body).then((r) => r.data),
+};
+
+export const cartApi = {
+  list: () => api.get('/cart').then((r) => r.data),
+  get: (cartId) => api.get(`/cart/${cartId}`).then((r) => r.data),
+  add: (listing_id) => api.post('/cart/items', { listing_id }).then((r) => r.data),
+  remove: (listing_id) => api.delete(`/cart/items/${listing_id}`).then((r) => r.data),
+  abandon: (cartId) => api.delete(`/cart/${cartId}`).then((r) => r.data),
+};
+
+export const checkoutApi = {
+  quote: (body) => api.post('/checkout/quote', body).then((r) => r.data),
+  place: (body) => api.post('/checkout/place', body).then((r) => r.data),
+  confirm: (order_id) => api.post('/checkout/confirm', { order_id }).then((r) => r.data),
+};
+
+export const ordersApi = {
+  list: (params = {}) => api.get('/orders', { params }).then((r) => r.data),
+  get: (id) => api.get(`/orders/${id}`).then((r) => r.data),
+  cancel: (id, reason) => api.post(`/orders/${id}/cancel`, { reason }).then((r) => r.data),
+};
+
+export const shippingApi = {
+  buyLabel: (orderId, fromAddress) =>
+    api.post(`/shipping/orders/${orderId}/label`, { from_address: fromAddress }).then((r) => r.data),
+  getLabel: (orderId) =>
+    api.get(`/shipping/orders/${orderId}/label`).then((r) => r.data),
+};
+
+export const orderDisputesApi = {
+  file: (body) => api.post('/order-disputes', body).then((r) => r.data),
+  evidence: (id, evidence) => api.post(`/order-disputes/${id}/evidence`, { evidence }).then((r) => r.data),
+  respond: (id, body) => api.post(`/order-disputes/${id}/respond`, body).then((r) => r.data),
+  withdraw: (id) => api.post(`/order-disputes/${id}/withdraw`).then((r) => r.data),
+};
+
+export const marketplaceApi = {
+  search: (params) => api.get('/marketplace/search', { params }).then((r) => r.data),
+  justListed: ({ limit = 25 } = {}) =>
+    api.get('/marketplace/just-listed', { params: { limit } }).then((r) => r.data),
+  mostWatched: ({ limit = 25 } = {}) =>
+    api.get('/marketplace/most-watched', { params: { limit } }).then((r) => r.data),
+  byCard: (catalogId, { limit = 50 } = {}) =>
+    api.get(`/marketplace/card/${catalogId}`, { params: { limit } }).then((r) => r.data),
+  feed: ({ limit = 25 } = {}) =>
+    api.get('/marketplace/feed', { params: { limit } }).then((r) => r.data),
+  listSavedSearches: () => api.get('/marketplace/saved-searches').then((r) => r.data),
+  createSavedSearch: (body) =>
+    api.post('/marketplace/saved-searches', body).then((r) => r.data),
+  updateSavedSearch: (id, body) =>
+    api.patch(`/marketplace/saved-searches/${id}`, body).then((r) => r.data),
+  deleteSavedSearch: (id) =>
+    api.delete(`/marketplace/saved-searches/${id}`).then((r) => r.data),
+};

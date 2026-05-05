@@ -78,6 +78,15 @@ import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../scree
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
 import { DealRadarFeedScreen } from '../screens/DealRadarFeedScreen';
 import { IntegrationsScreen } from '../screens/IntegrationsScreen';
+import { WalletScreen, PayoutScreen, TopupScreen } from '../screens/WalletScreen';
+import {
+  MarketplaceHomeScreen, MarketplaceSearchScreen, ListingDetailScreen, SavedSearchesScreen,
+} from '../screens/MarketplaceScreens';
+import { CartListScreen, CartDetailScreen, CheckoutScreen } from '../screens/CartScreens';
+import {
+  MyListingsScreen, CreateListingScreen, MyOrdersScreen,
+  OrderDetailScreen, FileOrderDisputeScreen,
+} from '../screens/SellerScreens';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -337,6 +346,23 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="SetsList" component={SetsListScreen} />
     <ProfileStackNav.Screen name="BrowseSets" component={BrowseSetsScreen} />
     <ProfileStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
+
+    {/* Marketplace Phase 2A */}
+    <ProfileStackNav.Screen name="Wallet" component={WalletScreen} />
+    <ProfileStackNav.Screen name="Payout" component={PayoutScreen} />
+    <ProfileStackNav.Screen name="Topup" component={TopupScreen} />
+    <ProfileStackNav.Screen name="MarketplaceHome" component={MarketplaceHomeScreen} />
+    <ProfileStackNav.Screen name="MarketplaceSearch" component={MarketplaceSearchScreen} />
+    <ProfileStackNav.Screen name="ListingDetail" component={ListingDetailScreen} />
+    <ProfileStackNav.Screen name="SavedSearches" component={SavedSearchesScreen} />
+    <ProfileStackNav.Screen name="CartList" component={CartListScreen} />
+    <ProfileStackNav.Screen name="CartDetail" component={CartDetailScreen} />
+    <ProfileStackNav.Screen name="Checkout" component={CheckoutScreen} />
+    <ProfileStackNav.Screen name="MyListings" component={MyListingsScreen} />
+    <ProfileStackNav.Screen name="CreateListing" component={CreateListingScreen} />
+    <ProfileStackNav.Screen name="MyOrders" component={MyOrdersScreen} />
+    <ProfileStackNav.Screen name="OrderDetail" component={OrderDetailScreen} />
+    <ProfileStackNav.Screen name="FileOrderDispute" component={FileOrderDisputeScreen} />
   </ProfileStackNav.Navigator>
 );
 
