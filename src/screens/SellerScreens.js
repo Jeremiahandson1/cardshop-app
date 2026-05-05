@@ -30,25 +30,51 @@ export const MyListingsScreen = ({ navigation }) => {
     queryFn: () => listingsApi.mine(),
   });
   const listings = data?.listings || [];
+  const draftCount = listings.filter((l) => l.status === 'draft').length;
+
+  const showBulkMenu = () => {
+    Alert.alert(
+      'Add listings',
+      undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Single listing', onPress: () => navigation.navigate('CreateListing') },
+        { text: 'Bulk-list inventory', onPress: () => navigation.navigate('BulkListInventory') },
+        { text: 'Import from eBay', onPress: () => navigation.navigate('EbayCsvImport') },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScreenHeader
         title="My listings"
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')}>
+          <TouchableOpacity onPress={showBulkMenu}>
             <Ionicons name="add-circle" size={28} color={Colors.accent} />
           </TouchableOpacity>
         }
       />
+      {draftCount > 0 && (
+        <TouchableOpacity
+          style={localStyles.draftBanner}
+          onPress={() => navigation.navigate('DraftsReview')}
+        >
+          <Ionicons name="document-text-outline" size={18} color={Colors.accent} />
+          <Text style={localStyles.draftBannerText}>
+            {draftCount} draft listing(s) waiting for review
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+      )}
       {isLoading ? (
         <LoadingScreen />
       ) : !listings.length ? (
         <EmptyState
           icon="🪧"
           title="No listings yet"
-          message="List a card you own to start selling on the marketplace."
-          action={{ title: 'List a card', onPress: () => navigation.navigate('CreateListing') }}
+          message="List a card you own, bulk-list your inventory, or import from eBay."
+          action={{ title: 'List a card', onPress: showBulkMenu }}
         />
       ) : (
         <FlatList
@@ -698,6 +724,19 @@ export const FileOrderDisputeScreen = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
+
+// Local styles specific to MyListings (banner). Kept separate to
+// avoid bloating the shared `styles` block below.
+const localStyles = StyleSheet.create({
+  draftBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#3a2820',
+    paddingVertical: 10, paddingHorizontal: 14,
+    marginHorizontal: Spacing.md, marginTop: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  draftBannerText: { flex: 1, color: '#ffaa66', fontSize: 13 },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },

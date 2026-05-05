@@ -90,6 +90,9 @@ import {
 import {
   MakeListingOfferScreen, MyOffersScreen, OfferDetailScreen,
 } from '../screens/OfferScreens';
+import {
+  BulkListInventoryScreen, EbayCsvImportScreen, DraftsReviewScreen,
+} from '../screens/BootstrapScreens';
 
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
@@ -369,6 +372,9 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="MakeListingOffer" component={MakeListingOfferScreen} options={{ presentation: 'modal' }} />
     <ProfileStackNav.Screen name="MyOffers" component={MyOffersScreen} />
     <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
+    <ProfileStackNav.Screen name="BulkListInventory" component={BulkListInventoryScreen} />
+    <ProfileStackNav.Screen name="EbayCsvImport" component={EbayCsvImportScreen} />
+    <ProfileStackNav.Screen name="DraftsReview" component={DraftsReviewScreen} />
   </ProfileStackNav.Navigator>
 );
 

@@ -714,6 +714,18 @@ export const listingsApi = {
   watch: (id) => api.post(`/listings/${id}/watch`).then((r) => r.data),
   unwatch: (id) => api.delete(`/listings/${id}/watch`).then((r) => r.data),
   report: (id, body) => api.post(`/listings/${id}/report`, body).then((r) => r.data),
+  publishDrafts: (ids) =>
+    api.post('/listings/mine/publish-drafts', ids ? { ids } : {}).then((r) => r.data),
+};
+
+// Marketplace bootstrap (M-H)
+export const marketplaceBootstrapApi = {
+  fromInventory: (body) =>
+    api.post('/marketplace/bootstrap/from-inventory', body).then((r) => r.data),
+  fromShow: (checkInId, body) =>
+    api.post(`/marketplace/bootstrap/from-show/${checkInId}`, body).then((r) => r.data),
+  ebayCsv: (body) =>
+    api.post('/marketplace/bootstrap/ebay-csv', body).then((r) => r.data),
 };
 
 export const cartApi = {
