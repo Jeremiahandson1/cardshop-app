@@ -755,6 +755,10 @@ export const ordersApi = {
   list: (params = {}) => api.get('/orders', { params }).then((r) => r.data),
   get: (id) => api.get(`/orders/${id}`).then((r) => r.data),
   cancel: (id, reason) => api.post(`/orders/${id}/cancel`, { reason }).then((r) => r.data),
+  // Returns the canonical receipt URL — caller passes to Linking or
+  // a WebView. We keep the JWT in the URL via the api baseURL since
+  // the route is auth-only.
+  receiptUrl: (id) => `${api.defaults.baseURL}/orders/${id}/receipt.pdf`,
 };
 
 export const shippingApi = {

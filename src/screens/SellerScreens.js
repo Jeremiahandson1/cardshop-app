@@ -16,6 +16,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listingsApi, ordersApi, shippingApi, cardsApi, bindersApi,
 } from '../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as SecureStore from 'expo-secure-store';
 import { Button, ScreenHeader, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -571,6 +574,36 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   const { order, items } = data;
   const isSeller = !!order.seller_id;     // page is shown for both — UI branches below
 
+  // Download + share the PDF receipt. Auth required, so we fetch
+  // with the Bearer token, write to a temp file, then open the
+  // share sheet. Same pattern existing screens use for CSV export.
+  const downloadReceipt = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('access_token');
+      const url = ordersApi.receiptUrl(id);
+      const filename = `cardshop-receipt-${id.slice(0, 8)}.pdf`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      const result = await FileSystem.downloadAsync(url, dest, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (result.status !== 200) {
+        Alert.alert('Receipt failed', `HTTP ${result.status}`);
+        return;
+      }
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Card Shop receipt',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Saved', `Receipt saved to ${result.uri}`);
+      }
+    } catch (e) {
+      Alert.alert('Receipt error', e.message);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScreenHeader title="Order" />
@@ -639,6 +672,16 @@ export const OrderDetailScreen = ({ navigation, route }) => {
             variant="ghost"
             onPress={() => navigation.navigate('FileOrderDispute', { order_id: order.id })}
             style={{ marginTop: Spacing.md }}
+          />
+        )}
+
+        {/* Receipt — available once captured */}
+        {!['pending', 'authorized', 'cancelled'].includes(order.status) && (
+          <Button
+            title="Download receipt (PDF)"
+            variant="ghost"
+            onPress={downloadReceipt}
+            style={{ marginTop: Spacing.sm }}
           />
         )}
 
