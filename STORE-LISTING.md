@@ -54,10 +54,13 @@ WHAT ELSE CARD SHOP DOES
 • Permanent ownership log — Every transfer is signed and timestamped. If a dispute ever happens, the chain of custody is documented.
 
 CARD SHOP PRO ($9.99/mo or $99/yr)
-• Unlimited AI scans
-• 25 vinyl QR stickers shipped to you each month
-• Set completion tracking
+• Show Floor — go live at card shows, follower push, browseable inventory
+• Case Mode — per-card show-floor pricing & trade prefs
+• Unlimited binders + per-binder analytics
+• Collection Intelligence (blended values + trend signals)
+• Deal Radar (eBay alerts on your want list)
 • Priority support
+(Vinyl QR stickers sold separately at cost — every tier pays the same per-sticker rate.)
 
 CARD SHOP IS FREE TO USE for the trade board, local prices, scans of cards you don't own yet, and verification scans of any card you find. You only need Pro if you want to track and tag your own collection.
 
@@ -101,10 +104,13 @@ WHAT ELSE YOU GET
 • Permanent ownership log — Every transfer is signed and timestamped. Chain of custody is documented forever.
 
 CARD SHOP PRO — $9.99/mo or $99/yr
+• Show Floor + Case Mode — go live at card shows
+• Unlimited binders + per-binder analytics
 • Unlimited AI scans
-• 25 vinyl QR stickers shipped each month
 • Set completion tracking
+• Deal Radar (eBay price alerts)
 • Priority support
+(Vinyl QR stickers sold separately at cost.)
 
 CARD SHOP IS FREE for the trade board, local prices, verification scans, and identifying any card you encounter. Pro is for tagging and tracking your own collection.
 
