@@ -286,6 +286,10 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
   const [hours, setHours] = useState(48);
   const [mode, setMode] = useState('binders');
   const [selectedBinderIds, setSelectedBinderIds] = useState([]);
+  // M-H carryover: when the show ends, automatically convert live
+  // cards into permanent marketplace listings.
+  const [convertToListings, setConvertToListings] = useState(false);
+  const [carryoverShipping, setCarryoverShipping] = useState('bmwt');
 
   // Autocomplete query — debounce to avoid spamming
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -326,6 +330,12 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
     return 0;
   }, [mode, cardsData, binders, selectedBinderIds]);
 
+  const SHIPPING_DEFAULTS = {
+    pwe: { tier: 'pwe', price_cents: 105 },
+    bmwt: { tier: 'bmwt', price_cents: 450 },
+    signature: { tier: 'signature', price_cents: 950 },
+  };
+
   const checkInMut = useMutation({
     mutationFn: () => showFloorApi.checkIn({
       show_event_id: pickedEvent?.id,
@@ -337,6 +347,10 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
       hours,
       go_live_binder_ids: mode === 'binders' && selectedBinderIds.length ? selectedBinderIds : undefined,
       go_live_card_ids: mode === 'all' ? (cardsData?.cards || []).map((c) => c.id) : undefined,
+      convert_to_listings: convertToListings,
+      carryover_shipping_options: convertToListings
+        ? [SHIPPING_DEFAULTS[carryoverShipping]]
+        : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['show-floor-me'] });
@@ -542,6 +556,53 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
             <Text style={{ color: Colors.accent, fontWeight: Typography.semibold, fontSize: Typography.sm }}>
               {previewCount} card{previewCount === 1 ? '' : 's'} will go live when you check in
             </Text>
+          </View>
+        )}
+
+        {/* M-H carryover: convert live cards to permanent listings on
+            session end. Only meaningful if cards/binders are going live. */}
+        {mode !== 'none' && (
+          <View style={carryoverStyles.box}>
+            <TouchableOpacity
+              style={carryoverStyles.row}
+              onPress={() => setConvertToListings(!convertToListings)}
+            >
+              <View style={[carryoverStyles.checkbox, convertToListings && carryoverStyles.checkboxOn]}>
+                {convertToListings && <Ionicons name="checkmark" size={16} color={Colors.bg} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={carryoverStyles.label}>Stay listed after the show</Text>
+                <Text style={carryoverStyles.hint}>
+                  When the session ends, live cards (with prices set) become permanent marketplace listings.
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {convertToListings && (
+              <View style={carryoverStyles.shipRow}>
+                <Text style={carryoverStyles.shipLabel}>Default shipping:</Text>
+                {[
+                  { tier: 'pwe', label: 'PWE' },
+                  { tier: 'bmwt', label: 'BMWT' },
+                  { tier: 'signature', label: 'Signature' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.tier}
+                    style={[
+                      carryoverStyles.shipChip,
+                      carryoverShipping === opt.tier && carryoverStyles.shipChipActive,
+                    ]}
+                    onPress={() => setCarryoverShipping(opt.tier)}
+                  >
+                    <Text style={[
+                      carryoverStyles.shipChipText,
+                      carryoverShipping === opt.tier && { color: Colors.bg, fontWeight: '700' },
+                    ]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -908,4 +969,33 @@ const styles = StyleSheet.create({
   cardSeller: { color: Colors.accent, fontSize: Typography.xs, marginTop: 4 },
   cardPrice: { color: Colors.accent, fontSize: Typography.md, fontWeight: Typography.bold },
   tradeOnly: { color: Colors.textMuted, fontSize: 10, fontStyle: 'italic' },
+});
+
+// Local styles for the M-H carryover toggle on ShowFloorCheckInScreen.
+// Kept separate so the main `styles` block stays focused on layout.
+const carryoverStyles = StyleSheet.create({
+  box: {
+    marginTop: Spacing.sm, padding: Spacing.sm, borderRadius: Radius.md,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 5,
+    borderWidth: 2, borderColor: Colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  checkboxOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  label: { color: Colors.text, fontSize: 14, fontWeight: '600' },
+  hint: { color: Colors.textMuted, fontSize: 11, marginTop: 2, lineHeight: 15 },
+  shipRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: Spacing.sm, paddingLeft: 30, flexWrap: 'wrap',
+  },
+  shipLabel: { color: Colors.textMuted, fontSize: 11 },
+  shipChip: {
+    paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12,
+    backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border,
+  },
+  shipChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  shipChipText: { color: Colors.textMuted, fontSize: 11 },
 });
