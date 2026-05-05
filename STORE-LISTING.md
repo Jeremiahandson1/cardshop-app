@@ -43,6 +43,8 @@ If any card you own surfaces somewhere it shouldn't, you'll know — and the cha
 
 WHAT ELSE CARD SHOP DOES
 
+• Marketplace — Sell to anyone, not just your trade circle. 10% capped at $1 plus Stripe processing — at $500 we take $1, CollX takes $50. Every sale flows through the chain so the next owner inherits documented provenance.
+
 • AI scan — Photograph the back of any card. Identifies player, year, set, parallel, and card number in seconds.
 
 • Trade Board — Post a card to your trade groups, your local groups, or publicly. Get private offers; nobody sees what others are bidding.
@@ -92,6 +94,8 @@ THREE-LAYER FINGERPRINT — every card you own gets a permanent identity:
 If your card surfaces somewhere it shouldn't, the next person who scans it sees it's flagged stolen — and you get a notification with where the scan happened.
 
 WHAT ELSE YOU GET
+
+• Marketplace — List a card for sale. Buyer pays via card or in-app wallet, we generate the shipping label, every sale flows through the chain. 10% capped at $1 plus Stripe — never gouged on big cards like other platforms.
 
 • AI scan — Photograph the back of any card. Card Shop identifies player, year, set, parallel, and card number in seconds.
 
