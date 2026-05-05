@@ -88,7 +88,7 @@ import {
   OrderDetailScreen, FileOrderDisputeScreen,
 } from '../screens/SellerScreens';
 import {
-  MakeListingOfferScreen, MyOffersScreen, OfferDetailScreen,
+  MakeListingOfferScreen, MyOffersScreen, ListingOfferDetailScreen,
 } from '../screens/OfferScreens';
 import {
   BulkListInventoryScreen, EbayCsvImportScreen, DraftsReviewScreen,
@@ -373,7 +373,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="FileOrderDispute" component={FileOrderDisputeScreen} />
     <ProfileStackNav.Screen name="MakeListingOffer" component={MakeListingOfferScreen} options={{ presentation: 'modal' }} />
     <ProfileStackNav.Screen name="MyOffers" component={MyOffersScreen} />
-    <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
+    <ProfileStackNav.Screen name="ListingOfferDetail" component={ListingOfferDetailScreen} />
     <ProfileStackNav.Screen name="BulkListInventory" component={BulkListInventoryScreen} />
     <ProfileStackNav.Screen name="EbayCsvImport" component={EbayCsvImportScreen} />
     <ProfileStackNav.Screen name="DraftsReview" component={DraftsReviewScreen} />

@@ -136,13 +136,15 @@ export function registerNotificationResponseHandler(navigationRef) {
       }
 
       // Marketplace offer events. Notification.data.offer_id always set.
+      // Route name is ListingOfferDetail to disambiguate from the
+      // existing trade/binder OfferDetail screen.
       if (data?.type === 'offer_received'
           || data?.type === 'offer_countered'
           || data?.type === 'offer_accepted'
           || data?.type === 'offer_rejected') {
         if (navReady && data.offer_id) {
           navigationRef.current.navigate('Profile', {
-            screen: 'OfferDetail', params: { id: data.offer_id },
+            screen: 'ListingOfferDetail', params: { id: data.offer_id },
           });
         }
         return;

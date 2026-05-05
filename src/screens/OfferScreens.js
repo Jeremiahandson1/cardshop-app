@@ -68,7 +68,7 @@ export const MakeListingOfferScreen = ({ navigation, route }) => {
       Alert.alert(
         'Offer sent',
         'The seller has 48 hours to respond. We\'ll push you when they do.',
-        [{ text: 'OK', onPress: () => navigation.replace('OfferDetail', { id: out.offer.id }) }],
+        [{ text: 'OK', onPress: () => navigation.replace('ListingOfferDetail', { id: out.offer.id }) }],
       );
     },
     onError: (err) => {
@@ -79,7 +79,7 @@ export const MakeListingOfferScreen = ({ navigation, route }) => {
           'You can only have one negotiation going on this at a time.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'View it', onPress: () => navigation.replace('OfferDetail', { id: data.offer_id }) },
+            { text: 'View it', onPress: () => navigation.replace('ListingOfferDetail', { id: data.offer_id }) },
           ],
         );
         return;
@@ -189,7 +189,7 @@ export const MyOffersScreen = ({ navigation }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.offerRow}
-              onPress={() => navigation.navigate('OfferDetail', { id: item.id })}
+              onPress={() => navigation.navigate('ListingOfferDetail', { id: item.id })}
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.offerStatus}>{statusLabel(item.status)}</Text>
@@ -239,7 +239,7 @@ function timeUntil(dateStr) {
 // ============================================================
 // OFFER DETAIL — counter/accept/reject/withdraw + checkout
 // ============================================================
-export const OfferDetailScreen = ({ navigation, route }) => {
+export const ListingOfferDetailScreen = ({ navigation, route }) => {
   const { id } = route.params;
   const qc = useQueryClient();
   const [counterAmount, setCounterAmount] = useState('');
