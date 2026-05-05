@@ -719,6 +719,14 @@ export const listingsApi = {
   myAnalytics: () => api.get('/listings/mine/analytics').then((r) => r.data),
 };
 
+// Saved buyer addresses.
+export const addressesApi = {
+  list: () => api.get('/addresses').then((r) => r.data),
+  create: (body) => api.post('/addresses', body).then((r) => r.data),
+  update: (id, body) => api.patch(`/addresses/${id}`, body).then((r) => r.data),
+  remove: (id) => api.delete(`/addresses/${id}`).then((r) => r.data),
+};
+
 // Marketplace bootstrap (M-H)
 export const marketplaceBootstrapApi = {
   fromInventory: (body) =>

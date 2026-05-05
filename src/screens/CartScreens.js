@@ -4,7 +4,7 @@
 //   CartDetailScreen — a single cart's items + checkout button
 //   CheckoutScreen — shipping picker, payment picker, place order
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
   ScrollView, Alert, TextInput, RefreshControl, Linking,
@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
-import { cartApi, checkoutApi, walletApi } from '../services/api';
+import { cartApi, checkoutApi, walletApi, addressesApi } from '../services/api';
 import { Button, ScreenHeader, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -173,6 +173,33 @@ export const CheckoutScreen = ({ navigation, route }) => {
   const [shipTo, setShipTo] = useState({
     name: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'US',
   });
+  const [addressId, setAddressId] = useState(null);
+
+  // Pull saved addresses; auto-fill default on first load.
+  const { data: addressesData } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => addressesApi.list(),
+  });
+  const savedAddresses = addressesData?.addresses || [];
+
+  useEffect(() => {
+    if (!addressId && savedAddresses.length > 0) {
+      const def = savedAddresses.find((a) => a.is_default) || savedAddresses[0];
+      setAddressId(def.id);
+      setShipTo({
+        name: def.name, line1: def.line1, line2: def.line2 || '',
+        city: def.city, state: def.state, zip: def.zip, country: def.country || 'US',
+      });
+    }
+  }, [savedAddresses.length, addressId]);
+
+  const pickAddress = (addr) => {
+    setAddressId(addr.id);
+    setShipTo({
+      name: addr.name, line1: addr.line1, line2: addr.line2 || '',
+      city: addr.city, state: addr.state, zip: addr.zip, country: addr.country || 'US',
+    });
+  };
 
   // Pull wallet balance to show pay-with-wallet option.
   const { data: wallet } = useQuery({
@@ -322,7 +349,35 @@ export const CheckoutScreen = ({ navigation, route }) => {
 
         {/* Address */}
         <Text style={styles.sectionLabel}>SHIP TO</Text>
-        <AddressForm value={shipTo} onChange={setShipTo} />
+        {savedAddresses.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
+            {savedAddresses.map((a) => {
+              const sel = addressId === a.id;
+              return (
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => pickAddress(a)}
+                  style={[styles.savedAddrChip, sel && styles.savedAddrChipActive]}
+                >
+                  <Text style={[styles.savedAddrLabel, sel && { color: Colors.bg }]}>
+                    {a.label || (a.is_default ? 'Default' : a.zip)}
+                  </Text>
+                  <Text style={[styles.savedAddrCity, sel && { color: 'rgba(0,0,0,0.7)' }]}>
+                    {a.city}, {a.state}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AddressForm', {})}
+              style={[styles.savedAddrChip, { borderStyle: 'dashed' }]}
+            >
+              <Text style={styles.savedAddrLabel}>+ New</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+        <AddressForm value={shipTo} onChange={(next) => { setShipTo(next); setAddressId(null); }} />
 
         {/* Payment */}
         <Text style={styles.sectionLabel}>PAYMENT</Text>
@@ -538,4 +593,12 @@ const styles = StyleSheet.create({
     padding: Spacing.md, backgroundColor: Colors.surface,
     borderTopWidth: 1, borderTopColor: Colors.border,
   },
+
+  savedAddrChip: {
+    backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.sm,
+    minWidth: 110, borderWidth: 1, borderColor: Colors.border,
+  },
+  savedAddrChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  savedAddrLabel: { color: Colors.text, fontSize: 12, fontWeight: '600' },
+  savedAddrCity: { color: Colors.textMuted, fontSize: 11, marginTop: 2 },
 });
