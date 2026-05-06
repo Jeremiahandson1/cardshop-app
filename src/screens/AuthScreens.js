@@ -249,10 +249,6 @@ export const RegisterScreen = ({ navigation }) => {
       }
     }
     form.date_of_birth = isoDob;
-    if (age < 13) {
-      setError('You must be at least 13 years old to use Card Shop.');
-      return;
-    }
     if (!agreed) {
       setError('You must agree to the Terms of Service and Privacy Policy.');
       return;
