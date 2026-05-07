@@ -18,6 +18,7 @@ import { Colors, Typography } from '../theme';
 
 // Screens
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
+import { HomeHubScreen } from '../screens/HomeHubScreen';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
@@ -130,6 +131,7 @@ const TabNavigator = () => {
 
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -149,6 +151,17 @@ const TabNavigator = () => {
         },
       }}
     >
+      {/* Home is the mode picker — three tiles for Show Floor /
+          Collection / Local LCS. First thing the user sees on
+          launch so they pick their lens before being confronted
+          with the full surface area. */}
+      <Tab.Screen
+        name="Home"
+        component={HomeHubScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+        }}
+      />
       {/* Binders is THE home for cards. Every card auto-files into
           a Default binder (migration 033), so there's no separate
           "Collection" — the binders ARE the collection.
