@@ -14,6 +14,11 @@ const API_URL =
 // localhost — typically means EXPO_PUBLIC_API_URL is missing from the
 // EAS profile AND app.json's extra.API_URL was emptied. Without this
 // the entire app silently 404s and looks like a backend outage.
+// Bare API URL (no /api prefix) — used by features that open a
+// browser tab against an API endpoint mounted at the root, like
+// the printable QR sticker sheet at /api/qr/my-stickers/sheet.
+export const API_BASE_URL = API_URL;
+
 if (!__DEV__ && API_URL.includes('localhost')) {
   console.error(
     '[api] PRODUCTION BUILD POINTING AT LOCALHOST. ' +

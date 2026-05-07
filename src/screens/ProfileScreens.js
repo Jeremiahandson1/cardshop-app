@@ -10,7 +10,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { showMessage } from 'react-native-flash-message';
 import * as Updates from 'expo-updates';
-import { wantListApi, authApi, notificationsApi } from '../services/api';
+import { wantListApi, authApi, notificationsApi, API_BASE_URL } from '../services/api';
+import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -99,6 +100,30 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'flash-outline', label: 'Show Floor — live now', onPress: () => navigation.navigate('ShowFloorHub') },
         { icon: 'storefront-outline', label: 'Case Mode (per card)', onPress: () => navigation.navigate('CaseMode') },
         { icon: 'pricetag-outline', label: 'Order stickers', onPress: () => navigation.navigate('OrderStickers') },
+        { icon: 'print-outline', label: 'Reprint my stickers', onPress: async () => {
+          // Opens an HTML print sheet with new URL-format QRs for
+          // every sticker the user has attached. Existing bare-code
+          // stickers don't work in stock phone cameras; reprinting
+          // these and swapping them on the cards migrates the
+          // install. Auth via ?token= since browser tabs don't
+          // carry the Authorization header.
+          try {
+            const token = await SecureStore.getItemAsync('access_token');
+            if (!token) {
+              Alert.alert('Sign in required', 'Please sign in again to load your sticker sheet.');
+              return;
+            }
+            const url = `${API_BASE_URL}/api/qr/my-stickers/sheet?token=${encodeURIComponent(token)}`;
+            const can = await Linking.canOpenURL(url);
+            if (!can) {
+              Alert.alert('Cannot open browser', 'Unable to open the print page on this device.');
+              return;
+            }
+            await Linking.openURL(url);
+          } catch (err) {
+            Alert.alert('Failed to open', err?.message || 'unknown error');
+          }
+        } },
         { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
