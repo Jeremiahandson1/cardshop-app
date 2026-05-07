@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { qrApi } from '../services/api';
+import { qrApi, cardsApi } from '../services/api';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { Button } from '../components/ui';
 
@@ -15,21 +15,51 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const scanGuardRef = useRef(false);
-  const mode = route?.params?.mode || 'register'; // 'register' | 'lookup'
+  const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
+  const cardIdToAttach = route?.params?.cardId || null;
 
-  const handleBarCodeScanned = async ({ data }) => {
+  const handleBarCodeScanned = async (event) => {
     if (scanGuardRef.current) return;
     scanGuardRef.current = true;
 
-    // Extract code from deep link: cardshop://card/UUID
-    let code = data;
-    if (data.includes('cardshop://card/')) {
-      code = data.replace('cardshop://card/', '');
+    // Defensive: barcode scanner sometimes hands back odd shapes
+    // (numeric, buffer, missing data). Coerce to string and bail
+    // gracefully if there's nothing usable.
+    let data = '';
+    try {
+      data = String(event?.data ?? '');
+    } catch {
+      data = '';
     }
+    if (!data) {
+      Alert.alert('Scan failed', 'No data read from QR code. Try again.');
+      scanGuardRef.current = false;
+      return;
+    }
+
+    // QR payloads we accept:
+    //   - bare 8-char short code           "ABCD1234"
+    //   - bare UUID                        "550e8400-e29b-..."
+    //   - app deep link                    "cardshop://card/<id>"
+    //   - public web URL (new format)      "https://.../c/<short_code>"
+    // The web URL is what stock phone cameras actually dispatch on,
+    // so existing stickers keep working AND newly-printed stickers
+    // can be scanned by anyone.
+    let code = data;
+    const cardshopMatch = /cardshop:\/\/(?:card|c)\/([A-Za-z0-9-]+)/.exec(data);
+    const httpsMatch    = /https?:\/\/[^/]+\/c\/([A-Za-z0-9-]+)/.exec(data);
+    if (httpsMatch)         code = httpsMatch[1];
+    else if (cardshopMatch) code = cardshopMatch[1];
 
     setScanned(true);
     setScanning(true);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Haptics is best-effort. If the module isn't available
+    // (rare native bundling edge case), don't crash the scan flow.
+    try {
+      if (Haptics?.notificationAsync) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch { /* ignore */ }
 
     const resetScanner = () => {
       setScanned(false);
@@ -58,7 +88,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
         if (insert.owned_card_id) {
           actions.unshift({
             text: 'View current card',
-            onPress: () => navigation.replace('CardDetail', { cardId: insert.owned_card_id }),
+            onPress: () => navigation.navigate('CardDetail', { cardId: insert.owned_card_id }),
           });
         }
         Alert.alert(
@@ -70,20 +100,93 @@ export const QRScannerScreen = ({ navigation, route }) => {
         return;
       }
 
+      if (mode === 'attach') {
+        if (!cardIdToAttach) {
+          Alert.alert('Attach failed', 'No card ID provided to attach the QR to.');
+          resetScanner();
+          return;
+        }
+        if (insert.status !== 'unregistered') {
+          Alert.alert(
+            'Sticker already used',
+            'This QR sticker is already attached to a card. Use a fresh sticker.',
+          );
+          resetScanner();
+          return;
+        }
+        try {
+          await cardsApi.update(cardIdToAttach, { qr_insert_code: code });
+          try {
+            if (Haptics?.notificationAsync) {
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+          } catch { /* ignore */ }
+          Alert.alert(
+            'Sticker attached',
+            'This QR is now linked to your card. Scan it any time to view, transfer, or verify ownership.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }],
+          );
+        } catch (err) {
+          const code = err?.response?.data?.code;
+          const msg = err?.response?.data?.error || 'Could not attach the sticker.';
+          Alert.alert(
+            code === 'qr_already_attached' ? 'Card already has a sticker' : 'Attach failed',
+            msg,
+          );
+          resetScanner();
+        }
+        return;
+      }
+
+      // Hide the "Scanning..." indicator before navigate so it
+      // doesn't look stuck. Keep `scanned: true` so the camera
+      // stays paused — if the navigate silently no-ops we don't
+      // want it re-firing on the same code in an infinite loop.
+      // The Scan tab uses QRScannerScreen directly as the tab
+      // content (no stack wrapper). When the user enters from the
+      // bottom Scan tab, our navigation prop is the bottom-tab
+      // navigator — it can only see sibling tabs (Binders, Trade,
+      // LCS, Profile), not the screens nested inside them. So
+      // `navigate('CardDetail')` from here silently no-ops.
+      //
+      // The fix is the tab/stack nested-navigation form:
+      //   navigation.navigate('Binders', { screen: 'CardDetail', params: {...} })
+      // which switches to the Binders tab AND tells its stack to
+      // push CardDetail. CardDetail/RegisterCard/InitiateTransfer
+      // all live in BinderStack so we route everything through it.
+      const goNavigate = (name, params) => {
+        setScanning(false);
+        try {
+          const state = navigation.getState?.();
+          const currentRoutes = state?.routes?.map((r) => r.name) || [];
+          // If we're at the tab-root level (current stack contains
+          // the tab names), route via the Binders stack which holds
+          // the target screens. Otherwise we're inside a stack
+          // already and a direct navigate works.
+          const isTabRoot = currentRoutes.includes('Binders') && currentRoutes.includes('Profile');
+          if (isTabRoot) {
+            navigation.navigate('Binders', { screen: name, params });
+          } else {
+            navigation.navigate(name, params);
+          }
+        } catch (e) {
+          Alert.alert('Navigation failed', e?.message || 'unknown');
+          resetScanner();
+        }
+      };
+
       if (mode === 'register') {
         if (insert.status === 'unregistered') {
-          // Navigate to registration flow with this code
-          navigation.replace('RegisterCard', { qrCode: code });
+          goNavigate('RegisterCard', { qrCode: code });
         } else if (insert.owned_card_id) {
-          // Show the card this QR is tied to
-          navigation.replace('CardDetail', { cardId: insert.owned_card_id });
+          goNavigate('CardDetail', { cardId: insert.owned_card_id });
         } else {
           Alert.alert('Already Registered', 'This QR insert has already been used but the card is no longer available.');
           resetScanner();
         }
       } else if (mode === 'transfer') {
         if (insert.owned_card_id) {
-          navigation.replace('InitiateTransfer', { cardId: insert.owned_card_id });
+          goNavigate('InitiateTransfer', { cardId: insert.owned_card_id });
         } else {
           Alert.alert('Not Registered', 'This card has not been registered yet.');
           resetScanner();
@@ -91,17 +194,31 @@ export const QRScannerScreen = ({ navigation, route }) => {
       } else {
         // Just lookup
         if (insert.owned_card_id) {
-          navigation.replace('CardDetail', { cardId: insert.owned_card_id });
+          goNavigate('CardDetail', { cardId: insert.owned_card_id });
         } else {
           Alert.alert('Unregistered', 'This QR insert has not been registered to a card yet.', [
-            { text: 'Register It', onPress: () => navigation.replace('RegisterCard', { qrCode: code }) },
+            { text: 'Register It', onPress: () => goNavigate('RegisterCard', { qrCode: code }) },
             { text: 'Cancel', onPress: resetScanner, style: 'cancel' },
           ]);
           setScanning(false);
         }
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to look up QR code');
+      const url = err?.config?.baseURL || err?.config?.url || '?';
+      const status = err?.response?.status || 'no_response';
+      const msg = err?.response?.data?.error || err?.message || 'unknown';
+      // First 4 lines of stack trace — pinpoints which line in the
+      // scanner is actually throwing. Strip file:// prefixes so the
+      // alert is readable on a phone screen.
+      const stack = (err?.stack || '')
+        .split('\n')
+        .slice(0, 4)
+        .map((s) => s.trim().replace(/file:\/\/[^/]+\//, ''))
+        .join('\n');
+      Alert.alert(
+        'Scan failed',
+        `data="${data.slice(0, 60)}"\ncode="${code.slice(0, 60)}"\nmode=${mode}\n\n${msg}\nstatus=${status}\nurl=${url}\n\nstack:\n${stack}`,
+      );
       setScanned(false);
       setScanning(false);
       scanGuardRef.current = false;
@@ -141,7 +258,10 @@ export const QRScannerScreen = ({ navigation, route }) => {
               <Ionicons name="close" size={24} color={Colors.text} />
             </TouchableOpacity>
             <Text style={styles.topTitle}>
-              {mode === 'register' ? 'Scan QR Insert' : mode === 'transfer' ? 'Scan to Transfer' : 'Scan Card'}
+              {mode === 'register' ? 'Scan QR Insert'
+                : mode === 'transfer' ? 'Scan to Transfer'
+                : mode === 'attach' ? 'Attach Sticker'
+                : 'Scan Card'}
             </Text>
             <View style={{ width: 40 }} />
           </View>
@@ -165,7 +285,11 @@ export const QRScannerScreen = ({ navigation, route }) => {
               </View>
             )}
           </View>
-          <Text style={styles.hint}>Point at the QR code on your card insert</Text>
+          {/* Hide the bottom hint once a scan completes — it covers
+              up React Native LogBox warnings that surface there. */}
+          {!scanned ? (
+            <Text style={styles.hint}>Point at the QR code on your card insert</Text>
+          ) : null}
         </View>
 
         {/* Bottom actions */}
