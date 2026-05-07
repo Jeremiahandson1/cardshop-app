@@ -90,7 +90,14 @@ export const SetsListScreen = ({ navigation }) => {
           <EmptyState
             icon="📋"
             title="No sets tracked yet"
-            message="Tap “Add set” to pick the releases you actually collect. Completion % updates as you register cards."
+            message="Pick the releases you actually collect. Completion % updates automatically as you register cards."
+            action={
+              <Button
+                title="Add a set"
+                onPress={() => navigation.navigate('BrowseSets')}
+                icon={<Ionicons name="add" size={16} color={Colors.bg} />}
+              />
+            }
           />
         }
       />
