@@ -24,8 +24,10 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 // ============================================================
 
 export const ShowFloorHubScreen = ({ navigation }) => {
-  const [tab, setTab] = useState('events'); // 'events' | 'live'
-  const [stateFilter, setStateFilter] = useState(''); // '' = nationwide
+  // Two-mode hub: "I'm selling at a show" vs "I'm shopping a show".
+  // Picking either lands the user in a focused flow. No tabs, no
+  // state filter, no nationwide collector feed — those live one
+  // tap away on the "Browse" link if needed.
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
@@ -34,9 +36,9 @@ export const ShowFloorHubScreen = ({ navigation }) => {
     queryFn: () => showFloorApi.me().then((r) => r.data),
   });
 
-  const { data: liveData, isLoading: liveLoading, refetch: refetchLive } = useQuery({
-    queryKey: ['show-floor-live', stateFilter],
-    queryFn: () => showFloorApi.live(stateFilter ? { state: stateFilter } : {}).then((r) => r.data),
+  const { data: liveData, refetch: refetchLive } = useQuery({
+    queryKey: ['show-floor-live', ''],
+    queryFn: () => showFloorApi.live({}).then((r) => r.data),
   });
 
   const { data: myLiveCards } = useQuery({
@@ -160,103 +162,60 @@ export const ShowFloorHubScreen = ({ navigation }) => {
         )}
       </View>
 
-      {/* Geo filter — empty = everywhere */}
-      <View style={styles.filterRow}>
-        <Text style={styles.filterLabel}>Show:</Text>
+      {/* Two big tiles: sell vs shop. Selling tile changes wording
+          when the user is already checked in (manage booth). Shop
+          tile always opens to the event picker. */}
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
         <TouchableOpacity
-          style={[styles.filterChip, !stateFilter && styles.filterChipOn]}
-          onPress={() => setStateFilter('')}
+          activeOpacity={0.85}
+          style={[styles.actionTile, { backgroundColor: 'rgba(232,197,71,0.10)', borderColor: 'rgba(232,197,71,0.45)' }]}
+          onPress={() => {
+            if (me) navigation.navigate('CaseMode');
+            else navigation.navigate('ShowFloorCheckIn');
+          }}
         >
-          <Text style={[styles.filterChipText, !stateFilter && styles.filterChipTextOn]}>Everywhere</Text>
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(232,197,71,0.20)' }]}>
+            <Ionicons name="storefront" size={28} color="#e8c547" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>
+              {me ? 'Manage my booth' : "I'm selling at a show"}
+            </Text>
+            <Text style={styles.actionSubtitle}>
+              {me ? 'Edit prices, swap cards on/off the floor' : 'Pick binders, set table number, go live'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
         </TouchableOpacity>
-        <TextInput
-          style={[styles.filterChip, { paddingHorizontal: 10, paddingVertical: 6, minWidth: 80, color: Colors.text }]}
-          value={stateFilter}
-          onChangeText={(v) => setStateFilter(v.toUpperCase().slice(0, 2))}
-          placeholder="State (e.g. MA)"
-          placeholderTextColor={Colors.textMuted}
-          autoCapitalize="characters"
-          maxLength={2}
-        />
-      </View>
 
-      <View style={styles.tabs}>
-        {[
-          { k: 'events', l: 'By event' },
-          { k: 'live', l: 'All collectors' },
-        ].map((t) => (
-          <TouchableOpacity
-            key={t.k}
-            style={[styles.tab, tab === t.k && styles.tabActive]}
-            onPress={() => setTab(t.k)}
-          >
-            <Text style={[styles.tabText, tab === t.k && styles.tabTextActive]}>{t.l}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.actionTile, { backgroundColor: 'rgba(125,211,252,0.10)', borderColor: 'rgba(125,211,252,0.40)' }]}
+          onPress={() => navigation.navigate('ShowFloorShop')}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(125,211,252,0.20)' }]}>
+            <Ionicons name="search" size={28} color="#7dd3fc" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>Shop a show</Text>
+            <Text style={styles.actionSubtitle}>
+              Search every seller's inventory at this show
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
 
-      {tab === 'live' ? (
-        liveLoading ? <LoadingScreen /> : (
-          <FlatList
-            data={checkIns}
-            keyExtractor={(c) => c.id}
-            contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
-            ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ShowFloorUser', { username: item.username })}
-                style={styles.userCard}
-              >
-                <View style={styles.avatarFallback}>
-                  {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                  ) : (
-                    <Text style={{ color: Colors.text, fontWeight: 'bold' }}>
-                      {(item.display_name || item.username || '?').slice(0, 1).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.userName}>@{item.username}</Text>
-                  <Text style={styles.userMeta} numberOfLines={1}>
-                    {item.event_name}
-                    {item.table_number ? ` · table ${item.table_number}` : ''}
-                  </Text>
-                  <Text style={styles.userCardCount}>{item.live_card_count} live card{item.live_card_count === 1 ? '' : 's'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={() => (
-              <EmptyState icon="storefront-outline" title="Nobody's live right now" message="When collectors check in to shows, they'll appear here." />
-            )}
-            refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetchLive(); refetchMe(); }} />}
-          />
-        )
-      ) : (
-        <FlatList
-          data={eventGroups}
-          keyExtractor={(e) => e.slug || e.name}
-          contentContainerStyle={{ padding: Spacing.base }}
-          ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ShowFloorEvent', { slug: item.slug })}
-              style={styles.eventCard}
-            >
-              <Text style={styles.eventName}>{item.name}</Text>
-              <Text style={styles.eventMeta}>
-                {item.city ? `${item.city}, ${item.state || ''}` : ''}
-                {item.city ? ' · ' : ''}
-                {item.count} collector{item.count === 1 ? '' : 's'} · {item.total_cards} card{item.total_cards === 1 ? '' : 's'} live
-              </Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={() => (
-            <EmptyState icon="calendar-outline" title="No active events" message="Check back during a show." />
-          )}
-        />
-      )}
+        {/* Optional secondary affordance — see who else is live */}
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.md, marginTop: Spacing.xs }}
+          onPress={() => navigation.navigate('ShowFloorShop')}
+        >
+          <Ionicons name="people-outline" size={16} color={Colors.textMuted} />
+          <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+            Browse all live sellers ({checkIns.length})
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -870,6 +829,20 @@ export const ShowFloorUserScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+  // New seller/shopper hub tiles
+  actionTile: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    padding: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1,
+  },
+  actionIcon: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actionTitle: {
+    fontFamily: Typography.display, fontSize: 18, fontWeight: '700',
+    color: Colors.text, marginBottom: 2,
+  },
+  actionSubtitle: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
   container: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -999,3 +972,144 @@ const carryoverStyles = StyleSheet.create({
   shipChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   shipChipText: { color: Colors.textMuted, fontSize: 11 },
 });
+
+// ============================================================
+// SHOP A SHOW — buyer-side screen. Two states:
+//   1. No event picked yet → list active events to choose from
+//   2. Event picked        → search inventory across all sellers
+//      at that event, with each card showing the table number to
+//      walk to.
+// ============================================================
+export const ShowFloorShopScreen = ({ navigation }) => {
+  const [pickedEvent, setPickedEvent] = useState(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
+
+  const { data: liveData, isLoading: liveLoading } = useQuery({
+    queryKey: ['show-floor-live-shop'],
+    queryFn: () => showFloorApi.live({}).then((r) => r.data),
+  });
+  const eventGroups = useMemo(() => {
+    const map = {};
+    for (const ci of (liveData?.check_ins || [])) {
+      const k = ci.event_slug || ci.event_name;
+      if (!map[k]) map[k] = { slug: ci.event_slug, name: ci.event_name, city: ci.venue_city, state: ci.venue_state, sellers: 0, total_cards: 0 };
+      map[k].sellers++;
+      map[k].total_cards += ci.live_card_count || 0;
+    }
+    return Object.values(map);
+  }, [liveData]);
+
+  const { data: inventoryData, isLoading: invLoading } = useQuery({
+    queryKey: ['show-floor-shop-inventory', pickedEvent?.slug, debouncedSearch],
+    queryFn: () => showFloorApi.eventInventory(pickedEvent.slug, { search: debouncedSearch || undefined, limit: 100 }).then((r) => r.data),
+    enabled: !!pickedEvent?.slug,
+  });
+
+  if (!pickedEvent) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Shop a show</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <Text style={[styles.intro, { padding: Spacing.base }]}>
+          Pick the show you're at. We'll search every live seller's inventory.
+        </Text>
+        {liveLoading ? <LoadingScreen /> : (
+          <FlatList
+            data={eventGroups}
+            keyExtractor={(e) => e.slug || e.name}
+            contentContainerStyle={{ padding: Spacing.base }}
+            ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+            renderItem={({ item }) => (
+              <TouchableOpacity onPress={() => setPickedEvent(item)} style={styles.eventCard}>
+                <Text style={styles.eventName}>{item.name}</Text>
+                <Text style={styles.eventMeta}>
+                  {item.city ? `${item.city}, ${item.state || ''} · ` : ''}
+                  {item.sellers} seller{item.sellers === 1 ? '' : 's'} · {item.total_cards} card{item.total_cards === 1 ? '' : 's'} live
+                </Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={() => (
+              <EmptyState icon="calendar-outline" title="No active shows" message="When sellers go live at a show, it'll appear here." />
+            )}
+          />
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  const inventory = inventoryData?.cards || [];
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setPickedEvent(null)}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>{pickedEvent.name}</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <View style={{ padding: Spacing.base, paddingBottom: Spacing.sm }}>
+        <Input
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by player, set, or parallel"
+          autoCapitalize="words"
+        />
+      </View>
+
+      {invLoading ? <LoadingScreen /> : (
+        <FlatList
+          data={inventory}
+          keyExtractor={(c) => c.id}
+          contentContainerStyle={{ padding: Spacing.base, paddingTop: 0, paddingBottom: 80 }}
+          ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+          renderItem={({ item }) => {
+            const img = item.image_front_url || (Array.isArray(item.photo_urls) ? item.photo_urls[0] : null) || item.catalog_image;
+            return (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ShowFloorUser', { username: item.owner_username })}
+                style={styles.userCard}
+              >
+                {img ? (
+                  <Image source={{ uri: img }} style={{ width: 44, height: 60, borderRadius: 4, backgroundColor: Colors.surface2 }} resizeMode="contain" />
+                ) : (
+                  <View style={{ width: 44, height: 60, borderRadius: 4, backgroundColor: Colors.surface2 }} />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userName} numberOfLines={1}>
+                    {item.player_name || '(unnamed)'}
+                  </Text>
+                  <Text style={styles.userMeta} numberOfLines={1}>
+                    {[item.year, item.set_name, item.parallel].filter(Boolean).join(' · ')}
+                    {item.card_number ? ` · #${item.card_number}` : ''}
+                  </Text>
+                  <Text style={styles.userCardCount}>
+                    @{item.owner_username}
+                    {item.owner_table ? ` · table ${item.owner_table}` : ''}
+                    {item.display_asking_price ? ` · $${Number(item.display_asking_price).toFixed(2)}` : ''}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              </TouchableOpacity>
+            );
+          }}
+          ListEmptyComponent={() => (
+            <EmptyState
+              icon="search-outline"
+              title={search ? 'No matches' : 'No live cards yet'}
+              message={search ? 'Try a different player or set.' : 'Sellers haven\'t put any cards on the floor yet.'}
+            />
+          )}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
