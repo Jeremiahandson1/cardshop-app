@@ -58,7 +58,22 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config || {};
-    const is401 = error.response?.status === 401;
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+
+    // 402 Show-Floor required → bounce to the upsell explainer
+    // instead of letting screens render a generic "subscription
+    // required" toast. Pull navigationRef lazily to avoid a
+    // require-cycle with the navigation module.
+    if (status === 402 && code === 'show_floor_required') {
+      try {
+        const { safeNavigate } = require('../lib/navigationRef');
+        safeNavigate('Profile', { screen: 'ShowFloorUpsell' });
+      } catch (_e) { /* nav unavailable, screen will handle */ }
+      return Promise.reject(error);
+    }
+
+    const is401 = status === 401;
     if (!is401 || original._retry) return Promise.reject(error);
 
     const url = String(original.url || '');

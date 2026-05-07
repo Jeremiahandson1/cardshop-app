@@ -484,9 +484,10 @@ const linkingConfig = {
 // ============================================================
 // ROOT NAVIGATOR
 // ============================================================
+import { navigationRef } from '../lib/navigationRef';
+
 export const RootNavigator = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const navigationRef = useRef(null);
   // Onboarding is a top-level Modal overlay, NOT a stack screen.
   // Stack-screen onboarding lived in Profile and persisted in
   // that tab's history — switching tabs and coming back showed

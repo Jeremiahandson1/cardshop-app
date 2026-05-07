@@ -276,10 +276,17 @@ export const ProfileScreen = ({ navigation }) => {
                 // Pro yet?" verification.
                 const refreshed = await useAuthStore.getState().refreshUser();
                 if (refreshed) {
+                  const tierLabel = (() => {
+                    switch (refreshed.subscription_tier) {
+                      case 'collector_pro':  return 'Collector Pro is active.';
+                      case 'show_floor':     return 'Show Floor is active.';
+                      case 'store_starter':  return 'Store plan is active.';
+                      case 'store_pro':      return 'Store Pro is active.';
+                      default:               return 'Still on free plan.';
+                    }
+                  })();
                   showMessage({
-                    message: refreshed.subscription_tier && refreshed.subscription_tier !== 'free'
-                      ? 'Pro is active.'
-                      : 'Still on free plan.',
+                    message: tierLabel,
                     type: 'info',
                     icon: 'info',
                     duration: 1800,
@@ -288,7 +295,15 @@ export const ProfileScreen = ({ navigation }) => {
               }}
             >
               <Text style={[styles.statValue, { color: Colors.accent }]}>
-                {user?.subscription_tier === 'free' || !user?.subscription_tier ? 'Free' : 'Pro'}
+                {(() => {
+                  switch (user?.subscription_tier) {
+                    case 'collector_pro':  return 'Pro';
+                    case 'show_floor':     return 'Show Floor';
+                    case 'store_starter':  return 'Store';
+                    case 'store_pro':      return 'Store Pro';
+                    default:               return 'Free';
+                  }
+                })()}
               </Text>
               <Text style={styles.statLabel}>Plan</Text>
             </TouchableOpacity>

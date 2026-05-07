@@ -34,19 +34,45 @@ import {
   restorePurchases,
 } from '../lib/revenuecat';
 
-const FEATURES = [
-  { icon: 'sparkles-outline', title: 'Collection Intelligence', desc: 'Blended values, trend + liquidity signals on every card.' },
-  { icon: 'pulse-outline',     title: 'Deal Radar',              desc: 'Custom alerts when a card on your want list hits below market.' },
-  { icon: 'albums-outline',    title: 'Unlimited binders',       desc: 'No cap on showcase binders, plus timed and show-floor link types.' },
-  { icon: 'analytics-outline', title: 'Per-binder analytics',    desc: 'Views, offers, conversion — see which binders work.' },
-  { icon: 'time-outline',      title: 'Price history',           desc: 'Full sold history on every card you own.' },
-];
+const TIER_DEFS = {
+  collector_pro: {
+    label: 'Collector Pro',
+    fallbackPrice: '$9.99/mo',
+    blurb: 'Power-user collection tools — search, alerts, unlimited binders.',
+    features: [
+      { icon: 'albums-outline',    title: 'Unlimited binders + sections',  desc: 'No cap on binders. Showcase, timed, and trade-board link types.' },
+      { icon: 'pulse-outline',     title: 'Deal Radar',                    desc: 'Push alerts when a want-list card hits below market.' },
+      { icon: 'sparkles-outline',  title: 'Collection Intelligence',       desc: 'Blended values, trend + liquidity signals on every card.' },
+      { icon: 'analytics-outline', title: 'Per-binder analytics',          desc: 'Views, offers, conversion — see which binders work.' },
+      { icon: 'time-outline',      title: 'Full price history',            desc: 'Sold history on every card you own.' },
+    ],
+  },
+  show_floor: {
+    label: 'Show Floor',
+    fallbackPrice: '$14.99/mo',
+    blurb: 'Everything in Collector Pro, plus the show-event experience.',
+    features: [
+      { icon: 'storefront-outline', title: 'Live booth at any show',        desc: 'Pick binders, set table number, go live. Buyers walk to your table.' },
+      { icon: 'pricetag-outline',   title: 'Show prices set once',          desc: 'Each card\'s show-floor price auto-applies whenever you go live.' },
+      { icon: 'qr-code-outline',    title: 'Stock-camera QR stickers',      desc: 'Any phone can scan your case — no app required for buyers.' },
+      { icon: 'search-outline',     title: 'Buyer search across the floor', desc: 'Buyers search every live seller\'s inventory at the show in one place.' },
+      { icon: 'sparkles-outline',   title: 'Includes everything in Pro',    desc: 'Binders, deal radar, analytics, full price history.' },
+    ],
+  },
+};
 
-export const UpgradeScreen = ({ navigation }) => {
+export const UpgradeScreen = ({ navigation, route }) => {
   const qc = useQueryClient();
   const [opening, setOpening] = useState(false);
   const [offering, setOffering] = useState(null);
   const [offeringLoading, setOfferingLoading] = useState(true);
+  // Picked tier — defaults to whatever the caller passed via route
+  // params, then falls back to collector_pro. Most users land here
+  // from the home picker's Show Floor upsell so respecting that
+  // hint avoids an extra tap.
+  const [selectedTier, setSelectedTier] = useState(
+    route?.params?.tier === 'show_floor' ? 'show_floor' : 'collector_pro',
+  );
 
   const { data: status, isLoading } = useQuery({
     queryKey: ['billing-status'],
@@ -198,21 +224,37 @@ export const UpgradeScreen = ({ navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 120 }}>
-        <View style={styles.hero}>
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>PRO</Text>
-          </View>
-          <Text style={styles.heroTitle}>Power-user tools for serious collectors.</Text>
-          <Text style={styles.heroSub}>
-            The trade board, transfers, and basic collection stay free for everyone.
-            Pro unlocks the data and the alerts.
-          </Text>
-          {!offeringLoading ? (
-            <Text style={styles.priceLabel}>{localPrice}</Text>
-          ) : null}
+        {/* Tier toggle — Collector Pro vs Show Floor. Local LCS
+            is always free and isn't represented here. Stores have
+            their own dedicated onboarding flow elsewhere. */}
+        <View style={styles.tierToggle}>
+          {Object.entries(TIER_DEFS).map(([key, def]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.tierToggleBtn, selectedTier === key && styles.tierToggleBtnActive]}
+              onPress={() => setSelectedTier(key)}
+            >
+              <Text style={[styles.tierToggleText, selectedTier === key && styles.tierToggleTextActive]}>
+                {def.label}
+              </Text>
+              <Text style={[styles.tierToggleSub, selectedTier === key && styles.tierToggleSubActive]}>
+                {selectedTier === key && !offeringLoading ? localPrice : def.fallbackPrice}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {FEATURES.map((f) => (
+        <View style={styles.hero}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>{TIER_DEFS[selectedTier].label.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.heroTitle}>{TIER_DEFS[selectedTier].blurb}</Text>
+          <Text style={styles.heroSub}>
+            Local LCS finder is always free for everyone. Trade groups and basic collection stay free too.
+          </Text>
+        </View>
+
+        {TIER_DEFS[selectedTier].features.map((f) => (
           <View key={f.title} style={styles.featureRow}>
             <Ionicons name={f.icon} size={22} color={Colors.accent} style={{ marginTop: 2 }} />
             <View style={{ flex: 1 }}>
@@ -242,10 +284,10 @@ export const UpgradeScreen = ({ navigation }) => {
       </ScrollView>
 
       <View style={styles.submitBar}>
-        {isPro ? (
+        {isPro && status?.tier === selectedTier ? (
           <View style={{ alignItems: 'center' }}>
             <Text style={{ color: Colors.success, fontWeight: Typography.semibold, marginBottom: 4 }}>
-              You're on Pro · Thank you
+              You're on {TIER_DEFS[selectedTier].label} · Thank you
             </Text>
             {status?.current_period_end ? (
               <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
@@ -253,12 +295,22 @@ export const UpgradeScreen = ({ navigation }) => {
               </Text>
             ) : null}
           </View>
+        ) : selectedTier === 'show_floor' && !buttonReady ? (
+          // RevenueCat doesn't have the show_floor SKU yet. Don't
+          // pretend the button works — say so honestly. Comping
+          // via /admin/users tier dropdown is the workaround for
+          // testing in the meantime.
+          <Button
+            title="Show Floor · launching soon"
+            disabled
+            style={{ flex: 1 }}
+          />
         ) : (
           <Button
             title={
               !buttonReady
-                ? 'Notify me when Pro opens'
-                : `Start Pro · ${localPrice}`
+                ? `Notify me when ${TIER_DEFS[selectedTier].label} opens`
+                : `Start ${TIER_DEFS[selectedTier].label} · ${selectedTier === 'collector_pro' ? localPrice : TIER_DEFS[selectedTier].fallbackPrice}`
             }
             onPress={startCheckout}
             loading={opening}
@@ -293,6 +345,21 @@ const styles = StyleSheet.create({
     color: Colors.accent, fontSize: Typography.xl, fontWeight: Typography.bold,
     marginTop: Spacing.md,
   },
+  tierToggle: {
+    flexDirection: 'row', gap: Spacing.xs,
+    padding: 4, borderRadius: Radius.md,
+    backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border,
+    marginBottom: Spacing.lg,
+  },
+  tierToggleBtn: {
+    flex: 1, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm, alignItems: 'center', gap: 2,
+  },
+  tierToggleBtnActive: { backgroundColor: Colors.accent },
+  tierToggleText: { color: Colors.text, fontWeight: '700', fontSize: Typography.sm },
+  tierToggleTextActive: { color: Colors.bg },
+  tierToggleSub: { color: Colors.textMuted, fontSize: 11, fontVariant: ['tabular-nums'] },
+  tierToggleSubActive: { color: Colors.bg, opacity: 0.8 },
   featureRow: {
     flexDirection: 'row', gap: Spacing.md,
     backgroundColor: Colors.surface, borderRadius: Radius.md,
