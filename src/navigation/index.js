@@ -397,7 +397,13 @@ const LCSStack = () => (
 );
 
 const TradeStack = () => (
-  <TradeStackNav.Navigator screenOptions={screenOptions}>
+  <TradeStackNav.Navigator screenOptions={screenOptions} initialRouteName="TradeGroupsList">
+    {/* TradeBoardMain (the nearby/proximity trade board) was the
+        old entry point but proximity matching was unreliable in
+        practice. Local groups + search inside a group cover the
+        same use case more reliably. The screen + listing flows
+        stay registered so existing deep links (cardshop://trade)
+        still resolve, but the tab now opens to TradeGroupsList. */}
     <TradeStackNav.Screen name="TradeBoardMain" component={TradeBoardScreen} />
     <TradeStackNav.Screen name="TradeListingDetail" component={TradeListingDetailScreen} />
     <TradeStackNav.Screen name="CreateTradeListing" component={CreateTradeListingScreen} />
