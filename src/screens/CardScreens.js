@@ -1118,14 +1118,30 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               ↑ {scanReview.parallel_evidence}
             </Text>
           ) : null}
-          {scanReview.print_run ? (
-            <Input
-              label={`Numbered: ${scanReview.serial_number || '?'} / ${scanReview.print_run}`}
-              value={scanReview.serial_number || ''}
-              onChangeText={updateField('serial_number')}
-              keyboardType="number-pad"
-            />
-          ) : null}
+          {/* Always show serial-number + print-run inputs — OCR
+              often misses the "/N" stamp on numbered cards, and
+              hiding the field forced users to navigate back to
+              find it. Both fields are optional. */}
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Serial #"
+                value={scanReview.serial_number || ''}
+                onChangeText={updateField('serial_number')}
+                keyboardType="number-pad"
+                placeholder={scanReview.print_run ? '?' : 'optional'}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Print run (/N)"
+                value={scanReview.print_run ? String(scanReview.print_run) : ''}
+                onChangeText={updateField('print_run')}
+                keyboardType="number-pad"
+                placeholder="optional"
+              />
+            </View>
+          </View>
 
           {/* Catalog candidates from OCR — let the user pick if any matched */}
           {scanReview.candidates?.length ? (
@@ -1139,7 +1155,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   onPress={() => {
                     commitScanPhotos();
                     setSelectedCatalog(c);
-                    setStep(c.print_run ? 'serial' : 'details');
+                    setStep('serial');
                   }}
                   style={{
                     padding: Spacing.sm,
@@ -1199,7 +1215,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   );
                   if (exact) {
                     setSelectedCatalog(exact);
-                    setStep(exact.print_run ? 'serial' : 'details');
+                    setStep('serial');
                     return;
                   }
                 } catch { /* fall through to manual entry */ }
@@ -1327,7 +1343,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               // Route into the serial-number step when the resolved
               // card is numbered (/10, /25, …). Chain-of-custody
               // wants the specific copy recorded on the owned_card.
-              setStep(picked.print_run ? 'serial' : 'details');
+              setStep('serial');
               return;
             }
           } catch { /* fall through to manual entry if lookup fails */ }
@@ -1782,26 +1798,44 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             <View style={{ flex: 1 }}>
               <Text style={styles.catalogPlayer}>{selectedCatalog?.player_name}</Text>
               <Text style={styles.catalogSet}>
-                {selectedCatalog?.parallel || 'Base'} /{selectedCatalog?.print_run}
+                {selectedCatalog?.parallel || 'Base'}
+                {selectedCatalog?.print_run ? ` /${selectedCatalog.print_run}` : ''}
               </Text>
             </View>
           </View>
 
           <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
-            Which copy do you have? (e.g. 14 of {selectedCatalog?.print_run})
+            {selectedCatalog?.print_run
+              ? `Which copy do you have? (e.g. 14 of ${selectedCatalog.print_run})`
+              : "If your card is serial-numbered (e.g. #14/25), enter the numbers. Otherwise tap Skip."}
           </Text>
 
-          <Input
-            label="Serial Number"
-            value={form.serial_number}
-            onChangeText={set('serial_number')}
-            placeholder={`1-${selectedCatalog?.print_run || '?'}`}
-            keyboardType="number-pad"
-          />
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Serial #"
+                value={form.serial_number}
+                onChangeText={set('serial_number')}
+                placeholder={`1-${selectedCatalog?.print_run || '?'}`}
+                keyboardType="number-pad"
+              />
+            </View>
+            {!selectedCatalog?.print_run ? (
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Print run (/N)"
+                  value={form.print_run || ''}
+                  onChangeText={set('print_run')}
+                  placeholder="e.g. 25"
+                  keyboardType="number-pad"
+                />
+              </View>
+            ) : null}
+          </View>
 
-          {form.serial_number && selectedCatalog?.print_run && (
+          {form.serial_number && (selectedCatalog?.print_run || form.print_run) && (
             <View style={[styles.rookieTag, { alignSelf: 'flex-start' }]}>
-              <Text style={styles.rookieTagText}>#{form.serial_number}/{selectedCatalog.print_run}</Text>
+              <Text style={styles.rookieTagText}>#{form.serial_number}/{selectedCatalog?.print_run || form.print_run}</Text>
             </View>
           )}
 
@@ -1825,7 +1859,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => selectedCatalog?.print_run ? setStep('serial') : setStep('parallel')}>
+        <TouchableOpacity onPress={() => setStep('serial')}>
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Card Details</Text>
