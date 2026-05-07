@@ -74,6 +74,7 @@ import { StolenMatchReviewScreen } from '../screens/StolenMatchReviewScreen';
 import {
   ShowFloorHubScreen, ShowFloorCheckInScreen, ShowFloorEventScreen, ShowFloorUserScreen, ShowFloorShopScreen,
 } from '../screens/ShowFloorScreens';
+import { ManageBoothScreen } from '../screens/ManageBoothScreen';
 import { SetsListScreen, SetCompletionScreen, BrowseSetsScreen } from '../screens/SetCompletionScreens';
 import { HelpScreen, ReportStolenScreen, FirstTradeSafetyScreen } from '../screens/HelpScreens';
 import { DealRadarSettingsScreen } from '../screens/DealRadarSettingsScreen';
@@ -336,6 +337,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="ShowFloorEvent" component={ShowFloorEventScreen} />
     <ProfileStackNav.Screen name="ShowFloorUser" component={ShowFloorUserScreen} />
     <ProfileStackNav.Screen name="ShowFloorShop" component={ShowFloorShopScreen} />
+    <ProfileStackNav.Screen name="ManageBooth" component={ManageBoothScreen} />
     <ProfileStackNav.Screen name="DisputeList" component={DisputeListScreen} />
     <ProfileStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
     <ProfileStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />

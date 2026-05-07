@@ -102,65 +102,22 @@ export const ShowFloorHubScreen = ({ navigation }) => {
         <View style={{ width: 22 }} />
       </View>
 
-      {/* Top card: my check-in status */}
-      <View style={styles.meCard}>
-        {me ? (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={styles.liveDot} />
-              <Text style={styles.meLive}>You're live at {me.event_name}</Text>
-            </View>
-            <Text style={styles.meMeta}>
-              {me.venue_name ? `${me.venue_name} · ` : ''}
-              {me.table_number ? `Table ${me.table_number} · ` : ''}
-              ends {new Date(me.ends_at).toLocaleString()}
-            </Text>
-            <Text style={[styles.meMeta, { color: Colors.accent, fontWeight: Typography.semibold, marginTop: 4 }]}>
-              {liveCardCount} card{liveCardCount === 1 ? '' : 's'} on the floor
-            </Text>
-            <View style={{ flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.sm, flexWrap: 'wrap' }}>
-              <Button
-                title="View my session"
-                variant="secondary"
-                onPress={() => navigation.navigate('ShowFloorUser', { username: user?.username })}
-                style={{ flex: 1, minWidth: 120 }}
-              />
-              <Button
-                title="Manage cards"
-                variant="secondary"
-                onPress={() => navigation.navigate('CaseMode')}
-                style={{ flex: 1, minWidth: 120 }}
-              />
-            </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.xs }}>
-              <Button
-                title="Share session"
-                variant="ghost"
-                onPress={shareSession}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title="Check out"
-                variant="ghost"
-                onPress={() => Alert.alert('End session?', 'Take all your cards off the floor.', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'End', style: 'destructive', onPress: () => checkOutMut.mutate() },
-                ])}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={styles.meIdle}>You're not at a show right now.</Text>
-            <Button
-              title="Check in to a show"
-              onPress={() => navigation.navigate('ShowFloorCheckIn')}
-              style={{ marginTop: Spacing.sm }}
-            />
-          </>
-        )}
-      </View>
+      {/* Top card: compact check-in status. The action buttons
+          previously here (View, Manage, Share, Check out) all moved
+          into ManageBooth — the "Manage my booth" tile below is the
+          single primary CTA when live. */}
+      {me ? (
+        <View style={styles.meCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.liveDot} />
+            <Text style={styles.meLive}>You're live at {me.event_name}</Text>
+          </View>
+          <Text style={styles.meMeta}>
+            {me.table_number ? `Table ${me.table_number} · ` : ''}
+            {liveCardCount} card{liveCardCount === 1 ? '' : 's'} on the floor
+          </Text>
+        </View>
+      ) : null}
 
       {/* Two big tiles: sell vs shop. Selling tile changes wording
           when the user is already checked in (manage booth). Shop
@@ -170,7 +127,7 @@ export const ShowFloorHubScreen = ({ navigation }) => {
           activeOpacity={0.85}
           style={[styles.actionTile, { backgroundColor: 'rgba(232,197,71,0.10)', borderColor: 'rgba(232,197,71,0.45)' }]}
           onPress={() => {
-            if (me) navigation.navigate('CaseMode');
+            if (me) navigation.navigate('ManageBooth');
             else navigation.navigate('ShowFloorCheckIn');
           }}
         >
