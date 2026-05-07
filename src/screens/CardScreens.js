@@ -3078,33 +3078,62 @@ export const CardDetailScreen = ({ navigation, route }) => {
             )
           ) : null}
 
-          {/* Message Owner — only when a non-owner is viewing
-              this card. Opens (or resumes) the card-scoped chat
-              thread. Owners see the Transfer button below instead. */}
+          {/* Non-owner CTA. Two modes:
+                a) Card is in active display mode (owner is live at
+                   a show) → "in person only" copy with the table
+                   number. We deliberately don't surface remote
+                   messaging here — show transactions are in-person.
+                b) Otherwise → opens the card-scoped chat thread. */}
           {card.owner_id && currentUserId && card.owner_id !== currentUserId ? (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Conversation', {
-                startWith: {
-                  to_user_id: card.owner_id,
-                  to_username: card.owner_username,
-                  owned_card_id: card.id,
-                },
-                otherName: card.owner_display_name || card.owner_username,
-                otherUsername: card.owner_username,
-                ownedCardId: card.id,
-                cardTitle: `${card.year} ${card.set_name}`,
-              })}
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
-                borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
-              }}
-            >
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.accent} />
-              <Text style={{ color: Colors.accent, fontWeight: '600' }}>
-                Message {card.owner_display_name || card.owner_username}
-              </Text>
-            </TouchableOpacity>
+            card.display_mode_enabled
+              && (!card.display_mode_expires_at || new Date(card.display_mode_expires_at) > new Date())
+              ? (
+                <View style={{
+                  marginTop: Spacing.md,
+                  padding: Spacing.md,
+                  borderRadius: Radius.md,
+                  borderWidth: 1,
+                  borderColor: 'rgba(232,197,71,0.45)',
+                  backgroundColor: 'rgba(232,197,71,0.10)',
+                  gap: 4,
+                }}>
+                  <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>
+                    LIVE AT A SHOW
+                  </Text>
+                  <Text style={{ color: Colors.text, fontWeight: '600' }}>
+                    {card.show_check_in?.table_number
+                      ? `Find @${card.owner_username} at Table ${card.show_check_in.table_number}`
+                      : `@${card.owner_username} is at ${card.show_check_in?.event_name || 'a show'}`}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
+                    Show-floor sales are in-person only — walk to the table to make an offer.
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Conversation', {
+                    startWith: {
+                      to_user_id: card.owner_id,
+                      to_username: card.owner_username,
+                      owned_card_id: card.id,
+                    },
+                    otherName: card.owner_display_name || card.owner_username,
+                    otherUsername: card.owner_username,
+                    ownedCardId: card.id,
+                    cardTitle: `${card.year} ${card.set_name}`,
+                  })}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                    gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+                  }}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontWeight: '600' }}>
+                    Message {card.owner_display_name || card.owner_username}
+                  </Text>
+                </TouchableOpacity>
+              )
           ) : null}
 
           {/* "This is my card" counter-claim — graded cards only,
