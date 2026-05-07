@@ -1193,11 +1193,27 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                 parallel: scanReview.parallel || cascade.parallel,
               };
               setCascade(newCascade);
+              // Carry serial_number + print_run forward into the
+              // grading/details form so the serial step pre-fills
+              // (or skips entirely if already complete) instead of
+              // making the user enter the same numbers twice.
+              if (scanReview.serial_number || scanReview.print_run) {
+                setForm((f) => ({
+                  ...f,
+                  serial_number: scanReview.serial_number || f.serial_number,
+                  print_run: scanReview.print_run ? String(scanReview.print_run) : f.print_run,
+                }));
+              }
               setScanReview(null);
               // If we have the discriminating fields (player + year +
               // card #), search the catalog directly and skip the
               // cascade entirely. Cascade is only needed when the
               // user has to pick a missing dimension.
+              // Local capture — scanReview gets cleared above, but we
+              // still want to know if the user already typed in their
+              // serial number so we can skip re-asking on the serial
+              // step.
+              const alreadyHasSerial = !!scanReview.serial_number;
               if (newCascade.player_name && newCascade.year && newCascade.card_number) {
                 try {
                   const r = await catalogApi.search({
@@ -1215,7 +1231,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   );
                   if (exact) {
                     setSelectedCatalog(exact);
-                    setStep('serial');
+                    setStep(alreadyHasSerial ? 'details' : 'serial');
                     return;
                   }
                 } catch { /* fall through to manual entry */ }
