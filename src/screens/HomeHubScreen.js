@@ -60,7 +60,11 @@ export const HomeHubScreen = ({ navigation }) => {
     return 'Good evening';
   })();
 
-  const hasShowFloor = SHOW_FLOOR_TIERS.has(user?.subscription_tier);
+  // Admins bypass tier gates (matches API middleware in
+  // requireShowFloor / requirePro). Same for store-owner roles
+  // since stores get Show Floor bundled.
+  const isAdmin = user?.role === 'admin' || user?.is_admin === true;
+  const hasShowFloor = isAdmin || SHOW_FLOOR_TIERS.has(user?.subscription_tier);
 
   const onTilePress = (tile) => {
     // Per-tile resolution. Show Floor is gated on tier — non-paying
