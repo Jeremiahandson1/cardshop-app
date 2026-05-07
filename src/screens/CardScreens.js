@@ -3243,6 +3243,9 @@ export const EditCardScreen = ({ navigation, route }) => {
       condition: card.condition || 'near_mint',
       condition_notes: card.condition_notes || '',
       asking_price: card.asking_price != null ? String(card.asking_price) : '',
+      // Show price: empty string = "use my regular price". Sellers set
+      // this once and it auto-applies whenever they go live at a show.
+      display_asking_price: card.display_asking_price != null ? String(card.display_asking_price) : '',
       serial_number: card.serial_number != null ? String(card.serial_number) : '',
       purchase_price: card.purchase_price != null ? String(card.purchase_price) : '',
       personal_valuation: card.personal_valuation != null ? String(card.personal_valuation) : '',
@@ -3349,11 +3352,18 @@ export const EditCardScreen = ({ navigation, route }) => {
           Alert.alert('Video read failed', err?.message || 'Could not read the recorded video.');
         }
       }
+      // Show price: empty string → null (clear the override, use asking_price);
+      // a number → parseFloat; undefined would leave it unchanged on the server.
+      // We always send the field so saving with an empty box clears it.
+      const showPriceValue = form.display_asking_price && form.display_asking_price.trim()
+        ? parseFloat(form.display_asking_price)
+        : null;
       return cardsApi.update(cardId, {
         status: form.status,
         condition: form.condition,
         condition_notes: form.condition_notes || undefined,
         asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
+        display_asking_price: showPriceValue,
         serial_number: form.serial_number ? parseInt(form.serial_number, 10) : undefined,
         purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
@@ -3484,7 +3494,19 @@ export const EditCardScreen = ({ navigation, route }) => {
         </View>
 
         {form.status === 'lets_talk' && (
-          <Input label="Asking Price" value={form.asking_price} onChangeText={set('asking_price')} placeholder="0.00" keyboardType="decimal-pad" />
+          <View style={{ gap: Spacing.xs }}>
+            <Input label="Asking Price" value={form.asking_price} onChangeText={set('asking_price')} placeholder="0.00" keyboardType="decimal-pad" />
+            <Input
+              label="Show price (optional)"
+              value={form.display_asking_price}
+              onChangeText={set('display_asking_price')}
+              placeholder="leave blank to use asking price"
+              keyboardType="decimal-pad"
+            />
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: -4 }}>
+              Auto-applies when you go live at a show. Set once, applies every show.
+            </Text>
+          </View>
         )}
 
         {/* Serial — only if the card is numbered */}
