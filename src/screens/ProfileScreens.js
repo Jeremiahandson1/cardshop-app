@@ -124,7 +124,7 @@ export const ProfileScreen = ({ navigation }) => {
             Alert.alert('Failed to open', err?.message || 'unknown error');
           }
         } },
-        { icon: 'sparkles-outline', label: 'Card Shop Pro', onPress: () => navigation.navigate('Upgrade') },
+        { icon: 'sparkles-outline', label: 'Plans & upgrade', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
     {

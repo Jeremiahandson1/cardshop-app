@@ -219,7 +219,7 @@ export const UpgradeScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Card Shop Pro</Text>
+        <Text style={styles.headerTitle}>Plans & upgrade</Text>
         <View style={{ width: 24 }} />
       </View>
 
