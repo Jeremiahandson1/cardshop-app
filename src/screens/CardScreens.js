@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -2273,13 +2273,27 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 // in the APK) so no rebuild is required.
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-function ZoomableImage({ uri }) {
+function ZoomableImage({ uri, onZoomChange }) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  // Bridge zoom state out to the parent so it can disable the
+  // pagingEnabled ScrollView's horizontal scroll while we're
+  // zoomed in. Without this the inner Pan gesture consumes the
+  // horizontal swipe even when at 1x, and the parent never sees
+  // it — that's why "Swipe to switch" looked broken.
+  useAnimatedReaction(
+    () => savedScale.value,
+    (current, prev) => {
+      if (current !== prev && onZoomChange) {
+        runOnJS(onZoomChange)(current > 1);
+      }
+    },
+  );
 
   const resetToOneX = () => {
     scale.value = withTiming(1);
@@ -2357,6 +2371,7 @@ function ZoomableImage({ uri }) {
 
 function ZoomableImageViewer({ visible, images, initialIndex = 0, onClose }) {
   const [idx, setIdx] = React.useState(initialIndex);
+  const [pagerEnabled, setPagerEnabled] = React.useState(true);
   React.useEffect(() => {
     if (visible) setIdx(initialIndex);
   }, [visible, initialIndex]);
@@ -2367,13 +2382,18 @@ function ZoomableImageViewer({ visible, images, initialIndex = 0, onClose }) {
         <ScrollView
           horizontal
           pagingEnabled
+          scrollEnabled={pagerEnabled}
           showsHorizontalScrollIndicator={false}
           contentOffset={{ x: initialIndex * SCREEN_W, y: 0 }}
           onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
           style={{ flex: 1 }}
         >
           {images.map((uri, i) => (
-            <ZoomableImage key={`${uri}-${i}`} uri={uri} />
+            <ZoomableImage
+              key={`${uri}-${i}`}
+              uri={uri}
+              onZoomChange={(zoomed) => setPagerEnabled(!zoomed)}
+            />
           ))}
         </ScrollView>
 
