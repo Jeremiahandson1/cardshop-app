@@ -554,10 +554,16 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       Alert.alert('Camera needed', 'Enable camera to scan a card.');
       return null;
     }
+    // allowsEditing surfaces the OS-native crop UI immediately
+    // after capture. Crucial for the back-of-card scan: the user
+    // can trim the table edge / fingers / glare bars before the
+    // photo hits Claude vision, which dramatically improves the
+    // OCR hit rate on year + card number.
     const pick = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.75,
       base64: true,
+      allowsEditing: true,
     });
     if (!pick.assets?.length) return null;
     const asset = pick.assets[0];
