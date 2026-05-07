@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
 
+// Tiers that include Show Floor access. Collector Pro does NOT —
+// Show Floor is a $14.99 standalone upgrade. Stores get it bundled.
+const SHOW_FLOOR_TIERS = new Set(['show_floor', 'store_starter', 'store_pro']);
+
 const TILES = [
   {
     key: 'show-floor',
@@ -22,7 +26,8 @@ const TILES = [
     subtitle: 'Live now — sell at a show or shop a show',
     bg: 'rgba(232,197,71,0.10)',
     border: 'rgba(232,197,71,0.45)',
-    target: { tab: 'Profile', screen: 'ShowFloorHub' },
+    // Target picked at render time based on user tier.
+    requires: 'show_floor',
   },
   {
     key: 'collection',
@@ -55,13 +60,26 @@ export const HomeHubScreen = ({ navigation }) => {
     return 'Good evening';
   })();
 
-  const onTilePress = (target) => {
+  const hasShowFloor = SHOW_FLOOR_TIERS.has(user?.subscription_tier);
+
+  const onTilePress = (tile) => {
+    // Per-tile resolution. Show Floor is gated on tier — non-paying
+    // users land on the upsell explainer instead of the live hub.
+    let target;
+    if (tile.key === 'show-floor') {
+      target = hasShowFloor
+        ? { tab: 'Profile', screen: 'ShowFloorHub' }
+        : { tab: 'Profile', screen: 'ShowFloorUpsell' };
+    } else if (tile.key === 'collection') {
+      target = { tab: 'Binders' };
+    } else if (tile.key === 'local-lcs') {
+      target = { tab: 'LCS' };
+    } else {
+      return;
+    }
     try {
-      if (target.screen) {
-        navigation.navigate(target.tab, { screen: target.screen });
-      } else {
-        navigation.navigate(target.tab);
-      }
+      if (target.screen) navigation.navigate(target.tab, { screen: target.screen });
+      else navigation.navigate(target.tab);
     } catch (e) {
       console.warn('[home] navigate failed', e?.message);
     }
@@ -83,16 +101,26 @@ export const HomeHubScreen = ({ navigation }) => {
               key={tile.key}
               activeOpacity={0.8}
               style={[styles.tile, { backgroundColor: tile.bg, borderColor: tile.border }]}
-              onPress={() => onTilePress(tile.target)}
+              onPress={() => onTilePress(tile)}
             >
               <View style={[styles.iconBubble, { backgroundColor: tile.iconColor + '20' }]}>
                 <Ionicons name={tile.icon} size={32} color={tile.iconColor} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.tileTitle}>{tile.title}</Text>
-                <Text style={styles.tileSubtitle}>{tile.subtitle}</Text>
+                <Text style={styles.tileSubtitle}>
+                  {tile.key === 'show-floor' && !hasShowFloor
+                    ? 'Tap to learn more'
+                    : tile.subtitle}
+                </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+              {tile.key === 'show-floor' && !hasShowFloor ? (
+                <View style={styles.upgradeChip}>
+                  <Text style={styles.upgradeChipText}>UPGRADE</Text>
+                </View>
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -164,5 +192,19 @@ const styles = StyleSheet.create({
   profileLinkText: {
     fontSize: 14,
     color: Colors.textMuted,
+  },
+  upgradeChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(232,197,71,0.20)',
+    borderWidth: 1,
+    borderColor: 'rgba(232,197,71,0.50)',
+  },
+  upgradeChipText: {
+    color: '#e8c547',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
 });
