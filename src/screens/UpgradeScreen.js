@@ -25,14 +25,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { billingApi } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import { Button, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import {
   isAvailable as rcAvailable,
   getCurrentOffering,
+  getOfferingByIdentifier,
   purchasePackage,
   restorePurchases,
 } from '../lib/revenuecat';
+
+// Map a tier key to the RevenueCat offering identifier configured
+// in the dashboard. Pro lives in the `default` (current) offering;
+// Show Floor lives in a separate `show_floor` offering so we can
+// have $rc_monthly + $rc_annual packages per tier without colliding
+// on RC's one-package-per-type-per-offering rule.
+const RC_OFFERING_FOR_TIER = {
+  collector_pro: null,        // null = current/default
+  show_floor:    'show_floor',
+};
 
 const TIER_DEFS = {
   collector_pro: {
@@ -79,24 +91,28 @@ export const UpgradeScreen = ({ navigation, route }) => {
     queryFn: () => billingApi.status().then((r) => r.data),
   });
 
-  // Load the RevenueCat offering on mount when we're on a native
-  // platform with a key configured. We use this to display the real
-  // store price (which can vary by region — App Store auto-localizes).
+  // Load the RevenueCat offering whenever the user toggles tiers.
+  // Pro reads the current/default offering; Show Floor reads the
+  // separate `show_floor` offering. Re-firing on tier change means
+  // the price + product reflect the picked tier, not whichever
+  // tier was selected on first mount.
   useEffect(() => {
     let cancelled = false;
     if (!rcAvailable()) {
       setOfferingLoading(false);
       return undefined;
     }
+    setOfferingLoading(true);
     (async () => {
-      const o = await getCurrentOffering();
+      const id = RC_OFFERING_FOR_TIER[selectedTier];
+      const o = id ? await getOfferingByIdentifier(id) : await getCurrentOffering();
       if (!cancelled) {
         setOffering(o);
         setOfferingLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [selectedTier]);
 
   if (isLoading) return <LoadingScreen />;
   const isPro = status?.tier && status.tier !== 'free';
@@ -124,13 +140,13 @@ export const UpgradeScreen = ({ navigation, route }) => {
       if (res.ok) {
         // RevenueCat webhook → backend → DB tier flip can lag 1-15s
         // behind the StoreKit confirm. Without optimistic UI the
-        // user lands on a Pro feature, sees free state, and bounces.
-        // We invalidate auth-store so the user object reflects Pro
-        // immediately, then re-fetch billing status from the server
-        // a few times to converge with the webhook.
+        // user lands on a paid feature, sees free state, and bounces.
+        // We optimistically write the picked tier into auth so the
+        // app reflects the entitlement now, then refetch billing
+        // status a few times to converge with the webhook.
         const auth = useAuthStore.getState();
         if (auth?.user) {
-          auth.setUser?.({ ...auth.user, subscription_tier: 'collector_pro' });
+          auth.setUser?.({ ...auth.user, subscription_tier: selectedTier });
         }
         // Stagger refetches: 1s, 4s, 10s. By the third hit the
         // webhook should have fired even on the slowest path.
@@ -138,7 +154,10 @@ export const UpgradeScreen = ({ navigation, route }) => {
           qc.invalidateQueries({ queryKey: ['billing-status'] });
           qc.invalidateQueries({ queryKey: ['me'] });
         }, delay));
-        Alert.alert('Welcome to Pro 🎉', 'Your subscription is active. Pro features are unlocked now.');
+        Alert.alert(
+          `Welcome to ${TIER_DEFS[selectedTier].label} 🎉`,
+          `Your subscription is active. ${TIER_DEFS[selectedTier].label} features are unlocked now.`,
+        );
       } else if (res.reason !== 'cancelled') {
         Alert.alert('Purchase failed', res.reason || 'Try again.');
       }

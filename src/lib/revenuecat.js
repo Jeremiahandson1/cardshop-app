@@ -109,6 +109,23 @@ export async function getCurrentOffering() {
   }
 }
 
+// Returns a specific offering by its RC identifier. Used by the
+// Upgrade screen when the user toggles between Pro (default
+// offering) and Show Floor (`show_floor` offering). Falls back to
+// `current` if the requested id isn't found so the screen still
+// renders something instead of going blank during a config gap.
+export async function getOfferingByIdentifier(identifier) {
+  const Purchases = getPurchases();
+  if (!Purchases || !_configured) return null;
+  try {
+    const offerings = await Purchases.getOfferings();
+    return offerings?.all?.[identifier] || offerings?.current || null;
+  } catch (err) {
+    console.warn('[revenuecat] getOfferings failed:', err.message);
+    return null;
+  }
+}
+
 // Initiates the system StoreKit / Play Billing purchase flow for
 // the given Package. Returns { ok: true, customerInfo } on success
 // or { ok: false, reason } on cancellation/failure.
