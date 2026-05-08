@@ -165,6 +165,14 @@ export const catalogApi = {
   // { fields, candidates } where fields is structured metadata
   // extracted directly from the image (no regex distillation).
   scanVision: (image_base64) => api.post('/catalog/scan-vision', { image_base64 }, { timeout: 30_000 }),
+  // Pair-mode scan: front + back, AI cross-references for higher
+  // confidence and parallel disambiguation. Backend falls back to
+  // single-photo mode if either side is omitted.
+  scanVisionPair: (front_b64, back_b64) => api.post(
+    '/catalog/scan-vision',
+    { image_base64_front: front_b64, image_base64_back: back_b64 },
+    { timeout: 35_000 },
+  ),
   // Cert lookup for graded slabs. Always returns already_claimed
   // status regardless of whether PSA is configured; slab metadata
   // + images populate only when PSA_API_TOKEN is set upstream.

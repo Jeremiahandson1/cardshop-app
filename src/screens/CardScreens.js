@@ -583,24 +583,64 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return { uri, b64 };
   };
 
-  // Back-of-card scan via Claude vision. Sends the photo to
-  // /scan-vision which returns structured metadata directly (no
-  // brittle regex distillation). Falls back to /ocr-suggest if
-  // ANTHROPIC_API_KEY isn't configured on the server.
+  // Two-photo scan: capture FRONT then BACK, send both to Claude in
+  // a single pair-mode call. Cross-referencing both photos catches
+  // parallels (front foil + back serial), raises confidence on
+  // agreement, and surfaces conflicts when the photos disagree.
+  // Replaces the prior single-back flow; the optional-front path
+  // is gone because we always want both for chain-of-custody.
   const runBackScan = async () => {
-    setScanDebug('photo OK • analyzing with Claude…');
-    const captured = await captureAndResize();
-    if (!captured) {
+    setScanDebug('capture FRONT…');
+    const frontCap = await captureAndResize();
+    if (!frontCap) {
       setScanDebug('cancelled');
       return;
     }
+    setScanDebug('front OK • capture BACK…');
+    // Brief alert so the user knows to flip the card before
+    // launching the second camera. Without it the OS just opens
+    // another camera, which feels like an error.
+    await new Promise((resolve) => {
+      Alert.alert(
+        'Now flip the card',
+        'Capture the back of the same card. Both photos save to your card record.',
+        [
+          { text: 'Skip back', onPress: () => resolve('skip'), style: 'cancel' },
+          { text: 'Capture back', onPress: () => resolve('go') },
+        ],
+      );
+    }).then(async (choice) => {
+      if (choice === 'skip') {
+        // User opted out — fall back to single-front analysis.
+        setScanDebug('analyzing FRONT only…');
+        await analyzeAndReview(frontCap, null);
+        return;
+      }
+      const backCap = await captureAndResize();
+      if (!backCap) {
+        // Camera dismissed — analyze front-only rather than losing the work.
+        setScanDebug('back skipped • analyzing FRONT only…');
+        await analyzeAndReview(frontCap, null);
+        return;
+      }
+      setScanDebug('both photos OK • analyzing with Claude…');
+      await analyzeAndReview(frontCap, backCap);
+    });
+  };
+
+  const analyzeAndReview = async (frontCap, backCap) => {
     try {
-      const res = await catalogApi.scanVision(`data:image/jpeg;base64,${captured.b64}`);
+      const res = backCap
+        ? await catalogApi.scanVisionPair(
+            `data:image/jpeg;base64,${frontCap.b64}`,
+            `data:image/jpeg;base64,${backCap.b64}`,
+          )
+        : await catalogApi.scanVision(`data:image/jpeg;base64,${frontCap.b64}`);
       const fields = res.data?.fields || {};
       const cands = res.data?.candidates || [];
       setScanReview({
-        backUri: captured.uri,
-        frontUri: null,
+        backUri: backCap?.uri || null,
+        frontUri: frontCap.uri,
         player_name: fields.player_name || '',
         year: fields.year ? String(fields.year) : '',
         card_number: fields.card_number ? String(fields.card_number) : '',
@@ -618,22 +658,22 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         confidence: fields.confidence ?? 0,
       });
       setStep('scan_review');
-      setScanDebug(`vision ok • ${cands.length} cands • ${fields.player_name || '?'} ${fields.year || '?'} #${fields.card_number || '?'}`);
+      const conf = Math.round((fields.confidence ?? 0) * 100);
+      setScanDebug(`${backCap ? 'pair' : 'front-only'} ok • ${conf}% • ${cands.length} cands • ${fields.player_name || '?'} ${fields.year || '?'} #${fields.card_number || '?'}`);
     } catch (err) {
       const code = err?.response?.data?.code;
       const errMsg = err?.response?.data?.error || err?.message || 'unknown';
       const status = err?.response?.status;
       setScanDebug(`SCAN FAILED • status=${status || 'NONE'} • ${errMsg}`);
-      // If Claude isn't configured yet, fall back to legacy OCR.
       if (code === 'vision_not_configured') {
         try {
-          const fallback = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${captured.b64}`);
+          const fallback = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${(backCap || frontCap).b64}`);
           const cands = fallback.data?.candidates || [];
           const distilled = fallback.data?.distilled || null;
           const bestPlayer = (distilled?.playerCandidates || [])[0] || '';
           setScanReview({
-            backUri: captured.uri,
-            frontUri: null,
+            backUri: backCap?.uri || null,
+            frontUri: frontCap.uri,
             player_name: bestPlayer,
             year: distilled?.year ? String(distilled.year) : '',
             card_number: distilled?.cardNumber || '',
@@ -652,8 +692,8 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     }
   };
 
-  // Optional second photo: front of card, used as the listing image.
-  // Doesn't go through OCR — just gets stored alongside.
+  // Re-capture single side after review (button on the scan-review
+  // screen). Doesn't re-run vision — just swaps the photo URI.
   const runFrontScan = async () => {
     const captured = await captureAndResize();
     if (!captured) return;
