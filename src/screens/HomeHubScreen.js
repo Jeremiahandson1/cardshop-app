@@ -89,13 +89,38 @@ export const HomeHubScreen = ({ navigation }) => {
     }
   };
 
+  // Tier label for the badge. Free users get a subtle "Free" pill
+  // that doubles as an upgrade nudge. Admins get an "Admin" pill.
+  const tierBadge = (() => {
+    if (isAdmin) return { label: 'Admin', color: '#a78bfa' };
+    const tier = user?.subscription_tier;
+    if (tier === 'show_floor')    return { label: 'Show Floor', color: '#4ade80' };
+    if (tier === 'collector_pro') return { label: 'Pro', color: '#e8c547' };
+    if (tier === 'store_pro' || tier === 'store_starter') return { label: 'Store', color: '#60a5fa' };
+    return { label: 'Free', color: '#9ca3af' };
+  })();
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Text style={styles.greeting}>
-            {greeting}{user?.display_name || user?.username ? `, ${user.display_name || user.username}` : ''}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={styles.greeting}>
+              {greeting}{user?.display_name || user?.username ? `, ${user.display_name || user.username}` : ''}
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile', { screen: 'Upgrade' })}
+              style={{
+                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+                backgroundColor: tierBadge.color + '22',
+                borderWidth: 1, borderColor: tierBadge.color + '88',
+              }}
+            >
+              <Text style={{ color: tierBadge.color, fontSize: 11, fontWeight: '700', letterSpacing: 0.4 }}>
+                {tierBadge.label.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
 

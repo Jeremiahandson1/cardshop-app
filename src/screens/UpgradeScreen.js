@@ -319,11 +319,16 @@ export const UpgradeScreen = ({ navigation, route }) => {
           // pretend the button works — say so honestly. Comping
           // via /admin/users tier dropdown is the workaround for
           // testing in the meantime.
-          <Button
-            title="Show Floor · launching soon"
-            disabled
-            style={{ flex: 1 }}
-          />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Button
+              title="Show Floor · launching soon"
+              disabled
+              style={{ flex: 1 }}
+            />
+            <Text style={{ color: Colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+              Apple's review of the new $14.99 subscription is in progress. Should be live within 48 hours of submission.
+            </Text>
+          </View>
         ) : (
           <Button
             title={
