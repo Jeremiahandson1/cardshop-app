@@ -59,7 +59,7 @@ CARD SHOP PRO ($9.99/mo or $99/yr)
 • Show Floor — go live at card shows, follower push, browseable inventory
 • Case Mode — per-card show-floor pricing & trade prefs
 • Unlimited binders + per-binder analytics
-• Collection Intelligence (blended values + trend signals)
+• Live market view — current ask median + ask-price history
 • Deal Radar (eBay alerts on your want list)
 • Priority support
 (Vinyl QR stickers sold separately at cost — every tier pays the same per-sticker rate.)

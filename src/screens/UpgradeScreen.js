@@ -54,9 +54,9 @@ const TIER_DEFS = {
     features: [
       { icon: 'albums-outline',    title: 'Unlimited binders + sections',  desc: 'No cap on binders. Showcase, timed, and trade-board link types.' },
       { icon: 'pulse-outline',     title: 'Deal Radar',                    desc: 'Push alerts when a want-list card hits below market.' },
-      { icon: 'sparkles-outline',  title: 'Collection Intelligence',       desc: 'Blended values, trend + liquidity signals on every card.' },
+      { icon: 'sparkles-outline',  title: 'Live market view',              desc: 'Current ask median + ask-price history on every card. Sold-comp data integrating now.' },
       { icon: 'analytics-outline', title: 'Per-binder analytics',          desc: 'Views, offers, conversion — see which binders work.' },
-      { icon: 'time-outline',      title: 'Full price history',            desc: 'Sold history on every card you own.' },
+      { icon: 'time-outline',      title: 'Sold-comp research links',      desc: 'eBay sold + 130 Point search pre-filtered on every card. One tap to verify.' },
     ],
   },
   show_floor: {

@@ -70,7 +70,7 @@ export const SubscriptionManageScreen = ({ navigation }) => {
           <Text style={styles.body}>
             {isPro
               ? `Update payment method, see your renewal date, or cancel through ${platformName}. Changes take effect immediately.`
-              : 'You\u2019re on the Free plan. Upgrade to Card Shop Pro ($9.99/mo or $99/yr) to unlock 25 vinyl QR stickers monthly, Collection Intelligence, Deal Radar, and unlimited binders.'}
+              : 'You\u2019re on the Free plan. Upgrade to Card Shop Pro ($9.99/mo or $99/yr) for unlimited binders, Deal Radar (eBay alerts on your want list), live market view on every card, and per-binder analytics.'}
           </Text>
 
           {isPro ? (
