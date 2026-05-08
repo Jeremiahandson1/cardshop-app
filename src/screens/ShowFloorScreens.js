@@ -9,7 +9,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
-  TextInput, Alert, Image, RefreshControl, Share as RNShare,
+  TextInput, Alert, Image, RefreshControl, Share as RNShare, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -964,6 +964,15 @@ export const ShowFloorShopScreen = ({ navigation }) => {
     enabled: !!pickedEvent?.slug,
   });
 
+  // Pull the catalog row for the picked event so we know if a
+  // venue map PDF is attached. Cheap call; the picker only fires
+  // it once per event the buyer drills into.
+  const { data: eventDetails } = useQuery({
+    queryKey: ['show-event-details', pickedEvent?.slug],
+    queryFn: () => showEventsApi.getBySlug(pickedEvent.slug).then((r) => r.data),
+    enabled: !!pickedEvent?.slug,
+  });
+
   if (!pickedEvent) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -1020,6 +1029,21 @@ export const ShowFloorShopScreen = ({ navigation }) => {
           placeholder="Search by player, set, or parallel"
           autoCapitalize="words"
         />
+        {eventDetails?.map_pdf_url ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(eventDetails.map_pdf_url)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+              gap: Spacing.xs, marginTop: Spacing.sm, paddingVertical: Spacing.sm,
+              borderWidth: 1, borderColor: Colors.accent, borderRadius: Radius.md,
+            }}
+          >
+            <Ionicons name="map" size={16} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontWeight: Typography.semibold }}>
+              View venue map
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {invLoading ? <LoadingScreen /> : (

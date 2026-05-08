@@ -440,9 +440,10 @@ export const showFloorApi = {
   user: (username) => api.get(`/show-floor/user/${encodeURIComponent(username)}`),
 };
 
-// Show-events catalog — used by check-in autocomplete
+// Show-events catalog — used by check-in autocomplete + map lookup
 export const showEventsApi = {
   list: (params) => api.get('/show-events', { params }),
+  getBySlug: (slug) => api.get(`/show-events/${encodeURIComponent(slug)}`),
 };
 
 // ============================================================
