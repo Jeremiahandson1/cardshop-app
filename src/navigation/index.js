@@ -219,8 +219,8 @@ const TabNavigator = () => {
           name="LCS"
           component={LCSStack}
           options={{
-            tabBarLabel: 'Prices',
-            tabBarIcon: ({ color, size }) => <Ionicons name="pricetag" size={size} color={color} />,
+            tabBarLabel: 'LCS',
+            tabBarIcon: ({ color, size }) => <Ionicons name="storefront" size={size} color={color} />,
           }}
         />
       )}
