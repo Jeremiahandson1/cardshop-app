@@ -472,9 +472,13 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [parallels, setParallels] = useState([]);
   const [scanDebug, setScanDebug] = useState('');
-  // Two-step scan: back first (text), then optional front (image).
-  // scanReview holds OCR result + photo URIs so the user can review
-  // and edit fields before committing to the cascade or manual entry.
+  // Loading flag for the AI analysis step. Surfaces a "analyzing
+  // both photos…" overlay so the user doesn't think the app stalled
+  // during the 3-5s Sonnet vision call.
+  const [scanAnalyzing, setScanAnalyzing] = useState(false);
+  // Two-step scan: front first, then back. scanReview holds the
+  // AI result + photo URIs so the user can review and edit before
+  // committing to the cascade or manual entry.
   const [scanReview, setScanReview] = useState(null);
   // { player_name, year, card_number, candidates: [], backUri, frontUri }
 
@@ -629,6 +633,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   };
 
   const analyzeAndReview = async (frontCap, backCap) => {
+    setScanAnalyzing(true);
     try {
       const res = backCap
         ? await catalogApi.scanVisionPair(
@@ -689,7 +694,40 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         { text: 'Manual entry', onPress: () => setStep('manual_entry') },
         { text: 'Cancel', style: 'cancel' },
       ]);
+    } finally {
+      setScanAnalyzing(false);
     }
+  };
+
+  // Retake helpers — let the user fix one side without restarting
+  // the whole flow. Front re-capture goes through pair-vision again
+  // because the catalog match might shift; back re-capture too.
+  // Cheaper than two extra Cloudinary uploads if the new analysis
+  // is better.
+  const retakeFront = async () => {
+    if (!scanReview) return;
+    const cap = await captureAndResize();
+    if (!cap) return;
+    const backCap = scanReview.backUri
+      ? { uri: scanReview.backUri, b64: null }
+      : null;
+    // Re-run analysis — but if backCap has no b64 (it's just a URI
+    // that we already uploaded), we can't re-send to vision. Fall
+    // back to front-only analysis when that happens.
+    if (backCap && !backCap.b64) {
+      // Just swap the front photo URI; don't re-analyze.
+      setScanReview((s) => (s ? { ...s, frontUri: cap.uri } : s));
+      return;
+    }
+    await analyzeAndReview(cap, backCap);
+  };
+
+  const retakeBack = async () => {
+    if (!scanReview) return;
+    const cap = await captureAndResize();
+    if (!cap) return;
+    // Same behavior — without front b64 we can't re-run vision.
+    setScanReview((s) => (s ? { ...s, backUri: cap.uri } : s));
   };
 
   // Re-capture single side after review (button on the scan-review
@@ -1126,32 +1164,81 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <View style={{ width: 22 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
-            We pulled these fields from the back of the card. Edit anything that's wrong before continuing.
-          </Text>
+          {/* Confidence pill — surfaces the model's certainty so the
+              user knows when to trust auto-fields vs double-check. */}
+          {(() => {
+            const conf = scanReview.confidence ?? 0;
+            const pct = Math.round(conf * 100);
+            const tone = conf >= 0.85 ? Colors.success
+                       : conf >= 0.65 ? Colors.accent
+                       : Colors.warning || '#f59e0b';
+            const label = conf >= 0.85 ? 'high confidence'
+                        : conf >= 0.65 ? 'medium confidence'
+                        : 'low — please review';
+            return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  paddingHorizontal: 10, paddingVertical: 4,
+                  borderRadius: 999, backgroundColor: tone + '22',
+                  borderWidth: 1, borderColor: tone + '88',
+                }}>
+                  <Text style={{ color: tone, fontSize: 11, fontWeight: '700' }}>
+                    {pct}% · {label}
+                  </Text>
+                </View>
+                <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, flex: 1 }}>
+                  {conf >= 0.65 ? 'Edit anything wrong; tap continue.' : 'Double-check the auto-filled fields.'}
+                </Text>
+              </View>
+            );
+          })()}
 
-          {/* Back photo thumbnail */}
-          {scanReview.backUri ? (
-            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-              <Image source={{ uri: scanReview.backUri }} style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: Colors.surface2 }} />
-              {scanReview.frontUri ? (
+          {/* Photo thumbnails with retake buttons. Front+back side by
+              side; missing side gets an inline capture CTA. */}
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            {scanReview.frontUri ? (
+              <View style={{ alignItems: 'center', gap: 4 }}>
                 <Image source={{ uri: scanReview.frontUri }} style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: Colors.surface2 }} />
-              ) : (
-                <TouchableOpacity
-                  onPress={runFrontScan}
-                  style={{
-                    width: 80, height: 110, borderRadius: 8,
-                    backgroundColor: Colors.surface2,
-                    alignItems: 'center', justifyContent: 'center',
-                    borderWidth: 1, borderColor: Colors.accent, borderStyle: 'dashed',
-                  }}
-                >
-                  <Ionicons name="camera" size={24} color={Colors.accent} />
-                  <Text style={{ color: Colors.accent, fontSize: 11, marginTop: 4 }}>Front photo</Text>
+                <TouchableOpacity onPress={retakeFront}>
+                  <Text style={{ color: Colors.accent, fontSize: 11 }}>Retake front</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          ) : null}
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={runFrontScan}
+                style={{
+                  width: 80, height: 110, borderRadius: 8,
+                  backgroundColor: Colors.surface2,
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 1, borderColor: Colors.accent, borderStyle: 'dashed',
+                }}
+              >
+                <Ionicons name="camera" size={24} color={Colors.accent} />
+                <Text style={{ color: Colors.accent, fontSize: 11, marginTop: 4 }}>Add front</Text>
+              </TouchableOpacity>
+            )}
+            {scanReview.backUri ? (
+              <View style={{ alignItems: 'center', gap: 4 }}>
+                <Image source={{ uri: scanReview.backUri }} style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: Colors.surface2 }} />
+                <TouchableOpacity onPress={retakeBack}>
+                  <Text style={{ color: Colors.accent, fontSize: 11 }}>Retake back</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={retakeBack}
+                style={{
+                  width: 80, height: 110, borderRadius: 8,
+                  backgroundColor: Colors.surface2,
+                  alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 1, borderColor: Colors.accent, borderStyle: 'dashed',
+                }}
+              >
+                <Ionicons name="camera-reverse" size={24} color={Colors.accent} />
+                <Text style={{ color: Colors.accent, fontSize: 11, marginTop: 4 }}>Add back</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <Input label="Player" value={scanReview.player_name} onChangeText={updateField('player_name')} />
           <Input label="Year" value={scanReview.year} onChangeText={updateField('year')} keyboardType="number-pad" />
@@ -1334,6 +1421,24 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // --- Cascade step: sport → year → mfr → set → subset → player → card# → parallel ---
   if (step === 'cascade') {
     return (
+      <>
+      {/* Full-screen overlay during AI analysis. Without it, the
+          user just sees the cascade screen for 3-5 seconds with no
+          indication anything is happening. */}
+      <Modal visible={scanAnalyzing} transparent animationType="fade">
+        <View style={{
+          flex: 1, backgroundColor: 'rgba(0,0,0,0.78)',
+          alignItems: 'center', justifyContent: 'center', padding: 32,
+        }}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>
+            Analyzing both photos…
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+            Cross-referencing front + back to identify the card. Usually 3-5 seconds.
+          </Text>
+        </View>
+      </Modal>
       <CascadePicker
         scanDebug={scanDebug}
         navigation={navigation}
@@ -1471,6 +1576,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         }}
         onCertEntry={() => setStep('cert_entry')}
       />
+      </>
     );
   }
 
@@ -2812,6 +2918,51 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <View style={{ flexDirection: 'row', marginBottom: Spacing.sm }}>
               <VerificationBadge status={card.verification_status} size="md" />
             </View>
+          ) : null}
+
+          {/* Chain-of-custody upgrade CTA. Shown when the viewer
+              owns the card AND its verification_level is below
+              gold. Tapping launches the pair-vision scan flow,
+              which when completed pushes the card to pair_scan
+              level. The badge on /c/:code reflects it publicly. */}
+          {card.owner_id === currentUserId &&
+           (card.verification_level === 'imported_metadata' || card.verification_level === 'self_upload') ? (
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Verify in person',
+                  'Take fresh front + back photos in the app to upgrade this card from "imported" to "in-hand verified" — buyers see a gold badge instead of gray on the public scan page.',
+                  [
+                    { text: 'Not now', style: 'cancel' },
+                    {
+                      text: 'Scan now',
+                      onPress: () => navigation.navigate('AddCard', { verifyExisting: card.id, catalogId: card.catalog_id }),
+                    },
+                  ],
+                );
+              }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                marginBottom: Spacing.sm,
+                paddingVertical: 10, paddingHorizontal: 14,
+                backgroundColor: 'rgba(232,197,71,0.12)',
+                borderWidth: 1, borderColor: 'rgba(232,197,71,0.45)',
+                borderRadius: 10,
+              }}
+            >
+              <Ionicons name="shield-checkmark-outline" size={18} color={Colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>
+                  Verify in person
+                </Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                  {card.verification_level === 'imported_metadata'
+                    ? 'No first-party photos yet — scan to upgrade the badge to gold.'
+                    : 'Photos uploaded but not in-hand verified — scan to upgrade.'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
+            </TouchableOpacity>
           ) : null}
 
           {/* Grade or condition with cert link */}
