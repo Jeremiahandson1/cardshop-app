@@ -947,16 +947,43 @@ export const ShowFloorShopScreen = ({ navigation }) => {
     queryKey: ['show-floor-live-shop'],
     queryFn: () => showFloorApi.live({}).then((r) => r.data),
   });
+  // Pull the upcoming-event catalog so we can show shows that
+  // exist on the calendar even when zero sellers have checked
+  // in yet. A buyer arriving early at the National shouldn't
+  // see "No active shows" when 200 sellers are an hour away.
+  const { data: upcomingData } = useQuery({
+    queryKey: ['show-events-upcoming'],
+    queryFn: () => showEventsApi.list({ upcoming: true, limit: 25 }).then((r) => r.data),
+  });
   const eventGroups = useMemo(() => {
     const map = {};
     for (const ci of (liveData?.check_ins || [])) {
       const k = ci.event_slug || ci.event_name;
-      if (!map[k]) map[k] = { slug: ci.event_slug, name: ci.event_name, city: ci.venue_city, state: ci.venue_state, sellers: 0, total_cards: 0 };
+      if (!map[k]) map[k] = { slug: ci.event_slug, name: ci.event_name, city: ci.venue_city, state: ci.venue_state, sellers: 0, total_cards: 0, isLive: true };
       map[k].sellers++;
       map[k].total_cards += ci.live_card_count || 0;
     }
     return Object.values(map);
   }, [liveData]);
+  // Upcoming events from the catalog, deduped against any event
+  // already showing in the live list (so we don't double-render
+  // the same show in both sections).
+  const upcomingGroups = useMemo(() => {
+    const liveSlugs = new Set(eventGroups.map((g) => g.slug).filter(Boolean));
+    return (upcomingData?.events || [])
+      .filter((e) => !liveSlugs.has(e.slug))
+      .map((e) => ({
+        slug: e.slug,
+        name: e.name,
+        city: e.city,
+        state: e.state,
+        venue_name: e.venue_name,
+        starts_on: e.starts_on,
+        sellers: 0,
+        total_cards: 0,
+        isLive: false,
+      }));
+  }, [upcomingData, eventGroups]);
 
   const { data: inventoryData, isLoading: invLoading } = useQuery({
     queryKey: ['show-floor-shop-inventory', pickedEvent?.slug, debouncedSearch],
@@ -987,24 +1014,67 @@ export const ShowFloorShopScreen = ({ navigation }) => {
           Pick the show you're at. We'll search every live seller's inventory.
         </Text>
         {liveLoading ? <LoadingScreen /> : (
-          <FlatList
-            data={eventGroups}
-            keyExtractor={(e) => e.slug || e.name}
-            contentContainerStyle={{ padding: Spacing.base }}
-            ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => setPickedEvent(item)} style={styles.eventCard}>
-                <Text style={styles.eventName}>{item.name}</Text>
-                <Text style={styles.eventMeta}>
-                  {item.city ? `${item.city}, ${item.state || ''} · ` : ''}
-                  {item.sellers} seller{item.sellers === 1 ? '' : 's'} · {item.total_cards} card{item.total_cards === 1 ? '' : 's'} live
-                </Text>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={() => (
-              <EmptyState icon="calendar-outline" title="No active shows" message="When sellers go live at a show, it'll appear here." />
-            )}
-          />
+          <ScrollView contentContainerStyle={{ padding: Spacing.base }}>
+            {/* Live now — sellers actively checked in. Tappable; goes
+                straight to the inventory search. */}
+            {eventGroups.length > 0 ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success }} />
+                  <Text style={{ color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Live now
+                  </Text>
+                </View>
+                {eventGroups.map((item) => (
+                  <TouchableOpacity
+                    key={item.slug || item.name}
+                    onPress={() => setPickedEvent(item)}
+                    style={[styles.eventCard, { marginBottom: Spacing.sm }]}
+                  >
+                    <Text style={styles.eventName}>{item.name}</Text>
+                    <Text style={styles.eventMeta}>
+                      {item.city ? `${item.city}, ${item.state || ''} · ` : ''}
+                      {item.sellers} seller{item.sellers === 1 ? '' : 's'} · {item.total_cards} card{item.total_cards === 1 ? '' : 's'} live
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : null}
+
+            {/* Upcoming — events from the catalog that aren't live
+                yet. Tappable but lands on a "no live sellers" state
+                inside the inventory search; the buyer can come back
+                later or share the event link. */}
+            {upcomingGroups.length > 0 ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm, marginTop: eventGroups.length > 0 ? Spacing.xl : 0 }}>
+                  <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Upcoming
+                  </Text>
+                </View>
+                {upcomingGroups.map((item) => (
+                  <TouchableOpacity
+                    key={item.slug || item.name}
+                    onPress={() => setPickedEvent(item)}
+                    style={[styles.eventCard, { marginBottom: Spacing.sm, opacity: 0.85 }]}
+                  >
+                    <Text style={styles.eventName}>{item.name}</Text>
+                    <Text style={styles.eventMeta}>
+                      {item.city ? `${item.city}${item.state ? ', ' + item.state : ''} · ` : ''}
+                      {item.starts_on ? new Date(item.starts_on).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                      {' · '}
+                      <Text style={{ color: Colors.textMuted }}>0 sellers live yet</Text>
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : null}
+
+            {eventGroups.length === 0 && upcomingGroups.length === 0 ? (
+              <EmptyState icon="calendar-outline" title="No shows scheduled" message="When sellers go live at a show, or shows are added to the calendar, they'll appear here." />
+            ) : null}
+          </ScrollView>
         )}
       </SafeAreaView>
     );
