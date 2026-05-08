@@ -979,11 +979,43 @@ export const ShowFloorShopScreen = ({ navigation }) => {
         state: e.state,
         venue_name: e.venue_name,
         starts_on: e.starts_on,
+        is_major: !!e.is_major,
         sellers: 0,
         total_cards: 0,
         isLive: false,
       }));
   }, [upcomingData, eventGroups]);
+
+  // Picker search — filters live + upcoming by name OR city.
+  // Case-insensitive, debounced for low keystroke noise.
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [debouncedPickerSearch, setDebouncedPickerSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPickerSearch(pickerSearch.trim().toLowerCase()), 200);
+    return () => clearTimeout(t);
+  }, [pickerSearch]);
+
+  const matchesSearch = (e) => {
+    if (!debouncedPickerSearch) return true;
+    const hay = `${e.name || ''} ${e.city || ''} ${e.state || ''} ${e.venue_name || ''}`.toLowerCase();
+    return hay.includes(debouncedPickerSearch);
+  };
+
+  // Major upcoming shows surface above the state-sorted list so
+  // big regionals + the National don't get buried alphabetically.
+  const filteredLive = useMemo(() => eventGroups.filter(matchesSearch), [eventGroups, debouncedPickerSearch]);
+  const filteredUpcoming = useMemo(() => upcomingGroups.filter(matchesSearch), [upcomingGroups, debouncedPickerSearch]);
+  const majorUpcoming = useMemo(() => filteredUpcoming.filter((e) => e.is_major), [filteredUpcoming]);
+  const otherUpcomingByState = useMemo(() => {
+    const map = {};
+    for (const e of filteredUpcoming.filter((x) => !x.is_major)) {
+      const key = e.state || '—';
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    }
+    // Sorted by state code so AK, AL, AR... cluster together.
+    return Object.keys(map).sort().map((state) => ({ state, events: map[state] }));
+  }, [filteredUpcoming]);
 
   const { data: inventoryData, isLoading: invLoading } = useQuery({
     queryKey: ['show-floor-shop-inventory', pickedEvent?.slug, debouncedSearch],
@@ -1010,14 +1042,25 @@ export const ShowFloorShopScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Shop a show</Text>
           <View style={{ width: 22 }} />
         </View>
-        <Text style={[styles.intro, { padding: Spacing.base }]}>
+        <Text style={[styles.intro, { paddingHorizontal: Spacing.base, paddingTop: Spacing.base }]}>
           Pick the show you're at. We'll search every live seller's inventory.
         </Text>
+
+        {/* Search bar — filters live + upcoming + major + state
+            buckets simultaneously by show name OR city. */}
+        <View style={{ paddingHorizontal: Spacing.base, paddingTop: Spacing.sm, paddingBottom: Spacing.xs }}>
+          <Input
+            value={pickerSearch}
+            onChangeText={setPickerSearch}
+            placeholder="Search shows by name or city"
+            autoCapitalize="words"
+          />
+        </View>
+
         {liveLoading ? <LoadingScreen /> : (
-          <ScrollView contentContainerStyle={{ padding: Spacing.base }}>
-            {/* Live now — sellers actively checked in. Tappable; goes
-                straight to the inventory search. */}
-            {eventGroups.length > 0 ? (
+          <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingTop: 0 }}>
+            {/* Live now — sellers actively checked in. */}
+            {filteredLive.length > 0 ? (
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success }} />
@@ -1025,7 +1068,7 @@ export const ShowFloorShopScreen = ({ navigation }) => {
                     Live now
                   </Text>
                 </View>
-                {eventGroups.map((item) => (
+                {filteredLive.map((item) => (
                   <TouchableOpacity
                     key={item.slug || item.name}
                     onPress={() => setPickedEvent(item)}
@@ -1041,23 +1084,21 @@ export const ShowFloorShopScreen = ({ navigation }) => {
               </>
             ) : null}
 
-            {/* Upcoming — events from the catalog that aren't live
-                yet. Tappable but lands on a "no live sellers" state
-                inside the inventory search; the buyer can come back
-                later or share the event link. */}
-            {upcomingGroups.length > 0 ? (
+            {/* Major shows — surfaced above state buckets so the
+                National + big regionals don't get buried. */}
+            {majorUpcoming.length > 0 ? (
               <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm, marginTop: eventGroups.length > 0 ? Spacing.xl : 0 }}>
-                  <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
-                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
-                    Upcoming
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm, marginTop: filteredLive.length > 0 ? Spacing.xl : 0 }}>
+                  <Ionicons name="star" size={14} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Major shows
                   </Text>
                 </View>
-                {upcomingGroups.map((item) => (
+                {majorUpcoming.map((item) => (
                   <TouchableOpacity
                     key={item.slug || item.name}
                     onPress={() => setPickedEvent(item)}
-                    style={[styles.eventCard, { marginBottom: Spacing.sm, opacity: 0.85 }]}
+                    style={[styles.eventCard, { marginBottom: Spacing.sm, borderColor: Colors.accent }]}
                   >
                     <Text style={styles.eventName}>{item.name}</Text>
                     <Text style={styles.eventMeta}>
@@ -1071,8 +1112,46 @@ export const ShowFloorShopScreen = ({ navigation }) => {
               </>
             ) : null}
 
-            {eventGroups.length === 0 && upcomingGroups.length === 0 ? (
-              <EmptyState icon="calendar-outline" title="No shows scheduled" message="When sellers go live at a show, or shows are added to the calendar, they'll appear here." />
+            {/* Other upcoming — grouped by state, alphabetical. */}
+            {otherUpcomingByState.length > 0 ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm, marginTop: (filteredLive.length > 0 || majorUpcoming.length > 0) ? Spacing.xl : 0 }}>
+                  <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Upcoming by state
+                  </Text>
+                </View>
+                {otherUpcomingByState.map(({ state, events }) => (
+                  <View key={state} style={{ marginBottom: Spacing.md }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.bold, letterSpacing: 1, marginBottom: Spacing.xs }}>
+                      {state}
+                    </Text>
+                    {events.map((item) => (
+                      <TouchableOpacity
+                        key={item.slug || item.name}
+                        onPress={() => setPickedEvent(item)}
+                        style={[styles.eventCard, { marginBottom: Spacing.xs, opacity: 0.85 }]}
+                      >
+                        <Text style={styles.eventName}>{item.name}</Text>
+                        <Text style={styles.eventMeta}>
+                          {item.city ? `${item.city} · ` : ''}
+                          {item.starts_on ? new Date(item.starts_on).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))}
+              </>
+            ) : null}
+
+            {filteredLive.length === 0 && majorUpcoming.length === 0 && otherUpcomingByState.length === 0 ? (
+              <EmptyState
+                icon={pickerSearch ? 'search-outline' : 'calendar-outline'}
+                title={pickerSearch ? 'No shows match' : 'No shows scheduled'}
+                message={pickerSearch
+                  ? 'Try a different name or city.'
+                  : "When sellers go live at a show, or shows are added to the calendar, they'll appear here."}
+              />
             ) : null}
           </ScrollView>
         )}
