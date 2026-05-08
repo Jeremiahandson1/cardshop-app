@@ -12,7 +12,8 @@ import {
   cardsApi, offersApi, pricingApi, safetyApi, bindersApi,
   listingDefaultsApi,
 } from '../services/api';
-import { getDeviceLocation, getZipFromCoords } from '../services/deviceLocation';
+// deviceLocation imports removed — GPS / ZIP capture for distance-
+// based discovery was retired. Re-import if zip search comes back.
 import { Linking } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { analytics, Events } from '../services/analytics';
@@ -100,8 +101,6 @@ export const TradeBoardScreen = ({ navigation, route }) => {
   const [groupId, setGroupId] = useState(initialGroupId);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [nearbyLocation, setNearbyLocation] = useState(null); // { latitude, longitude }
-  const [distanceMiles, setDistanceMiles] = useState(50);
 
   // Debounce search input so we don't fire a new request on every
   // keystroke. Queryfn still runs eventually, but the TextInput
@@ -121,33 +120,13 @@ export const TradeBoardScreen = ({ navigation, route }) => {
     const p = { limit: 50 };
     if (scope === 'global') p.scope = 'global';
     if (scope === 'group' && groupId) { p.scope = 'group'; p.group_id = groupId; }
-    if (scope === 'nearby' && nearbyLocation) {
-      p.scope = 'nearby';
-      p.lat = nearbyLocation.latitude;
-      p.lng = nearbyLocation.longitude;
-      p.distance_miles = distanceMiles;
-    }
     if (debouncedSearch) p.search = debouncedSearch;
     // Surface local-shop inventory alongside collector listings on
     // every public scope. 'Mine' and 'Group' don't include shops —
     // shops aren't yours and don't sit in trading circles.
     if (scope !== 'mine' && scope !== 'group') p.include_stores = 1;
     return p;
-  }, [scope, groupId, debouncedSearch, nearbyLocation, distanceMiles]);
-
-  const enableNearby = async () => {
-    const loc = await getDeviceLocation();
-    if (!loc) {
-      Alert.alert(
-        'Location needed',
-        'Nearby requires location permission. Enable it in your device settings and try again.',
-      );
-      return;
-    }
-    setNearbyLocation(loc);
-    setScope('nearby');
-    setGroupId(null);
-  };
+  }, [scope, groupId, debouncedSearch]);
 
   // The public feed deliberately hides the viewer's own listings
   // (you don't need to "discover" your own card). The "Mine" tab
@@ -403,7 +382,6 @@ export const TradeBoardScreen = ({ navigation, route }) => {
       >
         <ScopeTab label="All" active={scope === 'all'} onPress={() => { setScope('all'); setGroupId(null); }} />
         <ScopeTab label="Global" active={scope === 'global'} onPress={() => { setScope('global'); setGroupId(null); }} />
-        <ScopeTab label="Nearby" active={scope === 'nearby'} onPress={enableNearby} />
         <ScopeTab label="Mine" active={scope === 'mine'} onPress={() => { setScope('mine'); setGroupId(null); }} />
         <ScopeTab
           label={`Groups${myGroups.length ? ` (${myGroups.length})` : ''}`}
@@ -411,30 +389,6 @@ export const TradeBoardScreen = ({ navigation, route }) => {
           onPress={() => navigation.navigate('TradeGroupsList')}
         />
       </ScrollView>
-
-      {/* Nearby filter bar */}
-      {scope === 'nearby' && nearbyLocation ? (
-        <View style={styles.groupFilterBar}>
-          <Text style={styles.groupFilterText}>
-            Within {distanceMiles} mi of your location
-          </Text>
-          <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
-            {[25, 50, 100, 250].map((m) => (
-              <TouchableOpacity key={m} onPress={() => setDistanceMiles(m)}>
-                <Text
-                  style={{
-                    color: distanceMiles === m ? Colors.accent : Colors.textMuted,
-                    fontSize: Typography.xs,
-                    fontWeight: Typography.semibold,
-                  }}
-                >
-                  {m}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ) : null}
 
       {scope === 'group' && groupId ? (
         <View style={styles.groupFilterBar}>
@@ -909,12 +863,17 @@ const CompStat = ({ label, value }) => (
 // ============================================================
 export const CreateTradeListingScreen = ({ navigation, route }) => {
   const preselectedCardId = route.params?.ownedCardId;
+  const presetGroupId = route.params?.presetGroupId;
   const qc = useQueryClient();
 
   const [step, setStep] = useState(preselectedCardId ? 2 : 1);
   const [ownedCardId, setOwnedCardId] = useState(preselectedCardId || null);
   const [binderId, setBinderId] = useState(null);
-  const [visibility, setVisibility] = useState([]); // array of { scope_type, group_id }
+  // If we arrived from a Trade Group detail screen, pre-select that
+  // group as a visibility scope so the user doesn't have to re-pick.
+  const [visibility, setVisibility] = useState(
+    presetGroupId ? [{ scope_type: 'group', group_id: presetGroupId }] : []
+  );
   const [shippingPref, setShippingPref] = useState('either');
   const [acceptsBundles, setAcceptsBundles] = useState(false);
   const [lookingFor, setLookingFor] = useState('');
@@ -969,6 +928,29 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
     else if (myBinders.length) setBinderId(myBinders[0].id);
   }, [ownedCardId, myBinders, binderId]);
 
+  // Pre-fill the listing photos from the owned card's existing
+  // photos so the user doesn't have to re-photograph what's
+  // already on file. They can replace them if they want fresh
+  // shots — leaving this null until the user confirms means
+  // skipping a step they already did at registration.
+  useEffect(() => {
+    if (!ownedCardId) return;
+    if (photos.front && photos.back) return; // already filled
+    cardsApi.get(ownedCardId).then((r) => {
+      const c = r?.data || {};
+      const existing = Array.isArray(c.photo_urls) ? c.photo_urls : [];
+      const front = c.image_front_url || existing[0] || null;
+      const back  = c.image_back_url  || existing[1] || null;
+      const video = c.video_url || null;
+      setPhotos((p) => ({
+        front: p.front || front,
+        back:  p.back  || back,
+        video: p.video || video,
+      }));
+    }).catch(() => { /* fall back to user re-uploading */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownedCardId]);
+
   // After creating the listing, fire-and-forget the AI verification so
   // the badge populates. User doesn't wait on the result.
   const runVerification = async (listingId) => {
@@ -1008,10 +990,14 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
   const canSubmit = ownedCardId && binderId && visibility.length > 0 && photos.front && photos.back;
 
   const submit = async () => {
-    // Snapshot device location for distance filtering. Silent best-effort —
-    // if permission is denied, we just submit without lat/lng.
-    const loc = await getDeviceLocation();
-    const zip = loc ? await getZipFromCoords(loc.latitude, loc.longitude) : null;
+    // GPS / ZIP capture removed — distance-based discovery on the
+    // trade board was retired. The location_lat / location_lng /
+    // location_zip columns on trade_listings remain in the schema
+    // but new listings post nulls for all three. Existing rows
+    // don't need backfilling; queries no longer filter on them.
+    // GPS / ZIP capture removed — distance-based discovery retired.
+    // location_* columns on trade_listings remain in schema; new
+    // listings post nulls.
 
     createMutation.mutate({
       owned_card_id: ownedCardId,
@@ -1024,9 +1010,6 @@ export const CreateTradeListingScreen = ({ navigation, route }) => {
       photo_front_url: photos.front,
       photo_back_url: photos.back,
       video_url: photos.video || null,
-      location_lat: loc?.latitude || null,
-      location_lng: loc?.longitude || null,
-      location_zip: zip || null,
     });
   };
 

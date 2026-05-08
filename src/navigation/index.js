@@ -415,13 +415,12 @@ const LCSStack = () => (
 );
 
 const TradeStack = () => (
-  <TradeStackNav.Navigator screenOptions={screenOptions} initialRouteName="TradeGroupsList">
-    {/* TradeBoardMain (the nearby/proximity trade board) was the
-        old entry point but proximity matching was unreliable in
-        practice. Local groups + search inside a group cover the
-        same use case more reliably. The screen + listing flows
-        stay registered so existing deep links (cardshop://trade)
-        still resolve, but the tab now opens to TradeGroupsList. */}
+  <TradeStackNav.Navigator screenOptions={screenOptions} initialRouteName="TradeBoardMain">
+    {/* TradeBoardMain is the public everyone-feed and the default
+        Trade tab entry. The old nearby/proximity sort was removed
+        (GPS matching was unreliable + privacy noise) — search +
+        scope filters cover discovery now. Trade Groups remain
+        available as a secondary surface for private circles. */}
     <TradeStackNav.Screen name="TradeBoardMain" component={TradeBoardScreen} />
     <TradeStackNav.Screen name="TradeListingDetail" component={TradeListingDetailScreen} />
     <TradeStackNav.Screen name="CreateTradeListing" component={CreateTradeListingScreen} />
