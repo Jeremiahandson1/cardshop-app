@@ -297,6 +297,10 @@ export const billingApi = {
   // Stripe Customer Portal — short-lived URL we open in the
   // system browser for payment/cancel/invoice management.
   portalUrl: () => api.post('/billing/portal'),
+  // Tier waitlist — for tiers not yet purchasable (Show Floor
+  // while Apple reviews IAP). Idempotent.
+  joinWaitlist: (tier) => api.post('/billing/waitlist', { tier }),
+  myWaitlist: () => api.get('/billing/waitlist'),
 };
 
 // ============================================================

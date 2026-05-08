@@ -91,6 +91,14 @@ export const UpgradeScreen = ({ navigation, route }) => {
     queryFn: () => billingApi.status().then((r) => r.data),
   });
 
+  // Track waitlist state so the "Notify me" button flips to a
+  // confirmation state ("✓ You're on the list") on revisit.
+  const { data: waitlistData, refetch: refetchWaitlist } = useQuery({
+    queryKey: ['billing-waitlist'],
+    queryFn: () => billingApi.myWaitlist().then((r) => r.data),
+  });
+  const onShowFloorWaitlist = !!waitlistData?.entries?.find((e) => e.tier === 'show_floor');
+
   // Load the RevenueCat offering whenever the user toggles tiers.
   // Pro reads the current/default offering; Show Floor reads the
   // separate `show_floor` offering. Re-firing on tier change means
@@ -316,17 +324,33 @@ export const UpgradeScreen = ({ navigation, route }) => {
           </View>
         ) : selectedTier === 'show_floor' && !buttonReady ? (
           // RevenueCat doesn't have the show_floor SKU yet. Don't
-          // pretend the button works — say so honestly. Comping
-          // via /admin/users tier dropdown is the workaround for
-          // testing in the meantime.
+          // disable the CTA — instead, offer to add the user to the
+          // launch waitlist. Idempotent on the backend so re-taps
+          // are fine. Once on the list, button flips to a
+          // confirmation state.
           <View style={{ flex: 1, gap: 8 }}>
             <Button
-              title="Show Floor · launching soon"
-              disabled
+              title={onShowFloorWaitlist
+                ? "✓ You're on the list — we'll notify you"
+                : 'Notify me when Show Floor launches'}
+              onPress={async () => {
+                if (onShowFloorWaitlist) return;
+                try {
+                  await billingApi.joinWaitlist('show_floor');
+                  await refetchWaitlist();
+                  Alert.alert(
+                    "You're on the list",
+                    "We'll send a push + email the moment Show Floor is live. Should be within 48 hours of Apple's IAP review completing.",
+                  );
+                } catch (err) {
+                  Alert.alert('Could not join waitlist', err?.response?.data?.error || err?.message || 'Try again.');
+                }
+              }}
+              disabled={onShowFloorWaitlist}
               style={{ flex: 1 }}
             />
             <Text style={{ color: Colors.textMuted, fontSize: 12, textAlign: 'center' }}>
-              Apple's review of the new $14.99 subscription is in progress. Should be live within 48 hours of submission.
+              Apple's review of the new $14.99 subscription is in progress. Should be live within 48 hours.
             </Text>
           </View>
         ) : (
