@@ -953,7 +953,7 @@ export const ShowFloorShopScreen = ({ navigation }) => {
   // see "No active shows" when 200 sellers are an hour away.
   const { data: upcomingData } = useQuery({
     queryKey: ['show-events-upcoming'],
-    queryFn: () => showEventsApi.list({ upcoming: true, limit: 25 }).then((r) => r.data),
+    queryFn: () => showEventsApi.list({ upcoming: true, limit: 500 }).then((r) => r.data),
   });
   const eventGroups = useMemo(() => {
     const map = {};
