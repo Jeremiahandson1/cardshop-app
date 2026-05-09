@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert
+  View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -14,12 +14,23 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
-  // Camera zoom (0 = none, 1 = max). Needed for small printed
-  // QR stickers (sub-12mm) where the camera has trouble locking
-  // on at normal hand-distance — the user can crank zoom up
-  // and bring the QR into focus without physically getting their
-  // phone within 2 inches of the sticker.
-  const [zoom, setZoom] = useState(0);
+  // Tap-to-zoom on the camera preview. Storing {x,y} of the
+  // last tap (or null when not zoomed). When set, we apply a
+  // CSS transform to the CameraView that scales by ZOOM_FACTOR
+  // and translates so the tap point lands at the screen center.
+  // The barcode scanner runs on the FULL sensor frame regardless
+  // of the visual transform, so we lose nothing on decode.
+  const ZOOM_FACTOR = 4;
+  const [zoomCenter, setZoomCenter] = useState(null);
+  const screen = Dimensions.get('window');
+  // Computed transform — identity when not zoomed.
+  const cameraTransform = zoomCenter
+    ? [
+        { translateX: -(ZOOM_FACTOR - 1) * (zoomCenter.x - screen.width / 2) },
+        { translateY: -(ZOOM_FACTOR - 1) * (zoomCenter.y - screen.height / 2) },
+        { scale: ZOOM_FACTOR },
+      ]
+    : [];
   const scanGuardRef = useRef(false);
   const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
   const cardIdToAttach = route?.params?.cardId || null;
@@ -249,22 +260,27 @@ export const QRScannerScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <CameraView
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { transform: cameraTransform }]}
         facing="back"
-        zoom={zoom}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
-      {/* Tap-to-zoom: tapping anywhere on the camera preview
-          toggles between 1× and 5×. Lets the user frame the
-          whole card to confirm what they're scanning, then tap
-          to instantly zoom on the QR for the actual decode.
-          Lives behind the overlay chrome so it doesn't intercept
-          taps on the close button, zoom chips, or rescan button. */}
-      <TouchableOpacity
+      {/* Tap-to-zoom: tapping anywhere on the preview toggles
+          between 1× and 4× zoom CENTERED on the tap point. The
+          barcode scanner still reads the full sensor frame
+          regardless of the visual transform — no decode penalty.
+          Pressable lets us read the touch (x,y); a TouchableOpacity
+          would only give us the press event. */}
+      <Pressable
         style={StyleSheet.absoluteFillObject}
-        activeOpacity={1}
-        onPress={() => setZoom((z) => (z > 0 ? 0 : 0.5))}
+        onPress={(e) => {
+          if (zoomCenter) {
+            setZoomCenter(null);
+          } else {
+            const { locationX, locationY } = e.nativeEvent;
+            setZoomCenter({ x: locationX, y: locationY });
+          }
+        }}
       />
 
       {/* Dark overlay with cutout feel */}
@@ -307,38 +323,27 @@ export const QRScannerScreen = ({ navigation, route }) => {
               up React Native LogBox warnings that surface there. */}
           {!scanned ? (
             <Text style={styles.hint}>
-              {zoom > 0
-                ? 'Zoomed 5× · tap anywhere to zoom out'
-                : 'Frame the card · tap anywhere to zoom 5× on the QR'}
+              {zoomCenter
+                ? 'Zoomed 4× · tap anywhere to zoom out'
+                : 'Frame the card · tap on the QR to zoom 4× there'}
             </Text>
           ) : null}
         </View>
 
-        {/* Zoom control — tappable 1x / 2x / 5x / 10x preset chips
-            so users scanning small (sub-12mm) stickers can pull
-            the QR into focus from arm's length instead of having
-            to bring the phone within an inch of the sticker. */}
-        {!scanned && (
-          <View style={styles.zoomBar}>
-            {[
-              { label: '1×',  v: 0    },
-              { label: '2×',  v: 0.2  },
-              { label: '5×',  v: 0.5  },
-              { label: '10×', v: 0.85 },
-            ].map((step) => {
-              const active = Math.abs(zoom - step.v) < 0.05;
-              return (
-                <TouchableOpacity
-                  key={step.label}
-                  onPress={() => setZoom(step.v)}
-                  style={[styles.zoomChip, active ? styles.zoomChipActive : null]}
-                >
-                  <Text style={[styles.zoomChipText, active ? styles.zoomChipTextActive : null]}>
-                    {step.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        {/* Zoom-out chip — only shown when zoomed, gives a clear
+            non-tap-anywhere way to bail. Some users miss the
+            "tap anywhere to zoom out" hint and try to find a
+            button. This is that button. */}
+        {zoomCenter && !scanned && (
+          <View style={styles.zoomBar} pointerEvents="box-none">
+            <TouchableOpacity
+              onPress={() => setZoomCenter(null)}
+              style={[styles.zoomChip, styles.zoomChipActive]}
+            >
+              <Text style={[styles.zoomChipText, styles.zoomChipTextActive]}>
+                Zoom out
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
