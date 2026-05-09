@@ -514,6 +514,22 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
     enabled: !!listing?.is_owner,
   });
 
+  // For non-owners: pull the offers I've already sent on this
+  // listing so the button can read "1 trade pending" instead of
+  // looking like it never sent. We don't block additional offers
+  // — counter-offers and revised trades are useful — but the user
+  // needs to see that their last submission landed.
+  const { data: mySentData } = useQuery({
+    queryKey: ['trade-listing-my-offers', listingId],
+    queryFn: () => offersApi.mine({
+      target_type: 'trade_listing',
+      trade_listing_id: listingId,
+      direction: 'sent',
+    }).then((r) => r.data),
+    enabled: !!listing && !listing?.is_owner,
+  });
+  const myPendingOffers = (mySentData?.offers || []).filter((o) => o.status === 'pending');
+
   const bumpMutation = useMutation({
     mutationFn: () => tradeListingsApi.bump(listingId),
     onSuccess: () => {
@@ -722,11 +738,36 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
 
         {/* Offer button or owner actions */}
         {!isOwner ? (
-          <Button
-            title="Make a trade offer"
-            onPress={() => navigation.navigate('MakeTradeOffer', { listingId })}
-            style={{ marginTop: Spacing.lg }}
-          />
+          <View style={{ marginTop: Spacing.lg }}>
+            {myPendingOffers.length > 0 && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('TradeOfferDetail', { offerId: myPendingOffers[0].id })}
+                style={{
+                  backgroundColor: 'rgba(232,197,71,0.12)',
+                  borderWidth: 1, borderColor: 'rgba(232,197,71,0.45)',
+                  borderRadius: Radius.md,
+                  padding: Spacing.md,
+                  marginBottom: Spacing.sm,
+                  flexDirection: 'row', alignItems: 'center',
+                }}
+              >
+                <Ionicons name="time-outline" size={18} color={Colors.accent} style={{ marginRight: Spacing.sm }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.accent, fontWeight: Typography.bold }}>
+                    {myPendingOffers.length} {myPendingOffers.length === 1 ? 'offer' : 'offers'} pending
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                    Tap to view{myPendingOffers.length === 1 ? '' : ' the most recent'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              </TouchableOpacity>
+            )}
+            <Button
+              title={myPendingOffers.length > 0 ? 'Send another offer' : 'Make a trade offer'}
+              onPress={() => navigation.navigate('MakeTradeOffer', { listingId })}
+            />
+          </View>
         ) : (
           <>
             <SectionHeader title={`Incoming offers (${offersData?.total ?? 0})`} />
@@ -1339,6 +1380,10 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
       qc.invalidateQueries({ queryKey: ['trade-offers-mine'] });
+      // Invalidate the listing-detail "my offers pending" badge so
+      // when the user goes back, the listing reads "1 trade pending"
+      // instead of looking like the submission never happened.
+      qc.invalidateQueries({ queryKey: ['trade-listing-my-offers', listingId] });
       if (isEditing) qc.invalidateQueries({ queryKey: ['offer-detail', editOfferId] });
       analytics.track(isEditing ? Events.OFFER_UPDATED : Events.OFFER_SENT, {
         cards_offered: selectedCardIds.length,
