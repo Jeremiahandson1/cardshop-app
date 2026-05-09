@@ -19,6 +19,33 @@ import { useAuthStore } from '../store/authStore';
 import { Button, Input, LoadingScreen, EmptyState } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
+// US state lookup — full name OR 2-letter code → 2-letter code.
+// Used by the Shop-a-Show picker so typing either "Wisconsin" or
+// "WI" matches all shows in that state. Lowercased keys for direct
+// lookup against the lowercased search query.
+const US_STATE_LOOKUP = (() => {
+  const states = {
+    alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR',
+    california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE',
+    florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID',
+    illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS',
+    kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+    massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS',
+    missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV',
+    'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM',
+    'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND',
+    ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA',
+    'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+    tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+    virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+    wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC',
+  };
+  // Both name → code and code → code (so typing "wi" works directly).
+  const out = { ...states };
+  for (const code of Object.values(states)) out[code.toLowerCase()] = code;
+  return out;
+})();
+
 // ============================================================
 // HUB
 // ============================================================
@@ -986,8 +1013,12 @@ export const ShowFloorShopScreen = ({ navigation }) => {
       }));
   }, [upcomingData, eventGroups]);
 
-  // Picker search — filters live + upcoming by name OR city.
-  // Case-insensitive, debounced for low keystroke noise.
+  // Picker search — filters live + upcoming by name OR city OR
+  // state. State values in the DB are 2-letter codes ("WI", "FL").
+  // Map full names to codes so typing "Wisconsin" works as well as
+  // "WI", and treat any state-name match as an exact state filter
+  // (otherwise a 2-letter "wi" sweeps in everything containing those
+  // two letters: "Hartwick", "showcase", "winners", etc.).
   const [pickerSearch, setPickerSearch] = useState('');
   const [debouncedPickerSearch, setDebouncedPickerSearch] = useState('');
   useEffect(() => {
@@ -997,8 +1028,18 @@ export const ShowFloorShopScreen = ({ navigation }) => {
 
   const matchesSearch = (e) => {
     if (!debouncedPickerSearch) return true;
+    const q = debouncedPickerSearch;
+
+    // State-aware filter: if the query exactly matches a state name
+    // or 2-letter code, return ALL events in that state regardless
+    // of whether the name/city/venue mentions the typed text.
+    const stateCode = US_STATE_LOOKUP[q];
+    if (stateCode) {
+      return (e.state || '').toUpperCase() === stateCode;
+    }
+
     const hay = `${e.name || ''} ${e.city || ''} ${e.state || ''} ${e.venue_name || ''}`.toLowerCase();
-    return hay.includes(debouncedPickerSearch);
+    return hay.includes(q);
   };
 
   // Major upcoming shows surface above the state-sorted list so
