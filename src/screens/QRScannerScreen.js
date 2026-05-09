@@ -14,6 +14,12 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
+  // Camera zoom (0 = none, 1 = max). Needed for small printed
+  // QR stickers (sub-12mm) where the camera has trouble locking
+  // on at normal hand-distance — the user can crank zoom up
+  // and bring the QR into focus without physically getting their
+  // phone within 2 inches of the sticker.
+  const [zoom, setZoom] = useState(0);
   const scanGuardRef = useRef(false);
   const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
   const cardIdToAttach = route?.params?.cardId || null;
@@ -245,6 +251,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
       <CameraView
         style={StyleSheet.absoluteFillObject}
         facing="back"
+        zoom={zoom}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
@@ -291,6 +298,34 @@ export const QRScannerScreen = ({ navigation, route }) => {
             <Text style={styles.hint}>Point at the QR code on your card insert</Text>
           ) : null}
         </View>
+
+        {/* Zoom control — tappable 1x / 2x / 5x / 10x preset chips
+            so users scanning small (sub-12mm) stickers can pull
+            the QR into focus from arm's length instead of having
+            to bring the phone within an inch of the sticker. */}
+        {!scanned && (
+          <View style={styles.zoomBar}>
+            {[
+              { label: '1×',  v: 0    },
+              { label: '2×',  v: 0.2  },
+              { label: '5×',  v: 0.5  },
+              { label: '10×', v: 0.85 },
+            ].map((step) => {
+              const active = Math.abs(zoom - step.v) < 0.05;
+              return (
+                <TouchableOpacity
+                  key={step.label}
+                  onPress={() => setZoom(step.v)}
+                  style={[styles.zoomChip, active ? styles.zoomChipActive : null]}
+                >
+                  <Text style={[styles.zoomChipText, active ? styles.zoomChipTextActive : null]}>
+                    {step.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* Bottom actions */}
         <View style={styles.bottomBar}>
@@ -353,4 +388,21 @@ const styles = StyleSheet.create({
   rescanText: { color: Colors.bg, fontWeight: Typography.bold, fontSize: Typography.base },
   manualBtn: { paddingVertical: Spacing.sm },
   manualText: { color: 'rgba(255,255,255,0.5)', fontSize: Typography.sm },
+  zoomBar: {
+    flexDirection: 'row', justifyContent: 'center',
+    paddingVertical: Spacing.sm, gap: Spacing.sm,
+  },
+  zoomChip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  zoomChipActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  zoomChipText: {
+    color: Colors.text, fontSize: 13, fontWeight: Typography.bold,
+  },
+  zoomChipTextActive: { color: Colors.bg },
 });
