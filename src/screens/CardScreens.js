@@ -1024,6 +1024,12 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
         photo_urls: uploaded,
+        // Per-photo source flags ('camera' | 'gallery') so the
+        // server can grant single_scan verification when at least
+        // one photo was captured live in-app. Without this the
+        // backfill would have to assume gallery and downgrade
+        // the badge.
+        photo_sources: photoSources,
         video_url: videoDataUrl || undefined,
         binder_id: pickedBinderId || undefined,
       });
@@ -1466,19 +1472,20 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             );
             return;
           }
-          // Two-step flow: tell the user upfront we want the BACK
-          // first. Backs have machine-printed metadata (year,
-          // card #, set name, copyright) that OCR reads cleanly;
-          // fronts have stylized graphics that confuse Vision.
-          // After OCR, we land on a review screen where the user
-          // can confirm/edit fields and optionally add a front
-          // photo for the listing image.
+          // Pair-vision flow: capture FRONT first (player photo,
+          // foil treatment, set logo, front-stamped serials),
+          // then BACK (card #, copyright, back-stamped serials).
+          // The model cross-references both for confidence and
+          // parallel disambiguation. Old single-back flow used
+          // to land here saying "scan the BACK" — kept the runBackScan
+          // function name but updated the prompt to match the
+          // actual two-step capture order.
           Alert.alert(
-            'Scan the BACK of the card',
-            'Card backs have the printed text (year, set, card #) we use to identify the card. Hold the back flat and well-lit.',
+            'Scan front + back',
+            'We\'ll capture two photos — front first, then back. The pair lets us identify the card and any parallel/serial accurately.',
             [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Take photo', onPress: () => runBackScan() },
+              { text: 'Start with front', onPress: () => runBackScan() },
             ],
           );
         }}
@@ -3116,16 +3123,23 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 </View>
               ) : null}
 
-              {/* Empty state */}
+              {/* Empty state — be honest: eBay deprecated their public
+                  sold-listing API; what we can render via Browse is
+                  live asks only. Sold comps live one tap away on the
+                  research links below. */}
               {!asks.sold?.verified && !asks.sold?.asking_only && !asks.asks?.summary ? (
                 <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
-                  No recent eBay data for this card. Check research tools below.
+                  Live ask data isn't available right now. Tap eBay below to see sold comps directly on eBay.
                 </Text>
               ) : null}
 
-              {/* Research links — always visible */}
+              {/* Research links — always visible. These open
+                  pre-filtered eBay sold + 130 Point searches; they
+                  consistently return data even when the Browse API
+                  doesn't (different endpoints, no rate limit on the
+                  user's own browser). */}
               <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 12, fontStyle: 'italic' }}>
-                Cross-check on:
+                For sold comps and historical data:
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                 {(asks.research_links || []).map((link) => (
