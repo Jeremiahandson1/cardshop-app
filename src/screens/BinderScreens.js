@@ -312,7 +312,7 @@ export const BinderEditorScreen = ({ navigation, route }) => {
 
   const handleShare = async () => {
     if (!existingBinder?.link_token) return;
-    const url = `https://cardshop.app/binder/${existingBinder.link_token}`;
+    const url = `https://cs.twomiah.com/b/${existingBinder.link_token}`;
     try {
       await Share.share({ message: `Check out my binder: ${url}`, url });
     } catch {}
@@ -320,7 +320,7 @@ export const BinderEditorScreen = ({ navigation, route }) => {
 
   const handleCopyLink = async () => {
     if (!existingBinder?.link_token) return;
-    const url = `https://cardshop.app/binder/${existingBinder.link_token}`;
+    const url = `https://cs.twomiah.com/b/${existingBinder.link_token}`;
     await Clipboard.setStringAsync(url);
     Alert.alert('Copied', 'Binder link copied to clipboard.');
   };
@@ -494,7 +494,7 @@ export const BinderEditorScreen = ({ navigation, route }) => {
             <SectionHeader title="Share Link" />
             <View style={styles.shareLinkCard}>
               <Text style={styles.shareLinkUrl} numberOfLines={1}>
-                cardshop.app/binder/{existingBinder.link_token}
+                cs.twomiah.com/b/{existingBinder.link_token}
               </Text>
               <View style={styles.shareLinkBtns}>
                 <TouchableOpacity style={styles.shareLinkBtn} onPress={handleCopyLink}>
@@ -510,17 +510,37 @@ export const BinderEditorScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* QR Code (editing only) */}
+        {/* QR Code (editing only). Server-rendered PNG so the mobile
+            app doesn't need a QR-rendering dependency, and so the
+            print-sign endpoint reuses the exact same image. */}
         {isEditing && form.qr_enabled && existingBinder?.link_token && (
           <View>
             <SectionHeader title="QR Code" />
             <View style={styles.qrCard}>
-              <View style={styles.qrPlaceholder}>
-                <Ionicons name="qr-code" size={80} color={Colors.accent} />
-              </View>
+              <Image
+                source={{ uri: `https://cs.twomiah.com/b/${existingBinder.link_token}/qr.png?size=600` }}
+                style={styles.qrImage}
+              />
               <Text style={styles.qrHint}>
-                Share this QR code at shows for instant binder access
+                Print on a sign or display on a tablet at your booth.{'\n'}
+                Shoppers scan with any phone camera to browse the binder.
               </Text>
+              <View style={styles.qrBtnRow}>
+                <TouchableOpacity
+                  style={styles.qrBtn}
+                  onPress={() => Linking.openURL(`https://cs.twomiah.com/b/${existingBinder.link_token}/sign.html`)}
+                >
+                  <Ionicons name="print-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.qrBtnText}>Print sign</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.qrBtn}
+                  onPress={() => Linking.openURL(`https://cs.twomiah.com/b/${existingBinder.link_token}/qr.png?size=2400`)}
+                >
+                  <Ionicons name="download-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.qrBtnText}>Download PNG</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -2605,12 +2625,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: Radius.md,
     borderWidth: 1, borderColor: Colors.border, padding: Spacing.xl, alignItems: 'center',
   },
-  qrPlaceholder: {
-    width: 160, height: 160, borderRadius: Radius.md,
-    backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center',
+  qrImage: {
+    width: 220, height: 220, borderRadius: Radius.md,
+    backgroundColor: '#fff',
     marginBottom: Spacing.md,
   },
-  qrHint: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center' },
+  qrHint: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center', lineHeight: 18 },
+  qrBtnRow: {
+    flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md, alignSelf: 'stretch',
+  },
+  qrBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: Spacing.sm, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.accent, backgroundColor: 'transparent',
+  },
+  qrBtnText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
 
   // Show floor
   showFloorCard: {
