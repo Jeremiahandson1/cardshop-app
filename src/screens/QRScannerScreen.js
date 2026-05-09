@@ -255,9 +255,20 @@ export const QRScannerScreen = ({ navigation, route }) => {
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
+      {/* Tap-to-zoom: tapping anywhere on the camera preview
+          toggles between 1× and 5×. Lets the user frame the
+          whole card to confirm what they're scanning, then tap
+          to instantly zoom on the QR for the actual decode.
+          Lives behind the overlay chrome so it doesn't intercept
+          taps on the close button, zoom chips, or rescan button. */}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFillObject}
+        activeOpacity={1}
+        onPress={() => setZoom((z) => (z > 0 ? 0 : 0.5))}
+      />
 
       {/* Dark overlay with cutout feel */}
-      <View style={styles.overlay}>
+      <View style={styles.overlay} pointerEvents="box-none">
         {/* Top bar */}
         <SafeAreaView>
           <View style={styles.topBar}>
@@ -295,7 +306,11 @@ export const QRScannerScreen = ({ navigation, route }) => {
           {/* Hide the bottom hint once a scan completes — it covers
               up React Native LogBox warnings that surface there. */}
           {!scanned ? (
-            <Text style={styles.hint}>Point at the QR code on your card insert</Text>
+            <Text style={styles.hint}>
+              {zoom > 0
+                ? 'Zoomed 5× · tap anywhere to zoom out'
+                : 'Frame the card · tap anywhere to zoom 5× on the QR'}
+            </Text>
           ) : null}
         </View>
 
