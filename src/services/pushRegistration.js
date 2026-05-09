@@ -150,6 +150,26 @@ export function registerNotificationResponseHandler(navigationRef) {
         return;
       }
 
+      // Trade-board + binder-card offer events. Server emits
+      // 'trade_offer' / 'binder_offer' on creation, plus the
+      // trade_offer_countered / _accepted / _withdrawn / _declined
+      // family on subsequent events. All route to TradeOfferDetail
+      // (the unified offers table covers both surfaces).
+      if (data?.type === 'trade_offer'
+          || data?.type === 'binder_offer'
+          || data?.type?.startsWith('trade_offer_')
+          || data?.type?.startsWith('binder_offer_')) {
+        if (navReady && data.offer_id) {
+          // TradeOfferDetail lives in the Trade tab stack — navigate
+          // via the tab/stack nested form so the route resolves no
+          // matter which tab was active when the notification fired.
+          navigationRef.current.navigate('Trade', {
+            screen: 'TradeOfferDetail', params: { offerId: data.offer_id },
+          });
+        }
+        return;
+      }
+
       // Saved-search match — open the matching listing detail.
       if (data?.type === 'saved_search_match') {
         if (navReady && data.listing_id) {

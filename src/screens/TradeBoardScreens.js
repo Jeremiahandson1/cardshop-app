@@ -1532,7 +1532,10 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
       accept.mutate();
       return;
     }
-    navigation.navigate('FirstTradeSafetyScreen', {
+    // Screen is registered as 'FirstTradeSafety' (no 'Screen'
+     // suffix) — the mismatched route name was silently failing,
+     // which is why Accept appeared to do nothing on the first tap.
+     navigation.navigate('FirstTradeSafety', {
       onAcknowledge: async () => {
         try {
           await SecureStore.setItemAsync(SAFETY_CHECKLIST_SEEN_KEY, 'true');
