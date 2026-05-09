@@ -943,7 +943,7 @@ export const ShowFloorShopScreen = ({ navigation }) => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
 
-  const { data: liveData, isLoading: liveLoading } = useQuery({
+  const { data: liveData, isLoading: liveLoading, error: liveError } = useQuery({
     queryKey: ['show-floor-live-shop'],
     queryFn: () => showFloorApi.live({}).then((r) => r.data),
   });
@@ -951,7 +951,7 @@ export const ShowFloorShopScreen = ({ navigation }) => {
   // exist on the calendar even when zero sellers have checked
   // in yet. A buyer arriving early at the National shouldn't
   // see "No active shows" when 200 sellers are an hour away.
-  const { data: upcomingData } = useQuery({
+  const { data: upcomingData, isLoading: upcomingLoading, error: upcomingError, refetch: refetchUpcoming } = useQuery({
     queryKey: ['show-events-upcoming'],
     queryFn: () => showEventsApi.list({ upcoming: true, limit: 500 }).then((r) => r.data),
   });
@@ -1057,8 +1057,39 @@ export const ShowFloorShopScreen = ({ navigation }) => {
           />
         </View>
 
-        {liveLoading ? <LoadingScreen /> : (
+        {/* Don't gate the entire render on liveLoading — if the
+            live-shows query is slow or errors, the upcoming-events
+            list (which is what 95% of users actually want) was
+            hidden behind a spinner forever. Render as soon as
+            either query has data; the section bars are conditional
+            anyway, so a slow live-shows query just delays the "Live
+            now" header. */}
+        {liveLoading && upcomingLoading ? <LoadingScreen /> : (
           <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingTop: 0 }}>
+            {/* Surface query errors instead of silently degrading
+                to "No shows scheduled". A 401 or network drop here
+                used to look identical to a real empty calendar. */}
+            {(liveError || upcomingError) && (
+              <View style={{
+                backgroundColor: 'rgba(239,68,68,0.1)',
+                borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+                borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md,
+              }}>
+                <Text style={{ color: '#fca5a5', fontWeight: Typography.bold, marginBottom: 4 }}>
+                  Couldn't load shows
+                </Text>
+                <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+                  {(upcomingError?.response?.data?.error) || (liveError?.response?.data?.error) || upcomingError?.message || liveError?.message || 'Network error'}
+                </Text>
+                <TouchableOpacity
+                  onPress={refetchUpcoming}
+                  style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: Colors.accent }}
+                >
+                  <Text style={{ color: Colors.accent, fontSize: Typography.xs, fontWeight: Typography.bold }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Live now — sellers actively checked in. */}
             {filteredLive.length > 0 ? (
               <>
@@ -1144,14 +1175,24 @@ export const ShowFloorShopScreen = ({ navigation }) => {
               </>
             ) : null}
 
+            {/* Empty state only fires when both queries have RESOLVED
+                with no rows. While upcoming is still in flight, show
+                a tighter loading hint so the user doesn't think the
+                calendar is empty. */}
             {filteredLive.length === 0 && majorUpcoming.length === 0 && otherUpcomingByState.length === 0 ? (
-              <EmptyState
-                icon={pickerSearch ? 'search-outline' : 'calendar-outline'}
-                title={pickerSearch ? 'No shows match' : 'No shows scheduled'}
-                message={pickerSearch
-                  ? 'Try a different name or city.'
-                  : "When sellers go live at a show, or shows are added to the calendar, they'll appear here."}
-              />
+              upcomingLoading ? (
+                <View style={{ paddingVertical: Spacing.xl, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.textMuted }}>Loading upcoming shows…</Text>
+                </View>
+              ) : !liveError && !upcomingError ? (
+                <EmptyState
+                  icon={pickerSearch ? 'search-outline' : 'calendar-outline'}
+                  title={pickerSearch ? 'No shows match' : 'No shows scheduled'}
+                  message={pickerSearch
+                    ? 'Try a different name or city.'
+                    : "When sellers go live at a show, or shows are added to the calendar, they'll appear here."}
+                />
+              ) : null
             ) : null}
           </ScrollView>
         )}
