@@ -245,6 +245,7 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="CollectionMain" component={CollectionScreen} />
     <CollectionStackNav.Screen name="CollectionImportExport" component={CollectionImportExportScreen} />
     <CollectionStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <CollectionStackNav.Screen name="CardChain" component={CardChainScreen} />
     <CollectionStackNav.Screen name="EditCard" component={EditCardScreen} />
     <CollectionStackNav.Screen name="ConversationList" component={ConversationListScreen} />
     <CollectionStackNav.Screen name="Conversation" component={ConversationScreen} />
@@ -270,6 +271,7 @@ const BinderStack = () => (
     <BinderStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <BinderStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <BinderStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <BinderStackNav.Screen name="CardChain" component={CardChainScreen} />
     <BinderStackNav.Screen name="EditCard" component={EditCardScreen} />
     <BinderStackNav.Screen name="Conversation" component={ConversationScreen} />
     <BinderStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
