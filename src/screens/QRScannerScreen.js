@@ -14,23 +14,15 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
-  // Tap-to-zoom on the camera preview. Storing {x,y} of the
-  // last tap (or null when not zoomed). When set, we apply a
-  // CSS transform to the CameraView that scales by ZOOM_FACTOR
-  // and translates so the tap point lands at the screen center.
-  // The barcode scanner runs on the FULL sensor frame regardless
-  // of the visual transform, so we lose nothing on decode.
-  const ZOOM_FACTOR = 4;
-  const [zoomCenter, setZoomCenter] = useState(null);
-  const screen = Dimensions.get('window');
-  // Computed transform — identity when not zoomed.
-  const cameraTransform = zoomCenter
-    ? [
-        { translateX: -(ZOOM_FACTOR - 1) * (zoomCenter.x - screen.width / 2) },
-        { translateY: -(ZOOM_FACTOR - 1) * (zoomCenter.y - screen.height / 2) },
-        { scale: ZOOM_FACTOR },
-      ]
-    : [];
+  // Tap-to-zoom on the camera preview. Tracks whether we're
+  // zoomed in (true) or not (false). We tried CSS-transform
+  // tap-centered zoom but it was breaking autofocus on some
+  // devices — reverted to expo-camera's native zoom prop which
+  // properly co-operates with continuous autofocus.
+  // Native zoom is sensor-based and stays centered on the
+  // screen middle; the user just frames the QR there.
+  const [isZoomed, setIsZoomed] = useState(false);
+  const NATIVE_ZOOM = 0.4; // ~4× on most devices
   const scanGuardRef = useRef(false);
   const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
   const cardIdToAttach = route?.params?.cardId || null;
@@ -260,27 +252,21 @@ export const QRScannerScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <CameraView
-        style={[StyleSheet.absoluteFillObject, { transform: cameraTransform }]}
+        style={StyleSheet.absoluteFillObject}
         facing="back"
+        autofocus="on"
+        zoom={isZoomed ? NATIVE_ZOOM : 0}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
-      {/* Tap-to-zoom: tapping anywhere on the preview toggles
-          between 1× and 4× zoom CENTERED on the tap point. The
-          barcode scanner still reads the full sensor frame
-          regardless of the visual transform — no decode penalty.
-          Pressable lets us read the touch (x,y); a TouchableOpacity
-          would only give us the press event. */}
+      {/* Tap-to-zoom: tapping the preview toggles native sensor
+          zoom on/off. Centered on the screen middle — the user
+          frames the QR in the center then taps to zoom. CSS-
+          transform tap-centered zoom was breaking autofocus on
+          Android, hence the simpler approach. */}
       <Pressable
         style={StyleSheet.absoluteFillObject}
-        onPress={(e) => {
-          if (zoomCenter) {
-            setZoomCenter(null);
-          } else {
-            const { locationX, locationY } = e.nativeEvent;
-            setZoomCenter({ x: locationX, y: locationY });
-          }
-        }}
+        onPress={() => setIsZoomed((z) => !z)}
       />
 
       {/* Dark overlay with cutout feel */}
@@ -323,7 +309,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
               up React Native LogBox warnings that surface there. */}
           {!scanned ? (
             <Text style={styles.hint}>
-              {zoomCenter
+              {isZoomed
                 ? 'Zoomed 4× · tap anywhere to zoom out'
                 : 'Frame the card · tap on the QR to zoom 4× there'}
             </Text>
@@ -334,10 +320,10 @@ export const QRScannerScreen = ({ navigation, route }) => {
             non-tap-anywhere way to bail. Some users miss the
             "tap anywhere to zoom out" hint and try to find a
             button. This is that button. */}
-        {zoomCenter && !scanned && (
+        {isZoomed && !scanned && (
           <View style={styles.zoomBar} pointerEvents="box-none">
             <TouchableOpacity
-              onPress={() => setZoomCenter(null)}
+              onPress={() => setIsZoomed(false)}
               style={[styles.zoomChip, styles.zoomChipActive]}
             >
               <Text style={[styles.zoomChipText, styles.zoomChipTextActive]}>
