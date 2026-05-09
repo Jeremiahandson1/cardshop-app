@@ -14,15 +14,23 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
-  // Tap-to-zoom on the camera preview. Tracks whether we're
-  // zoomed in (true) or not (false). We tried CSS-transform
-  // tap-centered zoom but it was breaking autofocus on some
-  // devices — reverted to expo-camera's native zoom prop which
-  // properly co-operates with continuous autofocus.
-  // Native zoom is sensor-based and stays centered on the
-  // screen middle; the user just frames the QR there.
-  const [isZoomed, setIsZoomed] = useState(false);
-  const NATIVE_ZOOM = 0.4; // ~4× on most devices
+  // Three-state zoom cycle. User testing showed:
+  //   - Default 1× was fine for handheld at 4-6in but useless
+  //     standing over a display case (card too small to even see).
+  //   - 4× was halfway — readable but small QR stickers still
+  //     missed at arm's length.
+  //   - User asked for "start zoomed a little + a bigger jump."
+  // Three steps, taps cycle: 2× → 5× → 10× → back to 2×.
+  // expo-camera zoom is 0..1; values mapped empirically to those
+  // visible factors on iPhone 14 / Pixel 7.
+  const ZOOM_STEPS = [
+    { v: 0.2,  label: '2×' },
+    { v: 0.5,  label: '5×' },
+    { v: 0.85, label: '10×' },
+  ];
+  const [zoomIdx, setZoomIdx] = useState(0); // 0 = 2× (start zoomed)
+  const cycleZoom = () => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length);
+  const currentZoom = ZOOM_STEPS[zoomIdx];
   const scanGuardRef = useRef(false);
   const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
   const cardIdToAttach = route?.params?.cardId || null;
@@ -255,18 +263,17 @@ export const QRScannerScreen = ({ navigation, route }) => {
         style={StyleSheet.absoluteFillObject}
         facing="back"
         autofocus="on"
-        zoom={isZoomed ? NATIVE_ZOOM : 0}
+        zoom={currentZoom.v}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
-      {/* Tap-to-zoom: tapping the preview toggles native sensor
-          zoom on/off. Centered on the screen middle — the user
-          frames the QR in the center then taps to zoom. CSS-
-          transform tap-centered zoom was breaking autofocus on
-          Android, hence the simpler approach. */}
+      {/* Tap to cycle through 2× → 5× → 10× → 2×. Default is 2×
+          so the card is visible at arm's length; subsequent taps
+          step in for tiny QR stickers without you having to fish
+          through chip buttons. */}
       <Pressable
         style={StyleSheet.absoluteFillObject}
-        onPress={() => setIsZoomed((z) => !z)}
+        onPress={cycleZoom}
       />
 
       {/* Dark overlay with cutout feel */}
@@ -309,25 +316,24 @@ export const QRScannerScreen = ({ navigation, route }) => {
               up React Native LogBox warnings that surface there. */}
           {!scanned ? (
             <Text style={styles.hint}>
-              {isZoomed
-                ? 'Zoomed 4× · tap anywhere to zoom out'
-                : 'Frame the card · tap on the QR to zoom 4× there'}
+              Frame the QR in the center · tap to zoom in (currently {currentZoom.label})
             </Text>
           ) : null}
         </View>
 
-        {/* Zoom-out chip — only shown when zoomed, gives a clear
-            non-tap-anywhere way to bail. Some users miss the
-            "tap anywhere to zoom out" hint and try to find a
-            button. This is that button. */}
-        {isZoomed && !scanned && (
+        {/* Floating zoom-state chip — always visible, shows the
+            current step in the 2/5/10× cycle and is tappable as
+            an explicit alternative to tapping the camera area
+            (some users tap chrome corners and don't realize the
+            preview is the gesture target). */}
+        {!scanned && (
           <View style={styles.zoomBar} pointerEvents="box-none">
             <TouchableOpacity
-              onPress={() => setIsZoomed(false)}
+              onPress={cycleZoom}
               style={[styles.zoomChip, styles.zoomChipActive]}
             >
               <Text style={[styles.zoomChipText, styles.zoomChipTextActive]}>
-                Zoom out
+                {currentZoom.label} · tap to cycle
               </Text>
             </TouchableOpacity>
           </View>
