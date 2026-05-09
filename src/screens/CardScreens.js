@@ -1032,6 +1032,28 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         photo_sources: photoSources,
         video_url: videoDataUrl || undefined,
         binder_id: pickedBinderId || undefined,
+        // Silent training-data capture. Only sent when the user
+        // came through the vision-scan path (scanReview is null
+        // on manual / cascade / search registers). Server writes
+        // it to ai_scan_corrections after the card insert.
+        scan_log: scanReview ? {
+          ai_player_name: scanReview.player_name || null,
+          ai_year: scanReview.year || null,
+          ai_card_number: scanReview.card_number || null,
+          ai_set_name: scanReview.set_name || null,
+          ai_manufacturer: scanReview.manufacturer || null,
+          ai_parallel: scanReview.parallel || null,
+          ai_confidence: scanReview.confidence ?? null,
+          ai_candidate_ids: Array.isArray(scanReview.candidates)
+            ? scanReview.candidates.map((c) => c?.id).filter(Boolean)
+            : [],
+          ai_top_picked: Array.isArray(scanReview.candidates) && scanReview.candidates.length > 0
+            ? scanReview.candidates[0]?.id === selectedCatalog?.id
+            : null,
+          front_image_url: scanReview.frontUri || null,
+          back_image_url: scanReview.backUri || null,
+          vision_mode: scanReview.backUri ? 'pair' : 'front_only',
+        } : undefined,
       });
     },
     onSuccess: (res) => {
