@@ -61,7 +61,7 @@ const TIER_DEFS = {
   },
   show_floor: {
     label: 'Show Floor',
-    fallbackPrice: '$14.99/mo',
+    fallbackPrice: '$24.99/mo',
     blurb: 'Everything in Collector Pro, plus the show-event experience.',
     features: [
       { icon: 'storefront-outline', title: 'Live booth at any show',        desc: 'Pick binders, set table number, go live. Buyers walk to your table.' },

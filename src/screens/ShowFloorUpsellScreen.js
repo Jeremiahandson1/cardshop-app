@@ -77,8 +77,8 @@ export const ShowFloorUpsellScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.priceBlock}>
-          <Text style={styles.price}>$14.99/mo</Text>
-          <Text style={styles.priceSub}>Includes everything in Collector Pro.</Text>
+          <Text style={styles.price}>$24.99/mo</Text>
+          <Text style={styles.priceSub}>or $249/yr — save $50 (2 months free). Includes everything in Collector Pro.</Text>
         </View>
 
         <Button

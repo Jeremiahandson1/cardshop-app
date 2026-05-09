@@ -14,7 +14,7 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
 
 // Tiers that include Show Floor access. Collector Pro does NOT —
-// Show Floor is a $14.99 standalone upgrade. Stores get it bundled.
+// Show Floor is a $24.99 standalone upgrade. Stores get it bundled.
 const SHOW_FLOOR_TIERS = new Set(['show_floor', 'store_starter', 'store_pro']);
 
 const TILES = [
