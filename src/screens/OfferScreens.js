@@ -13,7 +13,7 @@
 // Trade Board / binder offers. Two separate domains, two separate
 // flows.
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
   ScrollView, Alert, TextInput, RefreshControl, Linking,
@@ -24,6 +24,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import {
   listingOffersApi, listingsApi, cartApi, checkoutApi, walletApi,
+  offersApi,
 } from '../services/api';
 import { Button, ScreenHeader, EmptyState, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -149,66 +150,181 @@ export const MakeListingOfferScreen = ({ navigation, route }) => {
 // ============================================================
 // MY OFFERS — list with role tabs
 // ============================================================
+// Unified offers inbox. Pulls from THREE sources at once:
+//   1. listing_offers — cash offers on marketplace listings
+//   2. offers (target_type='trade_listing') — card-for-card trades
+//   3. offers (target_type='binder')        — legacy binder offers
+//
+// One screen, one list, one place to look. Filter chips at the top
+// scope to a single source when needed; default 'All' shows the
+// merged + chronologically-sorted union. Tapping a row routes to
+// the type-specific detail screen (each kind keeps its own UI
+// because the actions differ — checkout-from-accepted on listings
+// vs accept-trade-cards on trades vs binder counter-flow).
+
+const KIND_META = {
+  marketplace: { label: 'Marketplace', icon: 'cart-outline',         color: '#4ade80' },
+  trade:       { label: 'Trade',       icon: 'swap-horizontal',      color: '#60a5fa' },
+  binder:      { label: 'Binder',      icon: 'book-outline',         color: '#a78bfa' },
+};
+const KIND_ORDER = ['all', 'marketplace', 'trade', 'binder'];
+
 export const MyOffersScreen = ({ navigation }) => {
-  const [role, setRole] = useState('buyer');
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['offers', role],
-    queryFn: () => listingOffersApi.list({ role }),
+  const [direction, setDirection] = useState('received');
+  const [kindFilter, setKindFilter] = useState('all');
+
+  // Marketplace listing-offers. role=buyer for sent, seller for
+  // received — naming inversion baked into the existing endpoint.
+  const mpQ = useQuery({
+    queryKey: ['unified-offers-mp', direction],
+    queryFn: () => listingOffersApi.list({ role: direction === 'sent' ? 'buyer' : 'seller' }),
   });
 
-  const offers = data?.offers || [];
+  // Trade-board + binder offers come from the same endpoint, just
+  // different target_type values. Pull both in one call (no filter)
+  // so we don't double the network round-trips.
+  const tbQ = useQuery({
+    queryKey: ['unified-offers-tb', direction],
+    queryFn: () => offersApi.mine({ direction, limit: 100 }).then((r) => r.data),
+  });
+
+  const isLoading = mpQ.isLoading || tbQ.isLoading;
+  const isFetching = mpQ.isFetching || tbQ.isFetching;
+  const refetch = () => Promise.all([mpQ.refetch(), tbQ.refetch()]);
+
+  // Normalize each source into a common row shape so the renderer
+  // doesn't have to branch on every field.
+  const rows = useMemo(() => {
+    const all = [];
+    for (const o of (mpQ.data?.offers || [])) {
+      all.push({
+        id: `mp-${o.id}`,
+        rawId: o.id,
+        kind: 'marketplace',
+        title: o.cart_id ? 'Bundle offer' : 'Listing offer',
+        subtitle: statusLabel(o.status),
+        amount: o.amount_cents != null ? usd(o.amount_cents) : null,
+        status: o.status,
+        updatedAt: o.updated_at || o.created_at,
+        expiresAt: o.expires_at,
+      });
+    }
+    for (const o of (tbQ.data?.offers || [])) {
+      const isTrade = o.target_type === 'trade_listing';
+      all.push({
+        id: `tb-${o.id}`,
+        rawId: o.id,
+        kind: isTrade ? 'trade' : 'binder',
+        title: isTrade
+          ? (o.tl_card_name || 'Trade offer')
+          : (o.binder_name || 'Binder offer'),
+        subtitle: `${o.direction === 'sent' ? 'to' : 'from'} ${o.other_party_name || 'user'} · ${o.status}`,
+        amount: o.offer_amount ? `$${o.offer_amount}` : null,
+        status: o.status,
+        updatedAt: o.updated_at || o.created_at,
+      });
+    }
+    all.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    if (kindFilter !== 'all') return all.filter((r) => r.kind === kindFilter);
+    return all;
+  }, [mpQ.data, tbQ.data, kindFilter]);
+
+  // Type-aware navigation: each kind has its own detail screen
+  // because the actions surface there differ enough that one
+  // unified detail would be a worse UX than three.
+  const openRow = (row) => {
+    if (row.kind === 'marketplace') return navigation.navigate('ListingOfferDetail', { id: row.rawId });
+    if (row.kind === 'trade')       return navigation.navigate('TradeOfferDetail',   { offerId: row.rawId });
+    if (row.kind === 'binder')      return navigation.navigate('OfferDetail',        { offerId: row.rawId });
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScreenHeader title="Offers" />
       <View style={styles.tabs}>
-        <TouchableOpacity style={[styles.tab, role === 'buyer' && styles.tabActive]} onPress={() => setRole('buyer')}>
-          <Text style={[styles.tabText, role === 'buyer' && styles.tabTextActive]}>Sent</Text>
+        <TouchableOpacity style={[styles.tab, direction === 'received' && styles.tabActive]} onPress={() => setDirection('received')}>
+          <Text style={[styles.tabText, direction === 'received' && styles.tabTextActive]}>Received</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, role === 'seller' && styles.tabActive]} onPress={() => setRole('seller')}>
-          <Text style={[styles.tabText, role === 'seller' && styles.tabTextActive]}>Received</Text>
+        <TouchableOpacity style={[styles.tab, direction === 'sent' && styles.tabActive]} onPress={() => setDirection('sent')}>
+          <Text style={[styles.tabText, direction === 'sent' && styles.tabTextActive]}>Sent</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Kind filter chips — All / Marketplace / Trade / Binder.
+          Horizontally scrollable in case we add more sources later. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.sm, gap: 8 }}
+      >
+        {KIND_ORDER.map((k) => {
+          const meta = KIND_META[k];
+          const active = kindFilter === k;
+          const label = k === 'all' ? 'All' : meta.label;
+          return (
+            <TouchableOpacity
+              key={k}
+              onPress={() => setKindFilter(k)}
+              style={{
+                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+                borderWidth: 1,
+                borderColor: active ? Colors.accent : Colors.border,
+                backgroundColor: active ? 'rgba(232,197,71,0.12)' : 'transparent',
+              }}
+            >
+              <Text style={{ color: active ? Colors.accent : Colors.textMuted, fontSize: 13, fontWeight: '600' }}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       {isLoading ? (
         <LoadingScreen />
-      ) : !offers.length ? (
+      ) : !rows.length ? (
         <EmptyState
           icon="💬"
-          title={role === 'buyer' ? 'No offers sent' : 'No offers received'}
-          message={role === 'buyer'
-            ? 'Tap "Make offer" on any listing that accepts them.'
-            : 'When buyers offer on your listings, they\'ll show up here.'}
+          title={direction === 'sent' ? 'No offers sent' : 'No offers received'}
+          message={direction === 'sent'
+            ? 'When you offer on a listing, trade card, or binder, it\'ll show up here.'
+            : 'When someone offers on your listings, trade cards, or binders, they\'ll show up here.'}
         />
       ) : (
         <FlatList
-          data={offers}
-          keyExtractor={(o) => o.id}
+          data={rows}
+          keyExtractor={(r) => r.id}
           contentContainerStyle={{ padding: Spacing.md, gap: Spacing.sm }}
           refreshControl={<RefreshControl refreshing={isFetching && !isLoading} onRefresh={refetch} tintColor={Colors.text} />}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.offerRow}
-              onPress={() => navigation.navigate('ListingOfferDetail', { id: item.id })}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.offerStatus}>{statusLabel(item.status)}</Text>
-                <Text style={styles.offerSub}>
-                  {item.cart_id ? 'Bundle offer' : 'Listing offer'}
-                  {' · '}
-                  {new Date(item.updated_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.offerAmount}>{usd(item.amount_cents)}</Text>
-                {['open', 'countered', 'accepted'].includes(item.status) && (
-                  <Text style={styles.offerExpires}>
-                    {timeUntil(item.expires_at)} left
+          renderItem={({ item }) => {
+            const meta = KIND_META[item.kind];
+            return (
+              <TouchableOpacity style={styles.offerRow} onPress={() => openRow(item)}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: `${meta.color}22`,
+                  alignItems: 'center', justifyContent: 'center',
+                  marginRight: Spacing.md,
+                }}>
+                  <Ionicons name={meta.icon} size={18} color={meta.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.offerStatus}>{item.title}</Text>
+                  <Text style={styles.offerSub}>
+                    {meta.label} · {item.subtitle}
                   </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  {item.amount && <Text style={styles.offerAmount}>{item.amount}</Text>}
+                  {item.expiresAt && ['open', 'countered', 'accepted'].includes(item.status) && (
+                    <Text style={styles.offerExpires}>
+                      {timeUntil(item.expiresAt)} left
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </SafeAreaView>
