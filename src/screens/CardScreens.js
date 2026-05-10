@@ -515,6 +515,12 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     personal_valuation: '',
     notes: '',
     public_notes: '',
+    // Vault state — when set, verification_level becomes
+    // 'vault_verified' and live photos are optional. The card
+    // shows as 'Vaulted at X' on public scan instead of 'In-hand'.
+    vault_provider: null,
+    vault_locker_id: '',
+    vault_receipt_url: '',
   });
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -1074,6 +1080,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         // on manual / cascade / search registers). Server writes
         // it to ai_scan_corrections after the card insert.
         tagging_session_id: activeTaggingSessionId || undefined,
+        vault_provider: form.vault_provider || undefined,
+        vault_locker_id: form.vault_provider ? (form.vault_locker_id || undefined) : undefined,
+        vault_receipt_url: form.vault_provider ? (form.vault_receipt_url || undefined) : undefined,
         scan_log: scanReview ? {
           ai_player_name: scanReview.player_name || null,
           ai_year: scanReview.year || null,
@@ -2286,6 +2295,64 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        {/* Vault declaration — for cards held by a third-party vault
+            (PSA Vault, Goldin, eBay Vault, etc.). When set, the card
+            is marked vault_verified and live photos are optional.
+            Public scan shows 'Vaulted at X' instead of 'In-hand'. */}
+        <View>
+          <SectionHeader title="Is this card in a vault?" />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            Optional. For cards held by a third-party vault service. We mark
+            it 'Vaulted at [provider]' on the public scan page so buyers know
+            the card isn't in your hands today.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.sm }}>
+            {[
+              { key: null,            label: 'Not vaulted' },
+              { key: 'psa_vault',     label: 'PSA Vault' },
+              { key: 'goldin_vault',  label: 'Goldin' },
+              { key: 'ebay_vault',    label: 'eBay Vault' },
+              { key: 'fanatics_vault',label: 'Fanatics Collect' },
+              { key: 'whatnot_vault', label: 'Whatnot' },
+              { key: 'private_vault', label: 'Private' },
+            ].map((v) => (
+              <TouchableOpacity
+                key={v.key || 'none'}
+                onPress={() => set('vault_provider')(v.key)}
+                style={{
+                  paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: form.vault_provider === v.key ? Colors.accent : Colors.border,
+                  backgroundColor: form.vault_provider === v.key ? 'rgba(232,197,71,0.12)' : 'transparent',
+                }}
+              >
+                <Text style={{
+                  color: form.vault_provider === v.key ? Colors.accent : Colors.textMuted,
+                  fontSize: 13, fontWeight: '600',
+                }}>{v.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {form.vault_provider ? (
+            <>
+              <Input
+                label="Locker / vault ID (recommended)"
+                value={form.vault_locker_id}
+                onChangeText={set('vault_locker_id')}
+                placeholder="e.g. PSA-VLT-123456"
+                autoCapitalize="characters"
+              />
+              <Input
+                label="Receipt / screenshot URL (optional)"
+                value={form.vault_receipt_url}
+                onChangeText={set('vault_receipt_url')}
+                placeholder="Link to vault confirmation email or dashboard screenshot"
+                autoCapitalize="none"
+              />
+            </>
+          ) : null}
         </View>
 
         {/* Price if lets_talk */}

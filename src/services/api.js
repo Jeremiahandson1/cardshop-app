@@ -329,6 +329,25 @@ export const adminStoresApi = {
   locations: (storeId) => api.get(`/stores/${storeId}/locations`).then((r) => r.data),
 };
 
+// Vault state — collectors/admins moving cards into / out of a
+// third-party vault (PSA Vault, eBay Vault, etc.).
+export const vaultApi = {
+  checkIn: (cardId, body) => api.post(`/cards/${cardId}/vault/check-in`, body).then((r) => r.data),
+  checkOut: (cardId) => api.post(`/cards/${cardId}/vault/check-out`).then((r) => r.data),
+};
+
+// User-to-user reviews + complaints. Reviews are public per-deal
+// 👍/👎 + comment; complaints route to admin moderation.
+export const reviewsApi = {
+  leave: (subjectUserId, body) =>
+    api.post(`/users/${subjectUserId}/reviews`, body).then((r) => r.data),
+  list: (subjectUserId, params) =>
+    api.get(`/users/${subjectUserId}/reviews`, { params }).then((r) => r.data),
+};
+export const complaintsApi = {
+  file: (body) => api.post('/safety/user-complaint', body).then((r) => r.data),
+};
+
 // Pro Tagging session API — admin-only. Mobile uses these to start
 // a session before tagging a shop's inventory; once active, the
 // register-card flow includes the session_id with every card.
