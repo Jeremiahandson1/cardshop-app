@@ -373,6 +373,10 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     <ProfileStackNav.Screen name="TradeOffersList" component={TradeOffersListScreen} />
     <ProfileStackNav.Screen name="TradeOfferDetail" component={TradeOfferDetailScreen} />
+    {/* FirstTradeSafety gated the very first Accept tap; it was only
+        registered in TradeStack, so accepts from Profile (push deep
+        link, offers inbox) silently no-op'd. */}
+    <ProfileStackNav.Screen name="FirstTradeSafety" component={FirstTradeSafetyScreen} />
     <ProfileStackNav.Screen name="SetsList" component={SetsListScreen} />
     <ProfileStackNav.Screen name="BrowseSets" component={BrowseSetsScreen} />
     <ProfileStackNav.Screen name="SetCompletion" component={SetCompletionScreen} />
