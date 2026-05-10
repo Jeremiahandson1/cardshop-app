@@ -65,7 +65,11 @@ const TILES = [
     title: 'Active Trade Offers',
     bg: 'rgba(167,139,250,0.10)',
     border: 'rgba(167,139,250,0.45)',
-    target: { tab: 'Profile', screen: 'MyOffers' },
+    // Pin the kind filter to 'trade' and hide the chip rail entirely
+    // — coming from this tile, the user has signaled they only care
+    // about trade offers, so the All/Marketplace/Binder chips would
+    // just be visual noise.
+    target: { tab: 'Profile', screen: 'MyOffers', params: { initialKindFilter: 'trade', lockKind: true } },
     // subtitle is computed at render from counts.active_trade_offers
   },
   {
@@ -154,8 +158,14 @@ export const HomeHubScreen = ({ navigation }) => {
       return;
     }
     try {
-      if (target.screen) navigation.navigate(target.tab, { screen: target.screen });
-      else navigation.navigate(target.tab);
+      if (target.screen) {
+        navigation.navigate(target.tab, {
+          screen: target.screen,
+          params: target.params,
+        });
+      } else {
+        navigation.navigate(target.tab);
+      }
     } catch (e) {
       console.warn('[home] navigate failed', e?.message);
     }

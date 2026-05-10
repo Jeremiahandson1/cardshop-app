@@ -169,9 +169,15 @@ const KIND_META = {
 };
 const KIND_ORDER = ['all', 'marketplace', 'trade', 'binder'];
 
-export const MyOffersScreen = ({ navigation }) => {
+export const MyOffersScreen = ({ navigation, route }) => {
+  // When opened from the home tile "Active Trade Offers", the route
+  // arrives with initialKindFilter='trade' + lockKind=true so the
+  // chip rail is hidden and the list filters to trade offers only.
+  // Direct nav from Profile → Offers gets the full unified inbox.
+  const initialKindFilter = route?.params?.initialKindFilter || 'all';
+  const lockKind = !!route?.params?.lockKind;
   const [direction, setDirection] = useState('received');
-  const [kindFilter, setKindFilter] = useState('all');
+  const [kindFilter, setKindFilter] = useState(initialKindFilter);
 
   // Marketplace listing-offers. role=buyer for sent, seller for
   // received — naming inversion baked into the existing endpoint.
@@ -240,7 +246,7 @@ export const MyOffersScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="Offers" />
+      <ScreenHeader title={lockKind && kindFilter === 'trade' ? 'Trade Offers' : 'Offers'} />
       <View style={styles.tabs}>
         <TouchableOpacity style={[styles.tab, direction === 'received' && styles.tabActive]} onPress={() => setDirection('received')}>
           <Text style={[styles.tabText, direction === 'received' && styles.tabTextActive]}>Received</Text>
@@ -251,34 +257,38 @@ export const MyOffersScreen = ({ navigation }) => {
       </View>
 
       {/* Kind filter chips — All / Marketplace / Trade / Binder.
-          Horizontally scrollable in case we add more sources later. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.sm, gap: 8 }}
-      >
-        {KIND_ORDER.map((k) => {
-          const meta = KIND_META[k];
-          const active = kindFilter === k;
-          const label = k === 'all' ? 'All' : meta.label;
-          return (
-            <TouchableOpacity
-              key={k}
-              onPress={() => setKindFilter(k)}
-              style={{
-                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
-                borderWidth: 1,
-                borderColor: active ? Colors.accent : Colors.border,
-                backgroundColor: active ? 'rgba(232,197,71,0.12)' : 'transparent',
-              }}
-            >
-              <Text style={{ color: active ? Colors.accent : Colors.textMuted, fontSize: 13, fontWeight: '600' }}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+          Hidden when arriving from a tile that already pinned the
+          filter (e.g. home → Active Trade Offers), since the chips
+          would just be visual noise the user has to ignore. */}
+      {!lockKind ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.sm, gap: 8 }}
+        >
+          {KIND_ORDER.map((k) => {
+            const meta = KIND_META[k];
+            const active = kindFilter === k;
+            const label = k === 'all' ? 'All' : meta.label;
+            return (
+              <TouchableOpacity
+                key={k}
+                onPress={() => setKindFilter(k)}
+                style={{
+                  paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: active ? Colors.accent : Colors.border,
+                  backgroundColor: active ? 'rgba(232,197,71,0.12)' : 'transparent',
+                }}
+              >
+                <Text style={{ color: active ? Colors.accent : Colors.textMuted, fontSize: 13, fontWeight: '600' }}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       {isLoading ? (
         <LoadingScreen />
