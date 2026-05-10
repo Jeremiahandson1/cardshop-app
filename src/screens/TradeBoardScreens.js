@@ -1681,21 +1681,60 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {/* Offered cards summary + optional cash boot */}
+        {/* Offered cards — was rendering '1 card' instead of the
+            actual card. The API now returns trade_cards resolved
+            against the catalog so the recipient sees what they're
+            being offered before deciding. */}
         <View style={styles.offerTerms}>
-          <Text style={styles.offerTermsLabel}>Offer</Text>
-          <Text style={styles.offerTermsLine}>
-            {Array.isArray(offer.trade_card_ids) && offer.trade_card_ids.length
-              ? `${offer.trade_card_ids.length} card${offer.trade_card_ids.length === 1 ? '' : 's'}`
-              : 'No cards'}
-            {offer.offer_amount && Number(offer.offer_amount) > 0
-              ? ` + $${Number(offer.offer_amount).toFixed(2)} cash`
-              : ''}
-          </Text>
+          <Text style={styles.offerTermsLabel}>Offering</Text>
+          {Array.isArray(offer.trade_cards) && offer.trade_cards.length > 0 ? (
+            <View style={{ marginTop: 4 }}>
+              {offer.trade_cards.map((c) => (
+                <View key={c.id} style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: Spacing.sm,
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: Colors.border,
+                }}>
+                  {c.image_url ? (
+                    <Image
+                      source={{ uri: c.image_url }}
+                      style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text>🃏</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                      {[c.year, c.set_name, c.player_name].filter(Boolean).join(' · ') || 'Card'}
+                    </Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+                      {c.card_number ? `#${c.card_number} ` : ''}
+                      {c.parallel ? `· ${c.parallel} ` : ''}
+                      {c.grading_company ? `· ${c.grading_company.toUpperCase()} ${c.grade || ''}` : ''}
+                      {c.serial_number && c.print_run ? ` · #${c.serial_number}/${c.print_run}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.offerTermsLine}>No cards</Text>
+          )}
           {offer.offer_amount && Number(offer.offer_amount) > 0 ? (
-            <Text style={styles.offerTermsSub}>
-              Cash handled off-platform at the meetup (Venmo, Zelle, in person).
-            </Text>
+            <>
+              <Text style={[styles.offerTermsLine, { marginTop: Spacing.sm }]}>
+                + ${Number(offer.offer_amount).toFixed(2)} cash
+              </Text>
+              <Text style={styles.offerTermsSub}>
+                Cash handled off-platform at the meetup (Venmo, Zelle, in person).
+              </Text>
+            </>
           ) : null}
         </View>
 
