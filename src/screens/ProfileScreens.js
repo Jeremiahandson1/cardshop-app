@@ -11,6 +11,7 @@ import * as Sharing from 'expo-sharing';
 import { showMessage } from 'react-native-flash-message';
 import * as Updates from 'expo-updates';
 import { wantListApi, authApi, notificationsApi, API_BASE_URL } from '../services/api';
+import { registerForPushNotificationsAsync } from '../services/pushRegistration';
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, EmptyState, LoadingScreen } from '../components/ui';
@@ -136,6 +137,27 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
         { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
+        { icon: 'paper-plane-outline', label: 'Re-register push notifications', onPress: async () => {
+          const r = await registerForPushNotificationsAsync();
+          if (r?.ok) {
+            Alert.alert('Push registered', 'Token sent to server. New offers + sales will push to this device.');
+          } else if (r?.reason === 'permission_denied') {
+            Alert.alert(
+              'Notifications denied',
+              'Open system Settings → Card Shop → Notifications and turn on Allow Notifications, then come back and tap this again.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ],
+            );
+          } else if (r?.reason === 'permission_undetermined') {
+            Alert.alert('No permission yet', 'The OS prompt should appear next time. Force-quit and try again.');
+          } else if (r?.reason === 'not_device') {
+            Alert.alert('Simulator', 'Push notifications need a real device, not the simulator.');
+          } else {
+            Alert.alert('Push registration failed', `Reason: ${r?.reason || 'unknown'}\n${r?.error || ''}`);
+          }
+        } },
         { icon: 'options-outline', label: 'Listing defaults', onPress: () => navigation.navigate('ListingDefaults') },
         { icon: 'card-outline', label: 'Manage subscription', onPress: () => navigation.navigate('SubscriptionManage') },
       ]
