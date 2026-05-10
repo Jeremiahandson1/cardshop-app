@@ -131,23 +131,31 @@ const CascadePicker = ({
   // and silently merges new cards into the existing catalog row.
   // Always require an explicit tap or typed entry on these.
   const IDENTITY_DIMS = new Set(['player_name', 'card_number']);
+  // Variant dims must NEVER auto-advance — even when the catalog
+  // only has one (often null/base) parallel/subset, the user is
+  // holding a physical card whose insert + parallel determines its
+  // value. Flashing past these steps is the bug the user reported:
+  // it looks glitchy and silently mis-classifies their card.
+  const VARIANT_DIMS = new Set(['subset_name', 'parallel']);
 
   // Auto-advance behavior:
   //  - Exactly one option (and no active typeahead) → pick it,
-  //    EXCEPT on identity dims (player_name, card_number) where
-  //    we always require explicit confirmation so the user can
-  //    add a new card to a sparsely-seeded set.
-  //  - Zero options on an optional dim (subset / parallel) →
-  //    skip silently. Lots of catalog rows have null subset or
-  //    null parallel and the user shouldn't land on a dead-end
-  //    empty list.
-  //  - Zero options on a required dim → stay; user sees the
-  //    "enter manually" fallback.
+  //    EXCEPT on identity dims (player_name, card_number) and
+  //    variant dims (subset_name, parallel) where the user must
+  //    explicitly confirm what variant they have in hand.
+  //  - Zero options on an optional dim was previously a silent
+  //    skip; that hid the parallel step entirely for sparsely
+  //    seeded sets. Now the empty-list view shows the manual-entry
+  //    + Skip buttons so the user makes an explicit choice.
   React.useEffect(() => {
     if (cascadeQuery) return;
     if (!options) return;
 
-    if (options.length === 1 && !IDENTITY_DIMS.has(cascadeDim)) {
+    if (
+      options.length === 1
+      && !IDENTITY_DIMS.has(cascadeDim)
+      && !VARIANT_DIMS.has(cascadeDim)
+    ) {
       const only = options[0];
       if (cascade[cascadeDim] === only) return;
       const next = { ...cascade, [cascadeDim]: only };
@@ -158,16 +166,6 @@ const CascadePicker = ({
       } else {
         onComplete(next);
       }
-      return;
-    }
-
-    if (options.length === 0 && OPTIONAL_DIMS.has(cascadeDim)) {
-      const nextIdx = currentIdx + 1;
-      if (nextIdx >= cascadeOrder.length) {
-        onComplete(cascade);
-        return;
-      }
-      setCascadeDim(cascadeOrder[nextIdx]);
       return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,9 +456,14 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // Cascade state — each level records the picked value, narrowing
   // the options for the next level. Order matters: each dimension
   // depends on the ones above.
+  // Order matters: collectors identify a card as "[player] #[number]
+  // [insert/parallel]" — picking subset before player meant the
+  // insert/variation step was resolved (often auto-advanced past)
+  // before the user had a chance to specify the variant they
+  // physically have in hand.
   const CASCADE_ORDER = [
     'sport', 'year', 'manufacturer', 'set_name',
-    'subset_name', 'player_name', 'card_number', 'parallel',
+    'player_name', 'card_number', 'subset_name', 'parallel',
   ];
   const CASCADE_LABEL = {
     sport:         'Sport',
