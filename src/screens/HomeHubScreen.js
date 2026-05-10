@@ -1,12 +1,15 @@
 // HomeHubScreen — first thing the user sees after login.
-// Three big tappable tiles, one per "mode" the app supports.
+// Five big tappable tiles, one per "mode" the app supports.
 // Tapping a tile jumps into the existing stack for that area.
 //
 // The point: keep the user from being confronted with the full
 // tab/screen surface area on launch. They pick the lens they
-// want (Show Floor, Collection, Local LCS) and only see what's
-// relevant to that lens until they come back here.
-import React, { useMemo } from 'react';
+// want (Show Floor / Collection / Local LCS / Trade Offers /
+// Marketplace Sales) and only see what's relevant to that lens
+// until they come back here. Trade-offers + marketplace tiles
+// surface a live count so the user knows at a glance whether
+// anything needs attention.
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +23,8 @@ import { homeApi } from '../services/api';
 // Show Floor is a $24.99 standalone upgrade. Stores get it bundled.
 const SHOW_FLOOR_TIERS = new Set(['show_floor', 'store_starter', 'store_pro']);
 
+// Static tile metadata — count subtitles get filled in at render
+// time from /api/home/pending. Order is the visual order on screen.
 const TILES = [
   {
     key: 'show-floor',
@@ -52,34 +57,27 @@ const TILES = [
     border: 'rgba(134,239,172,0.40)',
     target: { tab: 'LCS' },
   },
+  {
+    key: 'trade-offers',
+    icon: 'swap-horizontal',
+    iconColor: '#a78bfa',
+    title: 'Active Trade Offers',
+    bg: 'rgba(167,139,250,0.10)',
+    border: 'rgba(167,139,250,0.45)',
+    target: { tab: 'Profile', screen: 'MyOffers' },
+    // subtitle is computed at render from counts.active_trade_offers
+  },
+  {
+    key: 'marketplace-sales',
+    icon: 'cart',
+    iconColor: '#4ade80',
+    title: 'Marketplace Sales',
+    bg: 'rgba(74,222,128,0.10)',
+    border: 'rgba(74,222,128,0.45)',
+    target: { tab: 'Profile', screen: 'MyOrders' },
+    // subtitle is computed at render from counts.marketplace_sales
+  },
 ];
-
-// Banner — one row per pending state on the home screen. Tone
-// drives the background tint (hot=urgent green/red, warm=yellow
-// for incoming, cool=blue for informational).
-const ActivityBanner = ({ iconName, iconColor, tone, title, sub, onPress }) => {
-  const toneStyles = {
-    hot:  { bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.40)' },
-    warm: { bg: 'rgba(232,197,71,0.10)', border: 'rgba(232,197,71,0.45)' },
-    cool: { bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.40)' },
-  }[tone] || { bg: 'rgba(232,197,71,0.10)', border: 'rgba(232,197,71,0.45)' };
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.activityBanner, { backgroundColor: toneStyles.bg, borderColor: toneStyles.border }]}
-    >
-      <View style={[styles.activityIcon, { backgroundColor: iconColor + '22' }]}>
-        <Ionicons name={iconName} size={22} color={iconColor} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.activityTitle, { color: iconColor }]}>{title}</Text>
-        <Text style={styles.activitySub}>{sub}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-    </TouchableOpacity>
-  );
-};
 
 export const HomeHubScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
@@ -103,11 +101,8 @@ export const HomeHubScreen = ({ navigation }) => {
   });
   useFocusEffect(React.useCallback(() => { refetchPending(); }, [refetchPending]));
 
-  const offersReceivedCount   = pending?.offers_received?.length || 0;
-  const listingOffersCount    = pending?.listing_offers_received?.length || 0;
-  const ordersToShipCount     = pending?.orders_to_ship?.length || 0;
-  const offersAcceptedCount   = pending?.offers_accepted_for_buyer?.length || 0;
-  const ordersToConfirmCount  = pending?.orders_to_confirm?.length || 0;
+  const tradeOffersCount    = pending?.counts?.active_trade_offers || 0;
+  const marketplaceCount    = pending?.counts?.marketplace_sales   || 0;
 
   // Admins bypass tier gates (matches API middleware in
   // requireShowFloor / requirePro). Same for store-owner roles
@@ -127,6 +122,10 @@ export const HomeHubScreen = ({ navigation }) => {
       target = { tab: 'Binders' };
     } else if (tile.key === 'local-lcs') {
       target = { tab: 'LCS' };
+    } else if (tile.target) {
+      // trade-offers + marketplace-sales tiles ship with explicit
+      // targets in the static metadata — no per-key branching needed.
+      target = tile.target;
     } else {
       return;
     }
@@ -136,6 +135,22 @@ export const HomeHubScreen = ({ navigation }) => {
     } catch (e) {
       console.warn('[home] navigate failed', e?.message);
     }
+  };
+
+  // Build the per-tile subtitle. Static tiles use their declared
+  // subtitle; the two count-driven tiles inject the live count.
+  const subtitleFor = (tile) => {
+    if (tile.key === 'trade-offers') {
+      return tradeOffersCount === 0
+        ? '0 active trades'
+        : `${tradeOffersCount} active trade${tradeOffersCount === 1 ? '' : 's'}`;
+    }
+    if (tile.key === 'marketplace-sales') {
+      return marketplaceCount === 0
+        ? '0 marketplace sales pending'
+        : `${marketplaceCount} marketplace sale${marketplaceCount === 1 ? '' : 's'} pending`;
+    }
+    return tile.subtitle;
   };
 
   // Tier label for the badge. Free users get a subtle "Free" pill
@@ -173,65 +188,6 @@ export const HomeHubScreen = ({ navigation }) => {
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
 
-        {/* Active-state banners. Each renders only when its bucket
-            is non-zero. Order is by urgency: orders-to-ship first
-            (you owe a buyer), then accepted offers (you owe payment),
-            then incoming offers, then orders-to-confirm. */}
-        {ordersToShipCount > 0 ? (
-          <ActivityBanner
-            iconName="cube"
-            iconColor="#ef4444"
-            tone="hot"
-            title={`${ordersToShipCount} order${ordersToShipCount === 1 ? '' : 's'} to ship`}
-            sub="You've been paid. Add tracking to keep the buyer's clock ticking."
-            onPress={() => navigation.navigate('Profile', { screen: 'MyOrders' })}
-          />
-        ) : null}
-
-        {offersAcceptedCount > 0 ? (
-          <ActivityBanner
-            iconName="checkmark-circle"
-            iconColor="#4ade80"
-            tone="hot"
-            title={`${offersAcceptedCount} offer${offersAcceptedCount === 1 ? '' : 's'} accepted — your move`}
-            sub="The other party said yes. Coordinate the trade."
-            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
-          />
-        ) : null}
-
-        {offersReceivedCount > 0 ? (
-          <ActivityBanner
-            iconName="mail-unread"
-            iconColor="#e8c547"
-            tone="warm"
-            title={`${offersReceivedCount} offer${offersReceivedCount === 1 ? '' : 's'} waiting on you`}
-            sub="Trade-board offers you haven't responded to."
-            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
-          />
-        ) : null}
-
-        {listingOffersCount > 0 ? (
-          <ActivityBanner
-            iconName="cash"
-            iconColor="#e8c547"
-            tone="warm"
-            title={`${listingOffersCount} cash offer${listingOffersCount === 1 ? '' : 's'} on your listings`}
-            sub="Marketplace buyers offered below ask. Counter, accept, or pass."
-            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
-          />
-        ) : null}
-
-        {ordersToConfirmCount > 0 ? (
-          <ActivityBanner
-            iconName="archive"
-            iconColor="#60a5fa"
-            tone="cool"
-            title={`${ordersToConfirmCount} order${ordersToConfirmCount === 1 ? '' : 's'} arrived`}
-            sub="Confirm receipt to release the seller's funds."
-            onPress={() => navigation.navigate('Profile', { screen: 'MyOrders' })}
-          />
-        ) : null}
-
         <View style={styles.tileGrid}>
           {TILES.map((tile) => (
             <TouchableOpacity
@@ -248,7 +204,7 @@ export const HomeHubScreen = ({ navigation }) => {
                 <Text style={styles.tileSubtitle}>
                   {tile.key === 'show-floor' && !hasShowFloor
                     ? 'Tap to learn more'
-                    : tile.subtitle}
+                    : subtitleFor(tile)}
                 </Text>
               </View>
               {tile.key === 'show-floor' && !hasShowFloor ? (
@@ -343,39 +299,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
-  },
-
-  // Offer-activity banner — yellow by default for new incoming
-  // offers, green when there's an acceptance to act on.
-  activityBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    backgroundColor: 'rgba(232,197,71,0.10)',
-    borderColor: 'rgba(232,197,71,0.45)',
-    marginTop: -Spacing.xs,
-  },
-  activityBannerHot: {
-    backgroundColor: 'rgba(74,222,128,0.10)',
-    borderColor: 'rgba(74,222,128,0.50)',
-  },
-  activityIcon: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  activityTitle: {
-    color: '#e8c547',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  activitySub: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
   },
 });
