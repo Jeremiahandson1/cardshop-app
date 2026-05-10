@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { feedbackApi } from '../services/api';
+import { feedbackApi, reviewsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { LoadingScreen, SectionHeader, Divider } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -20,6 +20,18 @@ export const TrustProfileScreen = ({ navigation, route }) => {
     queryFn: () => feedbackApi.forUser(displayUsername).then((r) => r.data),
     enabled: !!displayUsername,
   });
+
+  // Pull post-transaction reviews. The reviews API keys on user_id
+  // (UUID), which the feedback profile response carries as user_id.
+  // Empty result → section just doesn't render.
+  const profileUserId = data?.user_id;
+  const { data: reviewsData } = useQuery({
+    queryKey: ['user-reviews', profileUserId],
+    queryFn: () => reviewsApi.list(profileUserId, { limit: 25 }),
+    enabled: !!profileUserId,
+  });
+  const reviewsSummary = reviewsData?.summary;
+  const reviews = reviewsData?.reviews || [];
 
   if (isLoading) return <LoadingScreen message="Loading trust profile..." />;
 
@@ -149,6 +161,36 @@ export const TrustProfileScreen = ({ navigation, route }) => {
         </View>
 
         <Divider />
+
+        {/* Post-transaction reviews — 👍/👎 from completed deals.
+            This is the eBay-feedback flywheel: every closed
+            transaction generates a trust signal that compounds. */}
+        {reviewsSummary && reviewsSummary.total > 0 ? (
+          <View>
+            <SectionHeader title={`Reviews · ${reviewsSummary.positive_pct}% positive (${reviewsSummary.total})`} />
+            {reviews.slice(0, 10).map((r) => (
+              <View key={r.id} style={styles.feedbackItem}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons
+                    name={r.rating === 'positive' ? 'thumbs-up' : 'thumbs-down'}
+                    size={14}
+                    color={r.rating === 'positive' ? Colors.success : Colors.accent3}
+                  />
+                  <Text style={{ color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.semibold }}>
+                    @{r.reviewer_username || r.reviewer_display_name}
+                  </Text>
+                </View>
+                {r.comment ? (
+                  <Text style={styles.feedbackComment}>{r.comment}</Text>
+                ) : null}
+                <Text style={styles.feedbackMeta}>
+                  {new Date(r.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            ))}
+            <Divider />
+          </View>
+        ) : null}
 
         {/* Feedback history */}
         <View>

@@ -19,7 +19,7 @@ import { showMessage } from 'react-native-flash-message';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi } from '../services/api';
+import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -2821,6 +2821,12 @@ export const CardDetailScreen = ({ navigation, route }) => {
     queryFn: () => cardsApi.history(cardId).then((r) => r.data),
   });
 
+  // Vault check-in modal state
+  const [vaultModalOpen, setVaultModalOpen] = useState(false);
+  const [vaultPickerProvider, setVaultPickerProvider] = useState('psa_vault');
+  const [vaultPickerLocker, setVaultPickerLocker] = useState('');
+  const [vaultPickerReceipt, setVaultPickerReceipt] = useState('');
+
   // Live eBay active-ask summary for the catalog row. We
   // deliberately don't show sold-comp medians — eBay deprecated
   // Finding API in 2024 and the Marketplace Insights replacement
@@ -3597,6 +3603,157 @@ export const CardDetailScreen = ({ navigation, route }) => {
               ⚠ A counter-claim is open on this card. Hold off on trades until it resolves.
             </Text>
           ) : null}
+
+          {/* Vault state — show current vault badge if any, plus
+              an action button to move into / out of vault. The
+              chain-of-custody story: when card moves to vault we
+              drop verification to vault_verified; when shipped out,
+              user is prompted to pair-scan to re-establish gold. */}
+          {card.vault_provider ? (
+            <View style={{
+              marginTop: Spacing.md,
+              padding: Spacing.md,
+              borderRadius: Radius.md,
+              backgroundColor: 'rgba(96,165,250,0.10)',
+              borderWidth: 1,
+              borderColor: 'rgba(96,165,250,0.40)',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Ionicons name="lock-closed" size={16} color="#60a5fa" />
+                <Text style={{ color: '#60a5fa', fontWeight: Typography.bold, fontSize: Typography.sm }}>
+                  Currently vaulted
+                </Text>
+              </View>
+              <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: Spacing.sm }}>
+                {card.vault_provider.replace(/_/g, ' ')}
+                {card.vault_locker_id ? ` · #${card.vault_locker_id}` : ''}
+                {card.vault_check_in_at ? ` · since ${new Date(card.vault_check_in_at).toLocaleDateString()}` : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => Alert.alert(
+                  'Ship out of vault?',
+                  'Mark this card as shipped out. Verification level drops to imported_metadata until you pair-scan it back in.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', onPress: async () => {
+                      try {
+                        await vaultApi.checkOut(cardId);
+                        queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+                        Alert.alert('Checked out', 'Pair-scan the card now to upgrade to in-hand verified.');
+                      } catch (err) {
+                        Alert.alert('Error', err?.response?.data?.error || 'Check-out failed');
+                      }
+                    }},
+                  ],
+                )}
+                style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#60a5fa' }}
+              >
+                <Text style={{ color: '#60a5fa', fontSize: 12, fontWeight: '600' }}>Ship out of vault</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setVaultModalOpen(true)}
+              style={{
+                marginTop: Spacing.md,
+                paddingVertical: Spacing.sm,
+                borderRadius: Radius.md,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Ionicons name="lock-closed-outline" size={16} color={Colors.textMuted} />
+              <Text style={{ color: Colors.textMuted, fontSize: 13 }}>Move to vault</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Vault check-in modal — provider chips + locker # + optional
+              receipt URL. Posts to /cards/:id/vault/check-in and
+              flips the verification badge to vault_verified. */}
+          <Modal visible={vaultModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setVaultModalOpen(false)}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <TouchableOpacity onPress={() => setVaultModalOpen(false)}>
+                  <Text style={{ color: Colors.accent, fontSize: 15 }}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '600' }}>Move to vault</Text>
+                <View style={{ width: 50 }} />
+              </View>
+              <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+                <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+                  Records this card as held by a third-party vault. Public scan
+                  page will show 'Vaulted at [provider]' and your trust badge
+                  drops from in-hand to vault_verified until you ship it out
+                  and pair-scan again.
+                </Text>
+                <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.bold, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Provider
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    { key: 'psa_vault', label: 'PSA Vault' },
+                    { key: 'goldin_vault', label: 'Goldin' },
+                    { key: 'ebay_vault', label: 'eBay Vault' },
+                    { key: 'fanatics_vault', label: 'Fanatics Collect' },
+                    { key: 'whatnot_vault', label: 'Whatnot' },
+                    { key: 'private_vault', label: 'Private' },
+                    { key: 'other', label: 'Other' },
+                  ].map((v) => (
+                    <TouchableOpacity
+                      key={v.key}
+                      onPress={() => setVaultPickerProvider(v.key)}
+                      style={{
+                        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: vaultPickerProvider === v.key ? Colors.accent : Colors.border,
+                        backgroundColor: vaultPickerProvider === v.key ? 'rgba(232,197,71,0.12)' : 'transparent',
+                      }}
+                    >
+                      <Text style={{
+                        color: vaultPickerProvider === v.key ? Colors.accent : Colors.textMuted,
+                        fontSize: 13, fontWeight: '600',
+                      }}>{v.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Input
+                  label="Locker / vault ID"
+                  value={vaultPickerLocker}
+                  onChangeText={setVaultPickerLocker}
+                  placeholder="e.g. PSA-VLT-123456"
+                  autoCapitalize="characters"
+                />
+                <Input
+                  label="Receipt URL (optional)"
+                  value={vaultPickerReceipt}
+                  onChangeText={setVaultPickerReceipt}
+                  placeholder="Vault confirmation email or screenshot URL"
+                  autoCapitalize="none"
+                />
+                <Button
+                  title="Move to vault"
+                  onPress={async () => {
+                    try {
+                      await vaultApi.checkIn(cardId, {
+                        vault_provider: vaultPickerProvider,
+                        vault_locker_id: vaultPickerLocker.trim() || undefined,
+                        vault_receipt_url: vaultPickerReceipt.trim() || undefined,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+                      setVaultModalOpen(false);
+                      Alert.alert('Vaulted', 'Card marked as vaulted. Trust badge updated.');
+                    } catch (err) {
+                      Alert.alert('Error', err?.response?.data?.error || 'Check-in failed');
+                    }
+                  }}
+                />
+              </ScrollView>
+            </SafeAreaView>
+          </Modal>
 
           {/* Transfer button */}
           <Button
