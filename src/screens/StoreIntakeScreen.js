@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import {
@@ -45,21 +46,30 @@ const CONDITIONS = [
   { value: 'poor',      label: 'Poor' },
 ];
 
-// Stages of the intake flow. Keeping them explicit makes the flow
-// easy to follow — each stage has a single responsibility.
+// Stages of the intake flow. Order matters — we photograph the
+// card BEFORE applying the QR sticker so the sticker doesn't
+// obscure any part of the card during the vision scan. The QR
+// sticker scan is the LAST step, right before save.
 const STAGE = {
-  SCAN: 'scan',       // employee scans a QR (the sticker they just applied)
-  CARD: 'card',       // pick the card via cascade / cert / manual
-  DETAILS: 'details', // condition, price, notes, photos
-  SAVING: 'saving',
+  VISION:  'vision',  // capture front + back, vision identifies the card
+  CARD:    'card',    // confirm the catalog match (or fall back to search)
+  DETAILS: 'details', // condition, price, notes
+  QR:      'qr',      // scan the sticker that's now on the card
+  SAVING:  'saving',
 };
 
 export const StoreIntakeScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
-  const [stage, setStage] = useState(STAGE.SCAN);
+  const [stage, setStage] = useState(STAGE.VISION);
   const [scannedQr, setScannedQr] = useState(null); // { code, short_code, id } on unregistered scan
   const [selectedCatalog, setSelectedCatalog] = useState(null); // { id, player_name, ... }
   const [locationId, setLocationId] = useState('');
+  // Vision-scan output — candidates the model surfaced + raw fields.
+  // Used to pre-select on the CARD stage so staff can confirm with
+  // one tap instead of typing a search.
+  const [visionCandidates, setVisionCandidates] = useState([]);
+  const [visionAnalyzing, setVisionAnalyzing] = useState(false);
+  const [showManualSearch, setShowManualSearch] = useState(false);
 
   // Details form
   const [condition, setCondition] = useState('near_mint');
@@ -82,24 +92,107 @@ export const StoreIntakeScreen = ({ navigation }) => {
   }, [locations, locationId]);
 
   // ============================================================
-  // Stage 1 — QR scan
+  // Stage 1 — Vision pair scan (front + back)
   // ============================================================
   const [permission, requestPermission] = useCameraPermissions();
   const [scanBusy, setScanBusy] = useState(false);
 
-  const handleScan = useCallback(async ({ data }) => {
+  // Capture an in-app camera shot, resize to 1024 wide, return
+  // { uri, b64 } or null on cancel. Mirrors RegisterCardScreen.
+  const captureAndResize = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera needed', 'Enable camera to scan a card.');
+      return null;
+    }
+    const pick = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.75,
+      base64: true,
+      allowsEditing: true,
+    });
+    if (!pick.assets?.length) return null;
+    const asset = pick.assets[0];
+    let b64 = asset.base64;
+    let uri = asset.uri;
+    try {
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      b64 = resized.base64; uri = resized.uri;
+    } catch { /* fall back to original */ }
+    return { uri, b64 };
+  };
+
+  // Two-photo capture → pair-scan vision call. Identifies the card,
+  // pre-fills frontPhoto + backPhoto for the save payload, jumps to
+  // the CARD stage with candidates ready to confirm.
+  const runPairScan = async () => {
+    setScanBusy(true);
+    try {
+      const front = await captureAndResize();
+      if (!front) { setScanBusy(false); return; }
+      Alert.alert('Now flip the card', 'Capture the back of the same card.', [
+        { text: 'Cancel', style: 'cancel', onPress: () => setScanBusy(false) },
+        {
+          text: 'Capture back',
+          onPress: async () => {
+            const back = await captureAndResize();
+            if (!back) { setScanBusy(false); return; }
+            setFrontPhoto(`data:image/jpeg;base64,${front.b64}`);
+            setBackPhoto(`data:image/jpeg;base64,${back.b64}`);
+            setVisionAnalyzing(true);
+            try {
+              const res = await catalogApi.scanVisionPair(
+                `data:image/jpeg;base64,${front.b64}`,
+                `data:image/jpeg;base64,${back.b64}`,
+              );
+              const cands = res.data?.candidates || [];
+              setVisionCandidates(cands);
+              // If there's a single high-confidence top candidate,
+              // pre-select and skip straight to details — keeps the
+              // counter flow tight when the model is confident.
+              if (cands.length === 1 && (res.data?.fields?.confidence ?? 0) >= 0.9) {
+                setSelectedCatalog(cands[0]);
+                setStage(STAGE.DETAILS);
+              } else {
+                setStage(STAGE.CARD);
+              }
+            } catch (err) {
+              // Vision down? Fall back to manual search; the card
+              // photos are already captured so no work is lost.
+              setShowManualSearch(true);
+              setStage(STAGE.CARD);
+              Alert.alert('Vision unavailable', 'Search for the card manually — photos are saved.');
+            } finally {
+              setVisionAnalyzing(false);
+              setScanBusy(false);
+            }
+          },
+        },
+      ]);
+    } catch (err) {
+      Alert.alert('Capture failed', err?.message || 'Try again.');
+      setScanBusy(false);
+    }
+  };
+
+  // ============================================================
+  // Stage 4 — QR sticker scan (the last step before save)
+  // ============================================================
+  const handleQrScan = useCallback(async ({ data }) => {
     if (scanBusy) return;
     setScanBusy(true);
     try {
       const raw = String(data || '').trim();
-      // Accept bare short codes (8-12 chars A-Z0-9) or full UUIDs
       const code = /^[0-9A-Za-z]{6,}$/.test(raw) ? raw : raw.replace(/^cardshop:\/\/(card\/|c\/)?/i, '');
       const { data: look } = await qrApi.lookup(code);
       if (look.status === 'superseded') {
         Alert.alert(
           'Outdated sticker',
-          'This QR was replaced. Do not reuse — grab a blank sticker from the sheet instead. ' +
-          'The old sticker is kept in the ledger as evidence that it was superseded.',
+          'This QR was replaced. Use a blank sticker instead.',
         );
         setScanBusy(false);
         return;
@@ -107,13 +200,15 @@ export const StoreIntakeScreen = ({ navigation }) => {
       if (look.status !== 'unregistered') {
         Alert.alert(
           'Already registered',
-          'This QR is already linked to a card. Use a blank sticker or scan in Card Detail instead.',
+          'This QR is already linked to a card. Use a blank sticker.',
         );
         setScanBusy(false);
         return;
       }
       setScannedQr({ code: look.code, short_code: look.short_code, id: look.id });
-      setStage(STAGE.CARD);
+      // QR is the last step — fire save immediately.
+      setStage(STAGE.SAVING);
+      saveMut.mutate();
     } catch (err) {
       Alert.alert('Scan failed', err?.response?.data?.error || err?.message || 'Try again.');
     } finally {
@@ -203,7 +298,7 @@ export const StoreIntakeScreen = ({ navigation }) => {
   });
 
   const resetForm = () => {
-    setStage(STAGE.SCAN);
+    setStage(STAGE.VISION);
     setScannedQr(null);
     setSelectedCatalog(null);
     setCondition('near_mint');
@@ -213,6 +308,8 @@ export const StoreIntakeScreen = ({ navigation }) => {
     setBackPhoto(null);
     setSearchQ('');
     setSearchResults([]);
+    setVisionCandidates([]);
+    setShowManualSearch(false);
   };
 
   // ============================================================
@@ -237,19 +334,58 @@ export const StoreIntakeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScreenHeader
-        title={stage === STAGE.SCAN ? 'Scan QR sticker' : 'Intake card'}
+        title={
+          stage === STAGE.VISION ? 'Photograph the card'
+          : stage === STAGE.QR     ? 'Scan QR sticker'
+          : 'Intake card'
+        }
         subtitle={locations.length > 0 ? locations.find((l) => l.id === locationId)
           ? `${locations.find((l) => l.id === locationId).store_name} — ${locations.find((l) => l.id === locationId).name}`
           : undefined
           : undefined}
-        right={stage !== STAGE.SCAN ? (
+        right={stage !== STAGE.VISION ? (
           <TouchableOpacity onPress={resetForm}>
             <Ionicons name="close" size={24} color={Colors.text} />
           </TouchableOpacity>
         ) : undefined}
       />
 
-      {stage === STAGE.SCAN && (
+      {/* VISION: capture the card UNOBSCURED before the sticker
+          goes on. This is the change from the old QR-first flow —
+          previously you applied the sticker first, which obscured
+          part of the card and degraded vision recognition. */}
+      {stage === STAGE.VISION && (
+        <View style={{ flex: 1, padding: Spacing.base }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg, paddingHorizontal: Spacing.lg }}>
+            <Ionicons name="camera-outline" size={64} color={Colors.accent} />
+            <Text style={[styles.cardTitle, { textAlign: 'center' }]}>Photograph the card first</Text>
+            <Text style={[styles.muted, { textAlign: 'center', lineHeight: 20 }]}>
+              Capture the front, then the back, BEFORE applying the QR sticker.
+              Our AI will identify the card so you don't have to type the catalog info.
+            </Text>
+            {visionAnalyzing ? (
+              <View style={{ alignItems: 'center', gap: Spacing.sm }}>
+                <Text style={styles.muted}>Analyzing both photos…</Text>
+              </View>
+            ) : (
+              <Button
+                title={scanBusy ? 'Capturing…' : 'Start scan (front + back)'}
+                onPress={runPairScan}
+                disabled={scanBusy}
+                style={{ alignSelf: 'stretch' }}
+              />
+            )}
+            <TouchableOpacity onPress={() => { setShowManualSearch(true); setStage(STAGE.CARD); }}>
+              <Text style={[styles.muted, { color: Colors.accent }]}>Or pick the card manually</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* QR: scan the sticker AFTER the card is photographed and
+          its details are entered. By this point the sticker is
+          physically on the card; scanning fires save immediately. */}
+      {stage === STAGE.QR && (
         <View style={{ flex: 1 }}>
           {!permission ? (
             <LoadingScreen />
@@ -261,12 +397,12 @@ export const StoreIntakeScreen = ({ navigation }) => {
           ) : (
             <CameraView
               style={{ flex: 1 }}
-              onBarcodeScanned={handleScan}
+              onBarcodeScanned={handleQrScan}
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             >
               <View style={styles.scanOverlay}>
                 <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Point at the QR sticker you just applied</Text>
+                <Text style={styles.scanHint}>Point at the sticker you just applied to this card</Text>
               </View>
             </CameraView>
           )}
@@ -275,50 +411,84 @@ export const StoreIntakeScreen = ({ navigation }) => {
 
       {stage === STAGE.CARD && (
         <ScrollView contentContainerStyle={styles.pad}>
-          <View style={styles.qrPill}>
-            <Ionicons name="qr-code" size={16} color={Colors.accent} />
-            <Text style={styles.qrPillText}>Sticker {scannedQr?.short_code || scannedQr?.code?.slice(0, 8)}</Text>
-          </View>
+          {visionCandidates.length > 0 && !showManualSearch && (
+            <>
+              <Text style={styles.sectionLabel}>Vision matches — tap to confirm</Text>
+              {visionCandidates.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.catalogRow}
+                  onPress={() => { setSelectedCatalog(c); setStage(STAGE.DETAILS); }}
+                >
+                  <Text style={styles.catalogTitle}>
+                    {[c.year, c.set_name, c.player_name].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {c.card_number ? `#${c.card_number}` : ''}
+                    {c.parallel ? ` · ${c.parallel}` : ''}
+                    {c.manufacturer ? ` · ${c.manufacturer}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                onPress={() => setShowManualSearch(true)}
+                style={{ alignItems: 'center', paddingVertical: Spacing.md }}
+              >
+                <Text style={[styles.muted, { color: Colors.accent }]}>None of these — search manually</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-          <Text style={styles.sectionLabel}>Which card is this?</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <View style={{ flex: 1 }}>
-              <Input
-                placeholder="Player, set, year, parallel…"
-                value={searchQ}
-                onChangeText={setSearchQ}
-                onSubmitEditing={runSearch}
-                returnKeyType="search"
-              />
-            </View>
-            <Button title="Search" onPress={runSearch} />
-          </View>
-          {searchBusy && <Text style={styles.muted}>Searching…</Text>}
-          {searchResults.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              style={styles.catalogRow}
-              onPress={() => { setSelectedCatalog(c); setStage(STAGE.DETAILS); }}
-            >
-              <Text style={styles.catalogTitle}>
-                {[c.year, c.set_name, c.player_name].filter(Boolean).join(' · ')}
-              </Text>
-              <Text style={styles.muted}>
-                {c.card_number ? `#${c.card_number}` : ''}
-                {c.parallel ? ` · ${c.parallel}` : ''}
-                {c.manufacturer ? ` · ${c.manufacturer}` : ''}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(showManualSearch || visionCandidates.length === 0) && (
+            <>
+              <Text style={styles.sectionLabel}>Search the catalog</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    placeholder="Player, set, year, parallel…"
+                    value={searchQ}
+                    onChangeText={setSearchQ}
+                    onSubmitEditing={runSearch}
+                    returnKeyType="search"
+                  />
+                </View>
+                <Button title="Search" onPress={runSearch} />
+              </View>
+              {searchBusy && <Text style={styles.muted}>Searching…</Text>}
+              {searchResults.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.catalogRow}
+                  onPress={() => { setSelectedCatalog(c); setStage(STAGE.DETAILS); }}
+                >
+                  <Text style={styles.catalogTitle}>
+                    {[c.year, c.set_name, c.player_name].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {c.card_number ? `#${c.card_number}` : ''}
+                    {c.parallel ? ` · ${c.parallel}` : ''}
+                    {c.manufacturer ? ` · ${c.manufacturer}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
         </ScrollView>
       )}
 
       {stage === STAGE.DETAILS && (
         <ScrollView contentContainerStyle={styles.pad}>
-          <View style={styles.qrPill}>
-            <Ionicons name="qr-code" size={16} color={Colors.accent} />
-            <Text style={styles.qrPillText}>Sticker {scannedQr?.short_code || scannedQr?.code?.slice(0, 8)}</Text>
-          </View>
+          {/* Photos pill — confirms vision capture is complete; the
+              old QR pill that lived here moved to the post-DETAILS
+              QR stage since the sticker scan is now the last step. */}
+          {(frontPhoto || backPhoto) ? (
+            <View style={[styles.qrPill, { backgroundColor: 'rgba(74,222,128,0.15)', borderColor: '#4ade80' }]}>
+              <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
+              <Text style={[styles.qrPillText, { color: '#4ade80' }]}>
+                Photos captured ({frontPhoto ? 'front' : ''}{frontPhoto && backPhoto ? ' + back' : (backPhoto ? 'back' : '')})
+              </Text>
+            </View>
+          ) : null}
 
           <Text style={styles.cardTitle}>{cardTitle}</Text>
           <TouchableOpacity onPress={() => setStage(STAGE.CARD)}>
@@ -373,37 +543,59 @@ export const StoreIntakeScreen = ({ navigation }) => {
             autoCapitalize="sentences"
           />
 
-          <Text style={styles.sectionLabel}>Photos</Text>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <TouchableOpacity style={styles.photoSlot} onPress={() => captureImage(setFrontPhoto)}>
-              {frontPhoto ? (
-                <Text style={styles.photoHint}>✓ Front captured (tap to retake)</Text>
-              ) : (
-                <>
-                  <Ionicons name="camera" size={24} color={Colors.accent} />
-                  <Text style={styles.photoHint}>Front</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoSlot} onPress={() => captureImage(setBackPhoto)}>
-              {backPhoto ? (
-                <Text style={styles.photoHint}>✓ Back captured (tap to retake)</Text>
-              ) : (
-                <>
-                  <Ionicons name="camera-reverse" size={24} color={Colors.accent} />
-                  <Text style={styles.photoHint}>Back</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          {/* Photos already captured in the VISION stage. Allow
+              retake here in case lighting was bad, but don't make
+              capture a required step — the vision pair scan was
+              the gate. */}
+          {(!frontPhoto || !backPhoto) && (
+            <>
+              <Text style={styles.sectionLabel}>Photos (optional retake)</Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <TouchableOpacity style={styles.photoSlot} onPress={() => captureImage(setFrontPhoto)}>
+                  {frontPhoto ? (
+                    <Text style={styles.photoHint}>✓ Front (tap to retake)</Text>
+                  ) : (
+                    <><Ionicons name="camera" size={24} color={Colors.accent} /><Text style={styles.photoHint}>Front</Text></>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoSlot} onPress={() => captureImage(setBackPhoto)}>
+                  {backPhoto ? (
+                    <Text style={styles.photoHint}>✓ Back (tap to retake)</Text>
+                  ) : (
+                    <><Ionicons name="camera-reverse" size={24} color={Colors.accent} /><Text style={styles.photoHint}>Back</Text></>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
-          <Button
-            title={saveMut.isPending ? 'Saving…' : 'Save to inventory'}
-            onPress={() => saveMut.mutate()}
-            disabled={saveMut.isPending || !askingPrice || !locationId}
-            style={{ marginTop: Spacing.lg }}
-          />
+          {/* Move to QR scan instead of saving — sticker is the
+              physical last step and pairs the just-applied label
+              to the now-finalized card record. If a save retry is
+              landing back here (QR already scanned but save errored),
+              the button becomes a direct save instead of re-scanning. */}
+          {scannedQr ? (
+            <Button
+              title={saveMut.isPending ? 'Saving…' : `Save (sticker ${scannedQr.short_code || scannedQr.code?.slice(0,8)})`}
+              onPress={() => saveMut.mutate()}
+              disabled={saveMut.isPending || !askingPrice || !locationId}
+              style={{ marginTop: Spacing.lg }}
+            />
+          ) : (
+            <Button
+              title="Apply sticker → Scan QR"
+              onPress={() => setStage(STAGE.QR)}
+              disabled={!askingPrice || !locationId}
+              style={{ marginTop: Spacing.lg }}
+            />
+          )}
         </ScrollView>
+      )}
+
+      {stage === STAGE.SAVING && (
+        <View style={styles.centered}>
+          <Text style={styles.muted}>Saving to inventory…</Text>
+        </View>
       )}
     </SafeAreaView>
   );
