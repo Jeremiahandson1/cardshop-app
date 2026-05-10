@@ -10,6 +10,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS, useAni
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { showMessage } from 'react-native-flash-message';
 // Expo SDK 55 moved the classic readAsStringAsync API to
 // expo-file-system/legacy; the default export is now a
@@ -447,6 +448,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [certForm, setCertForm] = useState({ company: 'psa', cert_number: '' });
   const [certLookupBusy, setCertLookupBusy] = useState(false);
   const [certLookupResult, setCertLookupResult] = useState(null); // { already_claimed, slab, catalog_match, provider_error }
+  // Slab barcode scanner — opens a Code 128 / Code 39 reader so the
+  // user can scan the printed barcode on a PSA / BGS / SGC slab
+  // instead of typing the cert # by hand.
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
+  const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
 
   // Cascade state — each level records the picked value, narrowing
   // the options for the next level. Order matters: each dimension
@@ -659,9 +665,29 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         parallel_evidence: fields.parallel_evidence || '',
         print_run: fields.print_run || null,
         serial_number: fields.serial_number || '',
+        // Slab fields — vision now extracts grading_company / grade /
+        // cert_number from the slab label so the user doesn't have to
+        // type a 9-digit cert by hand. Pre-fills the owned-card form
+        // when scanReview commits.
+        grading_company: fields.grading_company || null,
+        grade: fields.grade != null ? Number(fields.grade) : null,
+        cert_number: fields.cert_number || '',
         candidates: cands,
         confidence: fields.confidence ?? 0,
       });
+      // Auto-fill the owned-card form from the slab fields so the
+      // user doesn't re-enter what vision already read. They can
+      // correct any of these on the details screen if the OCR was
+      // wrong.
+      if (fields.grading_company || fields.cert_number) {
+        setForm((f) => ({
+          ...f,
+          grading_company: fields.grading_company || f.grading_company,
+          grade: fields.grade != null ? String(fields.grade) : f.grade,
+          cert_number: fields.cert_number || f.cert_number,
+          condition: fields.grading_company ? '' : f.condition,
+        }));
+      }
       setStep('scan_review');
       const conf = Math.round((fields.confidence ?? 0) * 100);
       setScanDebug(`${backCap ? 'pair' : 'front-only'} ok • ${conf}% • ${cands.length} cands • ${fields.player_name || '?'} ${fields.year || '?'} #${fields.card_number || '?'}`);
@@ -1633,6 +1659,48 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <View style={{ width: 22 }} />
         </View>
 
+        {/* Barcode scanner modal — Code 128 (PSA/BGS/CSG/CGC/HGA)
+            and Code 39 fallback. Auto-fills cert # on a successful
+            read; the user can still edit before tapping Look up. */}
+        <Modal
+          visible={barcodeScannerOpen}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setBarcodeScannerOpen(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.base }}>
+              <TouchableOpacity onPress={() => setBarcodeScannerOpen(false)}>
+                <Text style={{ color: '#fff', fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Scan slab barcode</Text>
+              <View style={{ width: 50 }} />
+            </View>
+            <CameraView
+              style={{ flex: 1 }}
+              barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'code93', 'qr'] }}
+              onBarcodeScanned={({ data, type }) => {
+                // Strip whitespace + clamp to a reasonable cert#
+                // length (PSA: 8-9 digits; BGS: 8-9; SGC: 7-9).
+                // QR codes might also encode a URL — just take the
+                // last digit run if so.
+                const raw = String(data || '').trim();
+                const digits = (raw.match(/\d{6,12}/) || [raw])[0];
+                if (!digits) return;
+                setCertForm((f) => ({ ...f, cert_number: digits }));
+                setBarcodeScannerOpen(false);
+              }}
+            >
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: 280, height: 80, borderWidth: 2, borderColor: '#fff', borderRadius: 8 }} />
+                <Text style={{ color: '#fff', marginTop: Spacing.md, paddingHorizontal: Spacing.lg, textAlign: 'center' }}>
+                  Frame the barcode on the back of the slab. Auto-fires.
+                </Text>
+              </View>
+            </CameraView>
+          </SafeAreaView>
+        </Modal>
+
         <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
           <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 18 }}>
             Enter the cert number off the slab label. We'll pull the card info when
@@ -1692,6 +1760,33 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             autoCapitalize="none"
             autoCorrect={false}
           />
+
+          {/* Slab barcode scanner — major graders (PSA, BGS, SGC,
+              CGC, CSG, HGA) all print Code 128 barcodes encoding the
+              cert#. One-tap scan beats typing 8-9 digits. */}
+          <TouchableOpacity
+            onPress={async () => {
+              if (!barcodePermission?.granted) {
+                const r = await requestBarcodePermission();
+                if (!r.granted) {
+                  Alert.alert('Camera needed', 'Enable camera to scan slab barcodes.');
+                  return;
+                }
+              }
+              setBarcodeScannerOpen(true);
+            }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+              gap: 8, paddingVertical: 12, marginTop: -8,
+              borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+              backgroundColor: 'transparent',
+            }}
+          >
+            <Ionicons name="barcode-outline" size={18} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontWeight: Typography.semibold, fontSize: Typography.sm }}>
+              Scan slab barcode
+            </Text>
+          </TouchableOpacity>
 
           {certForm.company && !['psa', 'bgs'].includes(certForm.company) ? (
             <View style={{ padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border }}>
