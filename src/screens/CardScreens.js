@@ -91,13 +91,44 @@ const CascadePicker = ({
     keepPreviousData: true,
   });
 
-  const options = cascadeDim === 'year' ? yearOptions : catalogOptions;
-  const isLoading = cascadeDim === 'year' ? false : catalogLoading;
-  const isFetching = cascadeDim === 'year' ? false : catalogFetching;
+  // On the card_number step we show full catalog rows for the
+  // player+set instead of distinct card_numbers. Each row carries
+  // its subset/parallel/print_run so the user picks an exact
+  // variant in one tap — picking sets card_number + subset_name +
+  // parallel simultaneously and the cascade completes. This is
+  // what the user expects: "show me every Aaron Donald card in
+  // this set, with the insert/variation already labeled."
+  const { data: variantRows, isLoading: variantLoading, isFetching: variantFetching } = useQuery({
+    queryKey: ['catalog-variants', cascade, cascadeQuery],
+    enabled: cascadeDim === 'card_number',
+    queryFn: () =>
+      catalogApi.search({
+        sport: cascade.sport,
+        year: cascade.year,
+        manufacturer: cascade.manufacturer,
+        set_name: cascade.set_name,
+        player_name: cascade.player_name,
+        q: cascadeQuery || undefined,
+        limit: 200,
+      }).then((r) => r.data?.cards || []),
+    staleTime: 10_000,
+    keepPreviousData: true,
+  });
+
+  const options = cascadeDim === 'year' ? yearOptions
+                : cascadeDim === 'card_number' ? variantRows
+                : catalogOptions;
+  const isLoading = cascadeDim === 'year' ? false
+                  : cascadeDim === 'card_number' ? variantLoading
+                  : catalogLoading;
+  const isFetching = cascadeDim === 'year' ? false
+                   : cascadeDim === 'card_number' ? variantFetching
+                   : catalogFetching;
 
   // Enriched rows for the parallel step — includes print_run so
   // the picker can show "Gold /10" instead of just "Gold". Only
-  // fires when the user actually reaches the parallel step.
+  // fires when the user actually reaches the parallel step (rare
+  // now that card_number step usually fills parallel directly).
   const { data: parallelRows } = useQuery({
     queryKey: ['catalog-parallel-rows', cascade, cascadeQuery],
     enabled: cascadeDim === 'parallel',
@@ -112,10 +143,6 @@ const CascadePicker = ({
         limit: 50,
       }).then((r) => {
         const rows = r.data?.cards || [];
-        // Keep only rows matching the user's subset + card_number
-        // picks so we don't list unrelated parallels of the same
-        // player from other inserts. Both fields are optional in
-        // the cascade so null === "don't filter".
         return rows.filter((c) =>
           (!cascade.subset_name || c.subset_name === cascade.subset_name) &&
           (!cascade.card_number || (c.card_number || '') === cascade.card_number)
@@ -151,6 +178,10 @@ const CascadePicker = ({
     if (cascadeQuery) return;
     if (!options) return;
 
+    // card_number step uses row objects, not strings — never auto-
+    // advance through it. The user picks the exact variant.
+    if (cascadeDim === 'card_number') return;
+
     if (
       options.length === 1
       && !IDENTITY_DIMS.has(cascadeDim)
@@ -172,6 +203,21 @@ const CascadePicker = ({
   }, [options, cascadeQuery, cascadeDim]);
 
   const pick = (value) => {
+    // card_number step passes a full catalog row — set card_number
+    // + subset_name + parallel together and complete the cascade,
+    // since those three uniquely identify the variant.
+    if (cascadeDim === 'card_number' && value && typeof value === 'object') {
+      const next = {
+        ...cascade,
+        card_number: value.card_number || '',
+        subset_name: value.subset_name || null,
+        parallel: value.parallel || null,
+      };
+      setCascade(next);
+      setCascadeQuery('');
+      onComplete(next);
+      return;
+    }
     const next = { ...cascade, [cascadeDim]: value };
     setCascade(next);
     setCascadeQuery('');
@@ -257,7 +303,7 @@ const CascadePicker = ({
 
       <FlatList
         data={options || []}
-        keyExtractor={(item, i) => String(item) + i}
+        keyExtractor={(item, i) => (item && typeof item === 'object' && item.id) ? String(item.id) : String(item) + i}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.xxxl }}
         ListHeaderComponent={
@@ -297,7 +343,9 @@ const CascadePicker = ({
             >
               <Ionicons name="add-circle-outline" size={18} color={Colors.accent} />
               <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: '600' }}>
-                Add a new {cascadeLabel[cascadeDim].toLowerCase()} to this set
+                {cascadeDim === 'card_number'
+                  ? 'Add a new variant to this set'
+                  : `Add a new ${cascadeLabel[cascadeDim].toLowerCase()} to this set`}
               </Text>
             </TouchableOpacity>
           ) : null
@@ -333,17 +381,29 @@ const CascadePicker = ({
           )
         }
         renderItem={({ item }) => {
+          // The card_number step uses full row objects so the user
+          // sees and picks the exact variant in one tap (#150 ·
+          // Refractor · /99). Picking sets card# + subset + parallel
+          // together via the pick() handler.
+          const isVariantRow = cascadeDim === 'card_number' && item && typeof item === 'object';
+
           // On the parallel step, look up the enriched catalog row
           // for this parallel name so we can surface the print run
           // inline ("Gold /10" reads very differently from "Gold").
           const enriched = cascadeDim === 'parallel' && parallelRows
             ? parallelRows.find((r) => (r.parallel || '') === String(item))
             : null;
-          const printRunLabel = enriched
-            ? (enriched.is_one_of_one ? '1/1'
-               : enriched.print_run ? `/${enriched.print_run}`
-               : 'Unlimited')
-            : null;
+          const printRunLabel = isVariantRow
+            ? (item.is_one_of_one ? '1/1'
+               : item.print_run ? `/${item.print_run}`
+               : null)
+            : enriched
+              ? (enriched.is_one_of_one ? '1/1'
+                 : enriched.print_run ? `/${enriched.print_run}`
+                 : 'Unlimited')
+              : null;
+          const showAuto = isVariantRow ? item.is_autograph : enriched?.is_autograph;
+
           return (
             <TouchableOpacity
               onPress={() => pick(item)}
@@ -360,16 +420,49 @@ const CascadePicker = ({
                 justifyContent: 'space-between',
               }}
             >
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                <Text style={{ color: Colors.text, fontSize: 15 }}>{String(item)}</Text>
-                {printRunLabel ? (
-                  <Text style={{ color: Colors.textMuted, fontSize: 13, fontWeight: '500' }}>
-                    {printRunLabel}
-                  </Text>
-                ) : null}
-                {enriched?.is_autograph ? (
-                  <Text style={{ color: '#9B59B6', fontSize: 11, fontWeight: '700' }}>AUTO</Text>
-                ) : null}
+              <View style={{ flex: 1, gap: 2 }}>
+                {isVariantRow ? (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                      <Text style={{ color: Colors.text, fontSize: 15, fontWeight: '600' }}>
+                        #{item.card_number || '—'}
+                      </Text>
+                      {item.subset_name ? (
+                        <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '600' }}>
+                          {item.subset_name}
+                        </Text>
+                      ) : null}
+                      {item.parallel ? (
+                        <Text style={{ color: Colors.text, fontSize: 13 }}>
+                          {item.parallel}
+                        </Text>
+                      ) : null}
+                      {printRunLabel ? (
+                        <Text style={{ color: Colors.textMuted, fontSize: 13, fontWeight: '500' }}>
+                          {printRunLabel}
+                        </Text>
+                      ) : null}
+                      {showAuto ? (
+                        <Text style={{ color: '#9B59B6', fontSize: 11, fontWeight: '700' }}>AUTO</Text>
+                      ) : null}
+                    </View>
+                    {!item.subset_name && !item.parallel ? (
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>Base</Text>
+                    ) : null}
+                  </>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                    <Text style={{ color: Colors.text, fontSize: 15 }}>{String(item)}</Text>
+                    {printRunLabel ? (
+                      <Text style={{ color: Colors.textMuted, fontSize: 13, fontWeight: '500' }}>
+                        {printRunLabel}
+                      </Text>
+                    ) : null}
+                    {showAuto ? (
+                      <Text style={{ color: '#9B59B6', fontSize: 11, fontWeight: '700' }}>AUTO</Text>
+                    ) : null}
+                  </View>
+                )}
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
             </TouchableOpacity>
@@ -472,7 +565,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     set_name:      'Set',
     subset_name:   'Subset / Insert',
     player_name:   'Player',
-    card_number:   'Card number',
+    card_number:   'Pick the exact card',
     parallel:      'Parallel / variant',
   };
   const [cascade, setCascade] = useState({});
