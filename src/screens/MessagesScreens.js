@@ -201,8 +201,14 @@ export const ConversationScreen = ({ navigation, route }) => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        // offset was 60 on iOS, which left the composer hidden behind
+        // the keyboard. The header sits OUTSIDE this view, so the
+        // view's bottom is already at the screen bottom — offset
+        // should be 0 so the composer lifts the full keyboard height.
+        // Android default behavior was undefined (no lift at all);
+        // 'height' resizes the view so the composer stays in view.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         {conversationId && isLoading ? (
           <LoadingScreen />

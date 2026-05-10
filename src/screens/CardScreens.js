@@ -18,6 +18,7 @@ import { showMessage } from 'react-native-flash-message';
 // from /legacy keeps the base64-conversion flow working without
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
+import * as WebBrowser from 'expo-web-browser';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -3185,16 +3186,26 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 <Text style={styles.certNum}>Cert #{card.cert_number}</Text>
                 {card.cert_number && (
                   <TouchableOpacity
-                    onPress={() => {
+                    onPress={async () => {
+                      // SGC's lookup page doesn't accept a cert in the
+                      // URL — user has to paste it. PSA/BGS deep-link.
                       const certUrls = {
                         psa: `https://www.psacard.com/cert/${card.cert_number}`,
                         bgs: `https://www.beckett.com/grading/cert/${card.cert_number}`,
                         sgc: 'https://www.sgccard.com/certification-lookup',
+                        csg: `https://www.csgcards.com/certification-lookup?cert=${card.cert_number}`,
+                        hga: `https://www.hybridgrading.com/lookup?cert=${card.cert_number}`,
                       };
                       const url = certUrls[card.grading_company];
-                      if (url) {
-                        // Open in-app browser
-                        navigation.navigate('WebView', { url, title: `Verify on ${card.grading_company.toUpperCase()}` });
+                      if (!url) return;
+                      try {
+                        await WebBrowser.openBrowserAsync(url);
+                      } catch (err) {
+                        // Fall back to system browser if the in-app
+                        // browser can't open (rare on Android).
+                        Linking.openURL(url).catch(() => {
+                          Alert.alert('Could not open', `Visit ${url} to verify this cert.`);
+                        });
                       }
                     }}
                   >
