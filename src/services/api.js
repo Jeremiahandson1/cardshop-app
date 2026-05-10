@@ -361,6 +361,14 @@ export const taggingSessionsApi = {
   get: (id) => api.get(`/admin/tagging-sessions/${id}`).then((r) => r.data),
 };
 
+// Home screen 'what needs your attention' snapshot — pending offers,
+// orders to ship, offers awaiting payment, etc. Replaces the unread-
+// notification-based banner since notifications get marked read on
+// tap but the underlying pending state stays.
+export const homeApi = {
+  pending: () => api.get('/home/pending').then((r) => r.data),
+};
+
 export const notificationsApi = {
   get: (params) => api.get('/notifications', { params }),
   markRead: (ids) => api.post('/notifications/mark-read', { ids }),

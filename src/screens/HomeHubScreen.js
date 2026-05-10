@@ -14,16 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { notificationsApi } from '../services/api';
-
-// Notification types that surface as a "you have offers" banner on
-// the home screen. Anything here triggers the yellow pill above the
-// tiles + counts toward the offer total.
-const OFFER_NOTIF_TYPES = new Set([
-  'trade_offer', 'trade_offer_accepted', 'trade_offer_countered', 'trade_offer_declined',
-  'binder_offer', 'binder_offer_accepted', 'binder_offer_countered', 'binder_offer_declined',
-  'listing_offer', 'listing_offer_accepted', 'listing_offer_countered', 'listing_offer_rejected',
-]);
+import { homeApi } from '../services/api';
 
 // Tiers that include Show Floor access. Collector Pro does NOT —
 // Show Floor is a $24.99 standalone upgrade. Stores get it bundled.
@@ -63,6 +54,33 @@ const TILES = [
   },
 ];
 
+// Banner — one row per pending state on the home screen. Tone
+// drives the background tint (hot=urgent green/red, warm=yellow
+// for incoming, cool=blue for informational).
+const ActivityBanner = ({ iconName, iconColor, tone, title, sub, onPress }) => {
+  const toneStyles = {
+    hot:  { bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.40)' },
+    warm: { bg: 'rgba(232,197,71,0.10)', border: 'rgba(232,197,71,0.45)' },
+    cool: { bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.40)' },
+  }[tone] || { bg: 'rgba(232,197,71,0.10)', border: 'rgba(232,197,71,0.45)' };
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={[styles.activityBanner, { backgroundColor: toneStyles.bg, borderColor: toneStyles.border }]}
+    >
+      <View style={[styles.activityIcon, { backgroundColor: iconColor + '22' }]}>
+        <Ionicons name={iconName} size={22} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.activityTitle, { color: iconColor }]}>{title}</Text>
+        <Text style={styles.activitySub}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+};
+
 export const HomeHubScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const greeting = (() => {
@@ -72,25 +90,24 @@ export const HomeHubScreen = ({ navigation }) => {
     return 'Good evening';
   })();
 
-  // Pull unread notifications so the home screen surfaces "X new
-  // offers" without requiring the user to dig through the offers
-  // inbox to discover anything happened. Refetch on screen focus
-  // so dismissing offers elsewhere updates the badge here.
-  const { data: notifData, refetch: refetchNotifs } = useQuery({
-    queryKey: ['home-unread-notifications'],
-    queryFn: () => notificationsApi.get({ unread_only: 'true', limit: 50 }).then((r) => r.data),
-    staleTime: 30000, // 30s — don't hammer on every nav
+  // Pull the consolidated 'pending state' snapshot. Banners on the
+  // home screen are keyed on real state (pending offers, paid-not-
+  // shipped orders, etc.), NOT unread notifications — notifications
+  // get marked read on tap but the underlying pending state stays
+  // until the user actually does something. Refetches on focus so
+  // accepting / shipping elsewhere clears the banner immediately.
+  const { data: pending, refetch: refetchPending } = useQuery({
+    queryKey: ['home-pending'],
+    queryFn: () => homeApi.pending(),
+    staleTime: 30000,
   });
-  useFocusEffect(React.useCallback(() => { refetchNotifs(); }, [refetchNotifs]));
+  useFocusEffect(React.useCallback(() => { refetchPending(); }, [refetchPending]));
 
-  const offerNotifs = useMemo(() => {
-    return (notifData?.notifications || []).filter((n) => OFFER_NOTIF_TYPES.has(n.type));
-  }, [notifData]);
-  const offerCount = offerNotifs.length;
-  // Most recent acceptance vs incoming offers — the wording matters,
-  // an accepted offer is a much higher-priority CTA than a new
-  // incoming one (cards are about to ship; check out NOW).
-  const hasAcceptance = offerNotifs.some((n) => /accepted/.test(n.type));
+  const offersReceivedCount   = pending?.offers_received?.length || 0;
+  const listingOffersCount    = pending?.listing_offers_received?.length || 0;
+  const ordersToShipCount     = pending?.orders_to_ship?.length || 0;
+  const offersAcceptedCount   = pending?.offers_accepted_for_buyer?.length || 0;
+  const ordersToConfirmCount  = pending?.orders_to_confirm?.length || 0;
 
   // Admins bypass tier gates (matches API middleware in
   // requireShowFloor / requirePro). Same for store-owner roles
@@ -156,43 +173,63 @@ export const HomeHubScreen = ({ navigation }) => {
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
 
-        {/* Offer-activity banner — only renders when the user has
-            offer-related unread notifications. Tapping jumps into
-            the unified offers inbox; the inbox-load implicitly
-            marks the activity acknowledged once the user sees it. */}
-        {offerCount > 0 ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
+        {/* Active-state banners. Each renders only when its bucket
+            is non-zero. Order is by urgency: orders-to-ship first
+            (you owe a buyer), then accepted offers (you owe payment),
+            then incoming offers, then orders-to-confirm. */}
+        {ordersToShipCount > 0 ? (
+          <ActivityBanner
+            iconName="cube"
+            iconColor="#ef4444"
+            tone="hot"
+            title={`${ordersToShipCount} order${ordersToShipCount === 1 ? '' : 's'} to ship`}
+            sub="You've been paid. Add tracking to keep the buyer's clock ticking."
+            onPress={() => navigation.navigate('Profile', { screen: 'MyOrders' })}
+          />
+        ) : null}
+
+        {offersAcceptedCount > 0 ? (
+          <ActivityBanner
+            iconName="checkmark-circle"
+            iconColor="#4ade80"
+            tone="hot"
+            title={`${offersAcceptedCount} offer${offersAcceptedCount === 1 ? '' : 's'} accepted — your move`}
+            sub="The other party said yes. Coordinate the trade."
             onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
-            style={[
-              styles.activityBanner,
-              hasAcceptance && styles.activityBannerHot,
-            ]}
-          >
-            <View style={[
-              styles.activityIcon,
-              { backgroundColor: hasAcceptance ? 'rgba(74,222,128,0.22)' : 'rgba(232,197,71,0.22)' },
-            ]}>
-              <Ionicons
-                name={hasAcceptance ? 'checkmark-circle' : 'mail-unread'}
-                size={22}
-                color={hasAcceptance ? '#4ade80' : '#e8c547'}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.activityTitle, hasAcceptance && { color: '#4ade80' }]}>
-                {hasAcceptance
-                  ? `${offerCount} offer${offerCount === 1 ? '' : 's'} update${offerCount === 1 ? '' : 'd'} — action needed`
-                  : `${offerCount} new offer${offerCount === 1 ? '' : 's'}`}
-              </Text>
-              <Text style={styles.activitySub}>
-                {hasAcceptance
-                  ? 'One of your offers was accepted. Tap to review.'
-                  : 'Tap to review and respond.'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
+          />
+        ) : null}
+
+        {offersReceivedCount > 0 ? (
+          <ActivityBanner
+            iconName="mail-unread"
+            iconColor="#e8c547"
+            tone="warm"
+            title={`${offersReceivedCount} offer${offersReceivedCount === 1 ? '' : 's'} waiting on you`}
+            sub="Trade-board offers you haven't responded to."
+            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
+          />
+        ) : null}
+
+        {listingOffersCount > 0 ? (
+          <ActivityBanner
+            iconName="cash"
+            iconColor="#e8c547"
+            tone="warm"
+            title={`${listingOffersCount} cash offer${listingOffersCount === 1 ? '' : 's'} on your listings`}
+            sub="Marketplace buyers offered below ask. Counter, accept, or pass."
+            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
+          />
+        ) : null}
+
+        {ordersToConfirmCount > 0 ? (
+          <ActivityBanner
+            iconName="archive"
+            iconColor="#60a5fa"
+            tone="cool"
+            title={`${ordersToConfirmCount} order${ordersToConfirmCount === 1 ? '' : 's'} arrived`}
+            sub="Confirm receipt to release the seller's funds."
+            onPress={() => navigation.navigate('Profile', { screen: 'MyOrders' })}
+          />
         ) : null}
 
         <View style={styles.tileGrid}>
