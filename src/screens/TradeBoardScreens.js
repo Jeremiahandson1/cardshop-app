@@ -263,10 +263,19 @@ export const TradeBoardScreen = ({ navigation, route }) => {
       ) : null}
       <View style={styles.listingCardRow}>
       <View style={styles.listingPhotoWrap}>
+        {/* Fallback ladder: listing's own photo → user's owned-card
+            photo → catalog's master front image → placeholder icon.
+            The catalog fallback means staff-uploaded card images
+            show up on any listing whose owner didn't bother to
+            photograph the card themselves. */}
         {item.photo_front_url ? (
           <Image source={{ uri: item.photo_front_url }} style={styles.listingPhoto} resizeMode="cover" />
         ) : Array.isArray(item.photos) && item.photos[0] ? (
           <Image source={{ uri: item.photos[0] }} style={styles.listingPhoto} resizeMode="cover" />
+        ) : item.own_image_front ? (
+          <Image source={{ uri: item.own_image_front }} style={styles.listingPhoto} resizeMode="contain" />
+        ) : item.front_image_url ? (
+          <Image source={{ uri: item.front_image_url }} style={styles.listingPhoto} resizeMode="contain" />
         ) : (
           <View style={[styles.listingPhoto, styles.listingPhotoEmpty]}>
             <Ionicons name="image-outline" size={28} color={Colors.textDim} />
@@ -588,7 +597,9 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
-        {/* Photos — front + back from verification flow, fallback to owned_card photos */}
+        {/* Photos — front + back from verification flow, fallback to
+            owned_card photos, then owner's master front, then catalog
+            front. Placeholder icon only if absolutely nothing exists. */}
         {(listing.photo_front_url || listing.photo_back_url) ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.base }}>
             {listing.photo_front_url ? (
@@ -604,6 +615,10 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
               <Image key={i} source={{ uri }} style={styles.detailPhoto} resizeMode="cover" />
             ))}
           </ScrollView>
+        ) : listing.own_image_front ? (
+          <Image source={{ uri: listing.own_image_front }} style={[styles.detailPhoto, { marginBottom: Spacing.base }]} resizeMode="contain" />
+        ) : listing.front_image_url ? (
+          <Image source={{ uri: listing.front_image_url }} style={[styles.detailPhoto, { marginBottom: Spacing.base }]} resizeMode="contain" />
         ) : (
           <View style={[styles.detailPhoto, styles.listingPhotoEmpty, { marginBottom: Spacing.base }]}>
             <Ionicons name="image-outline" size={48} color={Colors.textDim} />
