@@ -66,6 +66,18 @@ export const LoginScreen = ({ navigation }) => {
         setLoading(false);
         return;
       }
+      // Suspended account → route to the appeal screen with the
+      // 1h-scoped appeal_token so the user can submit their case.
+      if (code === 'account_suspended') {
+        const data = err.response.data;
+        navigation.navigate('Suspended', {
+          appeal_token: data.appeal_token,
+          suspended_reason: data.suspended_reason,
+          appeal_status: data.appeal_status,
+        });
+        setLoading(false);
+        return;
+      }
       // Verbose error surfacing while we diagnose the "login failed" report.
       const parts = [];
       if (err.response?.data?.error) parts.push(err.response.data.error);

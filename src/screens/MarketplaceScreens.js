@@ -287,9 +287,16 @@ export const ListingDetailScreen = ({ navigation, route }) => {
             <Ionicons name="person-circle-outline" size={28} color={Colors.textMuted} />
             <View style={{ flex: 1 }}>
               <Text style={styles.sellerName}>{listing.seller_username}</Text>
-              {listing.seller_trust_score && (
+              {/* Review summary inline — '94% positive (23)' next to
+                  the seller name. eBay-style trust signal that beats
+                  a single trust_score float. */}
+              {listing.seller_review_total > 0 ? (
+                <Text style={styles.sellerTrust}>
+                  {Math.round((listing.seller_review_positive / listing.seller_review_total) * 100)}% positive ({listing.seller_review_total})
+                </Text>
+              ) : listing.seller_trust_score ? (
                 <Text style={styles.sellerTrust}>Trust score {Number(listing.seller_trust_score).toFixed(2)}</Text>
-              )}
+              ) : null}
             </View>
             <TouchableOpacity onPress={() => watchMut.mutate()}>
               <Ionicons

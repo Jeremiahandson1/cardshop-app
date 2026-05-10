@@ -18,6 +18,7 @@ import { Colors, Typography } from '../theme';
 
 // Screens
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
+import { SuspendedScreen } from '../screens/SuspendedScreen';
 import { HomeHubScreen } from '../screens/HomeHubScreen';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
@@ -455,6 +456,7 @@ const AuthStack = () => (
     <AuthStackNav.Screen name="Login" component={LoginScreen} />
     <AuthStackNav.Screen name="Register" component={RegisterScreen} />
     <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <AuthStackNav.Screen name="Suspended" component={SuspendedScreen} />
   </AuthStackNav.Navigator>
 );
 
