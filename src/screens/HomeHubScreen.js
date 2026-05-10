@@ -6,12 +6,24 @@
 // tab/screen surface area on launch. They pick the lens they
 // want (Show Floor, Collection, Local LCS) and only see what's
 // relevant to that lens until they come back here.
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
+import { notificationsApi } from '../services/api';
+
+// Notification types that surface as a "you have offers" banner on
+// the home screen. Anything here triggers the yellow pill above the
+// tiles + counts toward the offer total.
+const OFFER_NOTIF_TYPES = new Set([
+  'trade_offer', 'trade_offer_accepted', 'trade_offer_countered', 'trade_offer_declined',
+  'binder_offer', 'binder_offer_accepted', 'binder_offer_countered', 'binder_offer_declined',
+  'listing_offer', 'listing_offer_accepted', 'listing_offer_countered', 'listing_offer_rejected',
+]);
 
 // Tiers that include Show Floor access. Collector Pro does NOT —
 // Show Floor is a $24.99 standalone upgrade. Stores get it bundled.
@@ -59,6 +71,26 @@ export const HomeHubScreen = ({ navigation }) => {
     if (h < 17) return 'Good afternoon';
     return 'Good evening';
   })();
+
+  // Pull unread notifications so the home screen surfaces "X new
+  // offers" without requiring the user to dig through the offers
+  // inbox to discover anything happened. Refetch on screen focus
+  // so dismissing offers elsewhere updates the badge here.
+  const { data: notifData, refetch: refetchNotifs } = useQuery({
+    queryKey: ['home-unread-notifications'],
+    queryFn: () => notificationsApi.get({ unread_only: 'true', limit: 50 }).then((r) => r.data),
+    staleTime: 30000, // 30s — don't hammer on every nav
+  });
+  useFocusEffect(React.useCallback(() => { refetchNotifs(); }, [refetchNotifs]));
+
+  const offerNotifs = useMemo(() => {
+    return (notifData?.notifications || []).filter((n) => OFFER_NOTIF_TYPES.has(n.type));
+  }, [notifData]);
+  const offerCount = offerNotifs.length;
+  // Most recent acceptance vs incoming offers — the wording matters,
+  // an accepted offer is a much higher-priority CTA than a new
+  // incoming one (cards are about to ship; check out NOW).
+  const hasAcceptance = offerNotifs.some((n) => /accepted/.test(n.type));
 
   // Admins bypass tier gates (matches API middleware in
   // requireShowFloor / requirePro). Same for store-owner roles
@@ -123,6 +155,45 @@ export const HomeHubScreen = ({ navigation }) => {
           </View>
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
+
+        {/* Offer-activity banner — only renders when the user has
+            offer-related unread notifications. Tapping jumps into
+            the unified offers inbox; the inbox-load implicitly
+            marks the activity acknowledged once the user sees it. */}
+        {offerCount > 0 ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Profile', { screen: 'MyOffers' })}
+            style={[
+              styles.activityBanner,
+              hasAcceptance && styles.activityBannerHot,
+            ]}
+          >
+            <View style={[
+              styles.activityIcon,
+              { backgroundColor: hasAcceptance ? 'rgba(74,222,128,0.22)' : 'rgba(232,197,71,0.22)' },
+            ]}>
+              <Ionicons
+                name={hasAcceptance ? 'checkmark-circle' : 'mail-unread'}
+                size={22}
+                color={hasAcceptance ? '#4ade80' : '#e8c547'}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.activityTitle, hasAcceptance && { color: '#4ade80' }]}>
+                {hasAcceptance
+                  ? `${offerCount} offer${offerCount === 1 ? '' : 's'} update${offerCount === 1 ? '' : 'd'} — action needed`
+                  : `${offerCount} new offer${offerCount === 1 ? '' : 's'}`}
+              </Text>
+              <Text style={styles.activitySub}>
+                {hasAcceptance
+                  ? 'One of your offers was accepted. Tap to review.'
+                  : 'Tap to review and respond.'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.tileGrid}>
           {TILES.map((tile) => (
@@ -235,5 +306,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+
+  // Offer-activity banner — yellow by default for new incoming
+  // offers, green when there's an acceptance to act on.
+  activityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    backgroundColor: 'rgba(232,197,71,0.10)',
+    borderColor: 'rgba(232,197,71,0.45)',
+    marginTop: -Spacing.xs,
+  },
+  activityBannerHot: {
+    backgroundColor: 'rgba(74,222,128,0.10)',
+    borderColor: 'rgba(74,222,128,0.50)',
+  },
+  activityIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  activityTitle: {
+    color: '#e8c547',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  activitySub: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });
