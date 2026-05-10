@@ -43,7 +43,6 @@
     "react-native-flash-message": "^0.4.2",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-mmkv": "^4.1.2",
-    "react-native-nfc-manager": "^3.17.2",
     "react-native-purchases": "^10.0.1",
     "react-native-purchases-ui": "^10.0.1",
     "react-native-reanimated": "4.2.1",

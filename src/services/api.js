@@ -206,7 +206,6 @@ export const cardsApi = {
 // ============================================================
 export const transfersApi = {
   initiate: (data) => api.post('/transfers', data),
-  nfc: (data) => api.post('/transfers/nfc', data),
   accept: (id) => api.post(`/transfers/${id}/accept`),
   addTracking: (id, data) => api.post(`/transfers/${id}/add-tracking`, data),
   confirmDelivery: (id) => api.post(`/transfers/${id}/confirm-delivery`),

@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { transfersApi, cardsApi, safetyApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -18,11 +16,8 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const [method, setMethod] = useState('standard'); // 'standard' | 'nfc'
   const [recipientUsername, setRecipientUsername] = useState('');
   const [price, setPrice] = useState('');
-  const [nfcReady, setNfcReady] = useState(false);
-  const [nfcScanning, setNfcScanning] = useState(false);
 
   const { data: card } = useQuery({
     queryKey: ['card', cardId],
@@ -38,18 +33,6 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
     enabled: trimmedRecipient.length >= 3,
     retry: false,
   });
-
-  // Check NFC availability
-  useEffect(() => {
-    NfcManager.isSupported().then((supported) => {
-      if (supported) {
-        NfcManager.start().then(() => setNfcReady(true)).catch((err) => {
-          console.warn('[nfc] start failed:', err?.message);
-        });
-      }
-    }).catch((err) => console.warn('[nfc] isSupported failed:', err?.message));
-    return () => { NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message)); };
-  }, []);
 
   const transferMutation = useMutation({
     mutationFn: (data) => transfersApi.initiate(data),
@@ -69,56 +52,7 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
     },
   });
 
-  const nfcMutation = useMutation({
-    mutationFn: (data) => transfersApi.nfc(data),
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['my-transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
-      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Transfer Complete!', 'Card ownership transferred via NFC.', [
-        { text: 'Done', onPress: () => navigation.goBack() }
-      ]);
-      NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
-    },
-    onError: (err) => {
-      Alert.alert('Error', err.response?.data?.error || 'NFC transfer failed');
-      setNfcScanning(false);
-      NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
-    },
-  });
 
-  const startNFCScan = async () => {
-    setNfcScanning(true);
-    try {
-      await NfcManager.requestTechnology(NfcTech.Ndef);
-      const tag = await NfcManager.getTag();
-      
-      // Read user ID from the NFC tag written by the other person's app
-      const userId = tag?.ndefMessage?.[0]?.payload
-        ? String.fromCharCode(...tag.ndefMessage[0].payload).replace(/\u0000/g, '').replace('\x02en', '')
-        : null;
-
-      if (!userId) {
-        Alert.alert('Error', 'Could not read user info from NFC tag');
-        setNfcScanning(false);
-        return;
-      }
-
-      // Complete the transfer
-      nfcMutation.mutate({
-        owned_card_id: cardId,
-        to_user_id: userId,
-        sale_price: price ? parseFloat(price) : undefined,
-        nfc_session_id: `nfc-${Date.now()}`,
-      });
-    } catch (err) {
-      if (err.message !== 'cancelled') {
-        Alert.alert('NFC Error', 'Could not complete NFC transfer. Make sure both phones support NFC.');
-      }
-      setNfcScanning(false);
-    }
-  };
 
   const handleStandardTransfer = () => {
     if (!recipientUsername.trim()) {
@@ -186,16 +120,6 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
               <Text style={styles.methodDesc}>Enter their username</Text>
             </TouchableOpacity>
 
-            {nfcReady && (
-              <TouchableOpacity
-                style={[styles.methodBtn, method === 'nfc' && styles.methodBtnActive]}
-                onPress={() => setMethod('nfc')}
-              >
-                <Ionicons name="radio" size={20} color={method === 'nfc' ? Colors.accent2 : Colors.textMuted} />
-                <Text style={[styles.methodLabel, method === 'nfc' && { color: Colors.accent2 }]}>NFC Tap</Text>
-                <Text style={styles.methodDesc}>Touch phones together</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
 
@@ -246,50 +170,11 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {method === 'nfc' && (
-          <View style={styles.nfcArea}>
-            {nfcScanning ? (
-              <View style={styles.nfcScanning}>
-                <ActivityIndicator size="large" color={Colors.accent2} />
-                <Text style={styles.nfcScanningText}>Waiting for NFC tap...</Text>
-                <Text style={styles.nfcScanningHint}>Hold phones back-to-back</Text>
-                <TouchableOpacity
-                  style={styles.cancelNfc}
-                  onPress={() => {
-                    NfcManager.cancelTechnologyRequest().catch((err) => console.warn('[nfc] cancel failed:', err?.message));
-                    setNfcScanning(false);
-                  }}
-                >
-                  <Text style={{ color: Colors.textMuted }}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.nfcReady}>
-                <View style={styles.nfcIcon}>
-                  <Ionicons name="radio" size={40} color={Colors.accent2} />
-                </View>
-                <Text style={styles.nfcTitle}>NFC Transfer</Text>
-                <Text style={styles.nfcDesc}>
-                  Both parties need to have the app open. The recipient goes to their profile and taps "Receive via NFC". Then touch phones back-to-back.
-                </Text>
-                <Button
-                  title="Start NFC Scan"
-                  variant="teal"
-                  onPress={startNFCScan}
-                  style={{ marginTop: Spacing.lg }}
-                />
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Important note */}
         <View style={styles.noteBox}>
           <Ionicons name="information-circle" size={16} color={Colors.info} />
           <Text style={styles.noteText}>
-            {method === 'nfc'
-              ? 'NFC transfers complete instantly when both parties confirm.'
-              : 'The recipient must accept the transfer. Ownership does not change until they confirm.'}
+            The recipient must accept the transfer. Ownership does not change until they confirm.
           </Text>
         </View>
       </ScrollView>
@@ -437,19 +322,6 @@ const styles = StyleSheet.create({
   methodBtnActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + '15' },
   methodLabel: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: Typography.semibold },
   methodDesc: { color: Colors.textMuted, fontSize: Typography.xs, textAlign: 'center' },
-  nfcArea: { backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: Spacing.xl },
-  nfcScanning: { alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xl },
-  nfcScanningText: { color: Colors.accent2, fontSize: Typography.lg, fontWeight: Typography.semibold },
-  nfcScanningHint: { color: Colors.textMuted, fontSize: Typography.sm },
-  cancelNfc: { marginTop: Spacing.md },
-  nfcReady: { alignItems: 'center' },
-  nfcIcon: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: Colors.accent2 + '22', borderWidth: 1, borderColor: Colors.accent2,
-    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md,
-  },
-  nfcTitle: { color: Colors.text, fontSize: Typography.lg, fontWeight: Typography.bold, marginBottom: Spacing.sm },
-  nfcDesc: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center', lineHeight: 20 },
   noteBox: {
     flexDirection: 'row', gap: Spacing.sm, alignItems: 'flex-start',
     backgroundColor: Colors.info + '15', borderRadius: Radius.md,

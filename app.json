@@ -2,7 +2,7 @@
   "expo": {
     "name": "Card Shop",
     "slug": "cardshop-twomiah",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,18 +17,12 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.twomiah.cardshop",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "infoPlist": {
-        "NFCReaderUsageDescription": "Used for card ownership transfers at trade shows",
         "NSCameraUsageDescription": "Used to scan QR codes and capture card photos for trade listings",
         "NSPhotoLibraryUsageDescription": "Used to upload card photos",
         "NSLocationWhenInUseUsageDescription": "Used to show nearby trade listings and snapshot your city on your own listings",
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": [
-          "TAG"
-        ]
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -129,14 +123,13 @@
       },
       "package": "com.twomiah.cardshop",
       "permissions": [
-        "android.permission.NFC",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 9
+      "versionCode": 10
     },
     "plugins": [
       [
@@ -152,12 +145,6 @@
         }
       ],
       "expo-notifications",
-      [
-        "react-native-nfc-manager",
-        {
-          "includeNdefEntitlement": false
-        }
-      ],
       "expo-secure-store",
       "expo-sharing",
       "expo-web-browser",
