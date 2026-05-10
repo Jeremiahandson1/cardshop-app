@@ -323,6 +323,26 @@ export const messagesApi = {
 // ============================================================
 // NOTIFICATIONS
 // ============================================================
+// Admin store directory — used by the mobile Pro Tagging picker
+// to find which store to attach a session to.
+export const adminStoresApi = {
+  list: (params = {}) => api.get('/admin/stores', { params }).then((r) => r.data),
+  locations: (storeId) => api.get(`/stores/${storeId}/locations`).then((r) => r.data),
+};
+
+// Pro Tagging session API — admin-only. Mobile uses these to start
+// a session before tagging a shop's inventory; once active, the
+// register-card flow includes the session_id with every card.
+export const taggingSessionsApi = {
+  start: ({ store_id, store_location_id, notes } = {}) =>
+    api.post('/admin/tagging-sessions', { store_id, store_location_id, notes }).then((r) => r.data),
+  active: () => api.get('/admin/tagging-sessions/active').then((r) => r.data),
+  end: (id) => api.post(`/admin/tagging-sessions/${id}/end`).then((r) => r.data),
+  cancel: (id) => api.post(`/admin/tagging-sessions/${id}/cancel`).then((r) => r.data),
+  list: (params = {}) => api.get('/admin/tagging-sessions', { params }).then((r) => r.data),
+  get: (id) => api.get(`/admin/tagging-sessions/${id}`).then((r) => r.data),
+};
+
 export const notificationsApi = {
   get: (params) => api.get('/notifications', { params }),
   markRead: (ids) => api.post('/notifications/mark-read', { ids }),

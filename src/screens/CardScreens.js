@@ -18,7 +18,7 @@ import { showMessage } from 'react-native-flash-message';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent } from '../services/api';
+import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -963,6 +963,17 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     setStep('manual_entry');
   };
 
+  // If the admin has an active Pro Tagging session, every card
+  // they register here gets stamped with the session_id so we can
+  // bill / report on it later. Non-admins / no-session = no-op.
+  const { data: taggingSession } = useQuery({
+    queryKey: ['tagging-active-register'],
+    queryFn: () => taggingSessionsApi.active().catch(() => ({ session: null })),
+    enabled: currentUser?.role === 'admin',
+    staleTime: 60000,
+  });
+  const activeTaggingSessionId = taggingSession?.session?.id || null;
+
   const registerMutation = useMutation({
     mutationFn: async () => {
       // Convert each local file:// photo into a base64 data URL so
@@ -1036,6 +1047,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         // came through the vision-scan path (scanReview is null
         // on manual / cascade / search registers). Server writes
         // it to ai_scan_corrections after the card insert.
+        tagging_session_id: activeTaggingSessionId || undefined,
         scan_log: scanReview ? {
           ai_player_name: scanReview.player_name || null,
           ai_year: scanReview.year || null,

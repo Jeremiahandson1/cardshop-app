@@ -41,6 +41,7 @@ import {
   ProfileScreen, WantListScreen,
   ChangeEmailScreen, DownloadDataScreen, DeleteAccountScreen,
 } from '../screens/ProfileScreens';
+import { ProTaggingScreen } from '../screens/ProTaggingScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import {
   BinderListScreen, BinderEditorScreen, BinderCardPickerScreen,
@@ -400,6 +401,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
     <ProfileStackNav.Screen name="Addresses" component={AddressesScreen} />
     <ProfileStackNav.Screen name="AddressForm" component={AddressFormScreen} options={{ presentation: 'modal' }} />
+    <ProfileStackNav.Screen name="ProTagging" component={ProTaggingScreen} />
   </ProfileStackNav.Navigator>
 );
 

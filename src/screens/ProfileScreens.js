@@ -219,6 +219,7 @@ export const ProfileScreen = ({ navigation }) => {
       items: [
         { icon: 'shield-outline', label: 'Admin overview', onPress: () => openAdminUrl('/admin') },
         { icon: 'person-outline', label: 'Users', onPress: () => openAdminUrl('/admin/users') },
+        { icon: 'pricetag-outline', label: 'Pro Tagging session', onPress: () => navigation.navigate('ProTagging') },
         { icon: 'clipboard-outline', label: 'Support tickets', onPress: () => openAdminUrl('/admin/tickets') },
         { icon: 'warning-outline', label: 'Stolen reports', onPress: () => openAdminUrl('/admin/stolen') },
         { icon: 'git-compare-outline', label: 'Counter-claims', onPress: () => openAdminUrl('/admin/counter-claims') },
