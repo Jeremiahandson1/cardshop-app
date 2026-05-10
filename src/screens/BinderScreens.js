@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi } from '../services/api';
+import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi, reviewsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
@@ -2013,6 +2013,11 @@ export const TransactionScreen = ({ navigation, route }) => {
   const user = useAuthStore((s) => s.user);
   const [paymentId, setPaymentId] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  // Review-on-complete prompt state.
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(null);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const { data: tx, isLoading } = useQuery({
     queryKey: ['transaction', transactionId],
@@ -2408,6 +2413,108 @@ export const TransactionScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           );
         })()}
+
+        {/* Review prompt — fires when the trade has completed and
+            we're inside the 7-day review window. The OTHER party is
+            the review subject. Shows once-per-trade; reviewSubmitted
+            local flag suppresses re-prompt this session. */}
+        {tx.status === 'complete' && !reviewSubmitted && (() => {
+          const isBuyer = tx.buyer_user_id === user?.id;
+          const subjectId = isBuyer ? tx.seller_user_id : tx.buyer_user_id;
+          const subjectName = isBuyer ? (tx.seller_username || 'seller') : (tx.buyer_username || 'buyer');
+          if (!subjectId) return null;
+          return (
+            <View style={{
+              padding: Spacing.md,
+              borderRadius: Radius.md,
+              backgroundColor: 'rgba(74,222,128,0.08)',
+              borderWidth: 1,
+              borderColor: 'rgba(74,222,128,0.40)',
+              marginBottom: Spacing.md,
+            }}>
+              <Text style={{ color: Colors.text, fontWeight: Typography.bold, marginBottom: 4 }}>
+                Trade complete · how was @{subjectName}?
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: Spacing.sm, lineHeight: 17 }}>
+                Your review shows on their trust profile. You have 7 days to submit.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <TouchableOpacity
+                  onPress={() => { setReviewRating('positive'); setReviewModalOpen(true); }}
+                  style={{ flex: 1, padding: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.success, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+                >
+                  <Ionicons name="thumbs-up" size={16} color={Colors.success} />
+                  <Text style={{ color: Colors.success, fontWeight: Typography.semibold }}>Positive</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setReviewRating('negative'); setReviewModalOpen(true); }}
+                  style={{ flex: 1, padding: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent3, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+                >
+                  <Ionicons name="thumbs-down" size={16} color={Colors.accent3} />
+                  <Text style={{ color: Colors.accent3, fontWeight: Typography.semibold }}>Negative</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Review modal — confirms rating + collects optional comment */}
+        <Modal visible={reviewModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setReviewModalOpen(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.base, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <TouchableOpacity onPress={() => setReviewModalOpen(false)}>
+                <Text style={{ color: Colors.accent, fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={{ color: Colors.text, fontSize: 16, fontWeight: '600' }}>
+                {reviewRating === 'positive' ? '👍 Positive review' : '👎 Negative review'}
+              </Text>
+              <View style={{ width: 50 }} />
+            </View>
+            <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+              <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+                Optional comment, public on their trust profile. Stay specific
+                ('shipped fast, well-packed' / 'photos didn't match condition'),
+                skip the personal stuff.
+              </Text>
+              <Input
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                placeholder="What worked? What didn't?"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+              <Button
+                title="Submit review"
+                onPress={async () => {
+                  const isBuyer = tx.buyer_user_id === user?.id;
+                  const subjectId = isBuyer ? tx.seller_user_id : tx.buyer_user_id;
+                  if (!subjectId || !reviewRating) return;
+                  try {
+                    await reviewsApi.leave(subjectId, {
+                      binder_transaction_id: tx.id,
+                      rating: reviewRating,
+                      comment: reviewComment.trim() || undefined,
+                    });
+                    setReviewModalOpen(false);
+                    setReviewSubmitted(true);
+                    setReviewComment('');
+                    Alert.alert('Review submitted', 'It now shows on their trust profile.');
+                  } catch (err) {
+                    const msg = err?.response?.data?.error;
+                    if (msg && msg.includes('already')) {
+                      setReviewSubmitted(true);
+                      setReviewModalOpen(false);
+                      Alert.alert('Already reviewed', 'You already left a review on this trade.');
+                    } else {
+                      Alert.alert('Could not submit', msg || err?.message || 'Try again.');
+                    }
+                  }
+                }}
+              />
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         {/* Report problem — with video-gate disclaimer if applicable */}
         {tx.status !== 'complete' && tx.status !== 'disputed' && (
