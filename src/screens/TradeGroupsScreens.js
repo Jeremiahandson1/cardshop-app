@@ -210,9 +210,15 @@ export const TradeGroupDetailScreen = ({ navigation, route }) => {
         ) : null}
 
         <Button
-          title="View this group's trade board"
-          onPress={() => navigation.navigate('TradeBoardMain', { scope: 'group', groupId })}
+          title="List a card to this group"
+          onPress={() => navigation.navigate('CreateTradeListing', { presetGroupId: groupId })}
           style={{ marginTop: Spacing.md }}
+        />
+        <Button
+          title="View this group's trade board"
+          variant="secondary"
+          onPress={() => navigation.navigate('TradeBoardMain', { scope: 'group', groupId })}
+          style={{ marginTop: Spacing.sm }}
         />
 
         <Divider style={{ marginVertical: Spacing.base }} />

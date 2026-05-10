@@ -1528,6 +1528,49 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
 // ============================================================
 // TRADE OFFER DETAIL — with accept/decline/counter and thread
 // ============================================================
+
+// Single-line card row used on both sides of the trade. Tap opens
+// CardDetail. Falls back to a 🃏 placeholder when the image_url is
+// missing so the row height stays consistent.
+const TradeCardRow = ({ card, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.7}
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    }}
+  >
+    {card.image_url ? (
+      <Image
+        source={{ uri: card.image_url }}
+        style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2 }}
+        resizeMode="contain"
+      />
+    ) : (
+      <View style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+        <Text>🃏</Text>
+      </View>
+    )}
+    <View style={{ flex: 1 }}>
+      <Text style={{ color: Colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+        {[card.year, card.set_name, card.player_name].filter(Boolean).join(' · ') || 'Card'}
+      </Text>
+      <Text style={{ color: Colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+        {card.card_number ? `#${card.card_number} ` : ''}
+        {card.parallel ? `· ${card.parallel} ` : ''}
+        {card.grading_company ? `· ${card.grading_company.toUpperCase()} ${card.grade || ''}` : ''}
+        {card.serial_number && card.print_run ? ` · #${card.serial_number}/${card.print_run}` : ''}
+      </Text>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+  </TouchableOpacity>
+);
+
 export const TradeOfferDetailScreen = ({ navigation, route }) => {
   const { offerId } = route.params;
   const qc = useQueryClient();
@@ -1681,46 +1724,36 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {/* Offered cards — was rendering '1 card' instead of the
-            actual card. The API now returns trade_cards resolved
-            against the catalog so the recipient sees what they're
-            being offered before deciding. */}
+        {/* Both sides of the trade — listing card ("For") + offered
+            cards ("Offering"). Each row is tappable into CardDetail so
+            either party can inspect grade, serial, condition, history
+            etc. before accepting. Previously this screen showed only
+            the offered side and as a flat list — recipients had no way
+            to see the card they'd be receiving without backing out. */}
         <View style={styles.offerTerms}>
+          <Text style={styles.offerTermsLabel}>For</Text>
+          {offer.listing_card ? (
+            <TradeCardRow
+              card={offer.listing_card}
+              onPress={() => navigation.navigate('CardDetail', { cardId: offer.listing_card.id })}
+            />
+          ) : (
+            <Text style={styles.offerTermsLine}>
+              {offer.tl_card_name || 'Listing card'}
+            </Text>
+          )}
+        </View>
+
+        <View style={[styles.offerTerms, { marginTop: Spacing.sm }]}>
           <Text style={styles.offerTermsLabel}>Offering</Text>
           {Array.isArray(offer.trade_cards) && offer.trade_cards.length > 0 ? (
             <View style={{ marginTop: 4 }}>
               {offer.trade_cards.map((c) => (
-                <View key={c.id} style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: Spacing.sm,
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: Colors.border,
-                }}>
-                  {c.image_url ? (
-                    <Image
-                      source={{ uri: c.image_url }}
-                      style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <View style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text>🃏</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: Colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
-                      {[c.year, c.set_name, c.player_name].filter(Boolean).join(' · ') || 'Card'}
-                    </Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12 }} numberOfLines={1}>
-                      {c.card_number ? `#${c.card_number} ` : ''}
-                      {c.parallel ? `· ${c.parallel} ` : ''}
-                      {c.grading_company ? `· ${c.grading_company.toUpperCase()} ${c.grade || ''}` : ''}
-                      {c.serial_number && c.print_run ? ` · #${c.serial_number}/${c.print_run}` : ''}
-                    </Text>
-                  </View>
-                </View>
+                <TradeCardRow
+                  key={c.id}
+                  card={c}
+                  onPress={() => navigation.navigate('CardDetail', { cardId: c.id })}
+                />
               ))}
             </View>
           ) : (

@@ -1,10 +1,11 @@
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
-import { Alert } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Alert, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import FlashMessage from 'react-native-flash-message';
+import FlashMessage, { showMessage } from 'react-native-flash-message';
+import * as Updates from 'expo-updates';
 
 // Global JS error handler — surfaces the message in an Alert so we
 // can capture the actual error when something crashes mid-flow.
@@ -52,12 +53,59 @@ const AppInner = () => {
   const isLoading = useAuthStore((s) => s.isLoading);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
+  // OTA update handler — runs on launch + every time the app
+  // returns to foreground. Aggressive about checking but
+  // non-disruptive about applying: never reloads mid-session,
+  // just downloads + queues for next cold start. User can also
+  // tap "Install update" if they want to apply immediately.
+  const otaCheckingRef = useRef(false);
+  const checkAndFetchUpdate = async ({ reloadIfReady = false } = {}) => {
+    if (otaCheckingRef.current) return;
+    if (__DEV__) return;
+    otaCheckingRef.current = true;
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (!check.isAvailable) return;
+      await Updates.fetchUpdateAsync();
+      // Surface a banner so the user knows an update is queued.
+      // If they pulled into the app moments ago and we just
+      // finished downloading, offer immediate apply via Alert.
+      if (reloadIfReady) {
+        await Updates.reloadAsync();
+      } else {
+        showMessage({
+          message: 'Update ready',
+          description: 'A new version downloaded. Restart the app to apply, or it will load automatically next time you open Card Shop.',
+          type: 'success',
+          duration: 6000,
+          autoHide: true,
+        });
+      }
+    } catch (err) {
+      console.warn('[ota] check failed:', err?.message || err);
+    } finally {
+      otaCheckingRef.current = false;
+    }
+  };
+
   useEffect(() => {
     initialize();
     initAnalytics();
-    // Bootstrap RevenueCat once on app launch — safe no-op when no
-    // platform key is configured (web, dev without keys).
     configureRevenueCat();
+    // Initial OTA check on cold start. Apply immediately on cold
+    // start since user just opened the app and won't lose state.
+    checkAndFetchUpdate({ reloadIfReady: true });
+
+    // Re-check every time the app comes back to foreground. Catches
+    // the case where the user backgrounds the app for a while, we
+    // ship an OTA, they return — they shouldn't have to force-close.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkAndFetchUpdate({ reloadIfReady: false });
+      }
+    });
+    return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialize]);
 
   // Once authenticated, register for push + identify to analytics +

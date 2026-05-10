@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:getcollectr.com)",
+      "WebFetch(domain:collx.app)"
+    ]
+  }
+}

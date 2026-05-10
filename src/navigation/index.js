@@ -445,6 +445,9 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="Help" component={HelpScreen} />
     <TradeStackNav.Screen name="ReportStolen" component={ReportStolenScreen} />
     <TradeStackNav.Screen name="FirstTradeSafety" component={FirstTradeSafetyScreen} />
+    {/* CardDetail registered in this stack so trade offer rows can
+        navigate into full card inspection without leaving the Trade tab. */}
+    <TradeStackNav.Screen name="CardDetail" component={CardDetailScreen} />
   </TradeStackNav.Navigator>
 );
 

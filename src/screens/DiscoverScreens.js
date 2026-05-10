@@ -65,8 +65,13 @@ export const DiscoverScreen = ({ navigation }) => {
       </View>
 
       {!query ? (
-        // Browse by sport
+        // Browse by sport — distinct `key` so RN unmounts this
+        // FlatList when the query flips truthy. Without it, RN
+        // tries to reuse this instance for the search-results
+        // FlatList below and crashes on the numColumns prop change
+        // ("Changing numColumns on the fly is not supported.").
         <FlatList
+          key="sports-grid"
           data={SPORTS}
           keyExtractor={(item) => item}
           numColumns={2}
@@ -91,6 +96,7 @@ export const DiscoverScreen = ({ navigation }) => {
         />
       ) : (
         <FlatList
+          key="search-results"
           data={results}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: Spacing.base, gap: Spacing.sm, paddingBottom: 80 }}
