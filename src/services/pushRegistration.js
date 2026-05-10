@@ -19,7 +19,7 @@ Notifications.setNotificationHandler({
  * Silently no-ops on simulators / unsupported environments.
  */
 export async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice) return null;
+  if (!Device.isDevice) return { ok: false, reason: 'not_device' };
 
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
@@ -28,7 +28,9 @@ export async function registerForPushNotificationsAsync() {
       const req = await Notifications.requestPermissionsAsync();
       status = req.status;
     }
-    if (status !== 'granted') return null;
+    if (status !== 'granted') {
+      return { ok: false, reason: 'permission_' + status, status };
+    }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId
       || Constants.easConfig?.projectId;
@@ -36,7 +38,7 @@ export async function registerForPushNotificationsAsync() {
       projectId ? { projectId } : undefined
     );
     const token = tokenResp.data;
-    if (!token) return null;
+    if (!token) return { ok: false, reason: 'no_token' };
 
     await api.post('/push-tokens/register', {
       token,
@@ -44,10 +46,22 @@ export async function registerForPushNotificationsAsync() {
       device_name: Device.modelName || undefined,
     });
 
-    return token;
+    return { ok: true, token };
   } catch (err) {
     console.warn('push registration failed', err.message);
-    return null;
+    return { ok: false, reason: 'error', error: err.message };
+  }
+}
+
+// Helper for the home-screen banner — checks current permission
+// without prompting. Returns 'granted' | 'denied' | 'undetermined'.
+export async function getPushPermissionStatus() {
+  if (!Device.isDevice) return 'not_device';
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status; // 'granted' | 'denied' | 'undetermined'
+  } catch {
+    return 'unknown';
   }
 }
 

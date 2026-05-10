@@ -9,8 +9,8 @@
 // until they come back here. Trade-offers + marketplace tiles
 // surface a live count so the user knows at a glance whether
 // anything needs attention.
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, Platform, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
 import { homeApi } from '../services/api';
+import { getPushPermissionStatus, registerForPushNotificationsAsync } from '../services/pushRegistration';
 
 // Tiers that include Show Floor access. Collector Pro does NOT —
 // Show Floor is a $24.99 standalone upgrade. Stores get it bundled.
@@ -104,6 +105,29 @@ export const HomeHubScreen = ({ navigation }) => {
   const tradeOffersCount    = pending?.counts?.active_trade_offers || 0;
   const marketplaceCount    = pending?.counts?.marketplace_sales   || 0;
 
+  // Push permission watcher — fires a yellow banner if the user
+  // doesn't have notifications enabled (otherwise no trade-offer or
+  // sale pushes ever land). Re-checks when the app comes back from
+  // background (in case they just toggled notifications on in
+  // Settings).
+  const [pushStatus, setPushStatus] = useState('granted'); // optimistic default
+  React.useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      const s = await getPushPermissionStatus();
+      if (mounted) setPushStatus(s);
+    };
+    check();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') check();
+    });
+    return () => { mounted = false; sub.remove(); };
+  }, []);
+  useFocusEffect(React.useCallback(() => {
+    getPushPermissionStatus().then(setPushStatus);
+  }, []));
+  const pushOff = pushStatus === 'denied' || pushStatus === 'undetermined';
+
   // Admins bypass tier gates (matches API middleware in
   // requireShowFloor / requirePro). Same for store-owner roles
   // since stores get Show Floor bundled.
@@ -187,6 +211,48 @@ export const HomeHubScreen = ({ navigation }) => {
           </View>
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
+
+        {/* Push-permission warning — without notifications enabled,
+            no trade-offer / sale push ever lands. Tapping fires the
+            re-prompt (works on first attempt) or opens system
+            Settings (works after a 'denied' state). */}
+        {pushOff ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={async () => {
+              if (pushStatus === 'undetermined') {
+                const r = await registerForPushNotificationsAsync();
+                if (r?.ok) setPushStatus('granted');
+                else setPushStatus('denied');
+              } else {
+                // 'denied' state — system won't re-prompt, must go
+                // through Settings. Linking.openSettings deep-links
+                // straight to this app's notification page.
+                Linking.openSettings();
+              }
+            }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+              padding: Spacing.md,
+              borderRadius: Radius.lg,
+              borderWidth: 1,
+              backgroundColor: 'rgba(232,197,71,0.10)',
+              borderColor: 'rgba(232,197,71,0.45)',
+              marginBottom: Spacing.md,
+            }}
+          >
+            <Ionicons name="notifications-off" size={22} color="#e8c547" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#e8c547', fontWeight: '700', fontSize: 14 }}>
+                Notifications are off
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                You won't get pushes for trade offers or sales until you enable them. Tap here.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.tileGrid}>
           {TILES.map((tile) => (
