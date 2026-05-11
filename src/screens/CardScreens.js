@@ -3504,7 +3504,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
           <Divider />
 
-          {/* Chain of custody — Carfax view of every owner, transfer,
+          {/* Chain of custody — full timeline of every owner, transfer,
               video, and stolen flag in this card's life. The
               differentiator's storefront. */}
           <TouchableOpacity

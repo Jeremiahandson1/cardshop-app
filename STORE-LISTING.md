@@ -25,7 +25,7 @@ Paste these into:
 ### Description (max 4,000 chars)
 
 ```
-Every card has a Carfax. Card Shop is the chain.
+The chain for every card.
 
 Card theft, mail fraud, and "buyer claims it never arrived" disputes are weekly problems in this hobby. Card Shop solves them with a documented ownership history, not promises.
 

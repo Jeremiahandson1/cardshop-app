@@ -1,5 +1,5 @@
 // Card chain-of-custody timeline screen (Theme B).
-// "Carfax for cards." Brand-facing — every transfer, stolen flag,
+// "The chain for every card." Brand-facing — every transfer, stolen flag,
 // grading event laid out in a vertical timeline. Anonymized to
 // usernames; no PII. The most polished screen in the app should
 // live here because it's the differentiator's storefront.
