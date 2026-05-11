@@ -308,8 +308,17 @@ export const MyOffersScreen = ({ navigation, route }) => {
           refreshControl={<RefreshControl refreshing={isFetching && !isLoading} onRefresh={refetch} tintColor={Colors.text} />}
           renderItem={({ item }) => {
             const meta = KIND_META[item.kind];
+            const fresh = freshness(item.updatedAt);
             return (
-              <TouchableOpacity style={styles.offerRow} onPress={() => openRow(item)}>
+              <TouchableOpacity
+                style={[
+                  styles.offerRow,
+                  // Left-edge freshness stripe so hot rows pop and
+                  // stale rows recede when the list is scrolled.
+                  { borderLeftWidth: 4, borderLeftColor: fresh.color, opacity: fresh.level === 'stale' ? 0.7 : 1 },
+                ]}
+                onPress={() => openRow(item)}
+              >
                 <View style={{
                   width: 36, height: 36, borderRadius: 18,
                   backgroundColor: `${meta.color}22`,
@@ -326,6 +335,19 @@ export const MyOffersScreen = ({ navigation, route }) => {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   {item.amount && <Text style={styles.offerAmount}>{item.amount}</Text>}
+                  {fresh.label ? (
+                    <View style={{
+                      backgroundColor: `${fresh.color}22`,
+                      borderRadius: 4,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      marginTop: 4,
+                    }}>
+                      <Text style={{ color: fresh.color, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+                        {fresh.label.toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
                   {item.expiresAt && ['open', 'countered', 'accepted'].includes(item.status) && (
                     <Text style={styles.offerExpires}>
                       {timeUntil(item.expiresAt)} left
@@ -360,6 +382,23 @@ function timeUntil(dateStr) {
   if (hours >= 24) return `${Math.floor(hours / 24)}d`;
   if (hours >= 1) return `${hours}h`;
   return `${Math.max(1, Math.floor(ms / 60000))}m`;
+}
+
+// Color-code each offer by how recently it was touched. From the
+// colorful home tile, this list previously read as a flat grey
+// stack — adding a freshness signal turns it back into something
+// scannable: hot offers jump, dying ones recede.
+//
+// Buckets: 0-2d hot, 3-6d warming, 7d+ stale.
+function freshness(dateStr) {
+  if (!dateStr) return { color: '#6b7280', label: '', level: 'stale' };
+  const ageMs = Date.now() - new Date(dateStr).getTime();
+  const ageDays = ageMs / (24 * 3600 * 1000);
+  if (ageDays < 1)  return { color: '#f97316', label: 'new',   level: 'hot' };
+  if (ageDays < 3)  return { color: '#f97316', label: `${Math.floor(ageDays)}d`, level: 'hot' };
+  if (ageDays < 7)  return { color: '#fbbf24', label: `${Math.floor(ageDays)}d`, level: 'warm' };
+  if (ageDays < 30) return { color: '#6b7280', label: `${Math.floor(ageDays)}d`, level: 'stale' };
+  return { color: '#4b5563', label: `${Math.floor(ageDays / 30)}mo`, level: 'stale' };
 }
 
 // ============================================================
