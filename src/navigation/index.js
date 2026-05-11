@@ -121,18 +121,24 @@ const screenOptions = {
 // bar restores that tab's last nested-stack state — so if a Home tile
 // previously deep-linked you into Profile/MyOrders, the next time you
 // tap the Profile tab you land on MyOrders, not the Profile root.
-// That feels broken: users expect tab-bar taps to behave like Twitter
-// or Instagram and always go to the tab's home screen.
 //
-// This listener resets the tab's nested stack to its initial route on
-// every tap, regardless of focus state. The deep-link from a Home tile
-// still works because that path goes through `navigation.navigate(...)`
-// which sets the nested route directly, not through a tab-bar tap.
+// Previous version of this only fired when tabState.index > 0, which
+// caught drill-down navigation but MISSED Home-tile deep-links: those
+// use navigation.navigate('Profile', { screen: 'MyOrders' }) which
+// sets the nested stack to [MyOrders] as the sole route (index === 0,
+// but the route name isn't the tab's initial route). So tile-driven
+// users got stuck — tap Profile → still see MyOrders → tap again →
+// pop to top works the second time.
+//
+// New check: if the CURRENT focused route in the nested stack isn't
+// the initial route, reset. Covers both drill-down and tile-deep-link.
 function resetOnTabPress(tabName, initialRouteName) {
   return ({ navigation }) => ({
     tabPress: (e) => {
       const tabState = navigation.getState().routes.find((r) => r.name === tabName)?.state;
-      if (tabState && tabState.index > 0) {
+      if (!tabState) return; // Tab never visited — let default behavior run.
+      const currentRouteName = tabState.routes?.[tabState.index]?.name;
+      if (currentRouteName && currentRouteName !== initialRouteName) {
         e.preventDefault();
         navigation.dispatch({
           ...CommonActions.reset({
