@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, CommonActions } from '@react-navigation/native';
 import { registerNotificationResponseHandler } from '../services/pushRegistration';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -117,6 +117,36 @@ const screenOptions = {
   animation: 'slide_from_right',
 };
 
+// Tab-press listener factory. By default, tapping a tab in the bottom
+// bar restores that tab's last nested-stack state — so if a Home tile
+// previously deep-linked you into Profile/MyOrders, the next time you
+// tap the Profile tab you land on MyOrders, not the Profile root.
+// That feels broken: users expect tab-bar taps to behave like Twitter
+// or Instagram and always go to the tab's home screen.
+//
+// This listener resets the tab's nested stack to its initial route on
+// every tap, regardless of focus state. The deep-link from a Home tile
+// still works because that path goes through `navigation.navigate(...)`
+// which sets the nested route directly, not through a tab-bar tap.
+function resetOnTabPress(tabName, initialRouteName) {
+  return ({ navigation }) => ({
+    tabPress: (e) => {
+      const tabState = navigation.getState().routes.find((r) => r.name === tabName)?.state;
+      if (tabState && tabState.index > 0) {
+        e.preventDefault();
+        navigation.dispatch({
+          ...CommonActions.reset({
+            index: 0,
+            routes: [{ name: initialRouteName }],
+          }),
+          target: tabState.key,
+        });
+        navigation.navigate(tabName);
+      }
+    },
+  });
+}
+
 // ============================================================
 // BOTTOM TAB NAVIGATOR
 // ============================================================
@@ -179,6 +209,7 @@ const TabNavigator = () => {
           tabBarLabel: 'Collection',
           tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
         }}
+        listeners={resetOnTabPress('Binders', 'BinderList')}
       />
       <Tab.Screen
         name="Scan"
@@ -215,6 +246,7 @@ const TabNavigator = () => {
         options={{
           tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal" size={size} color={color} />,
         }}
+        listeners={resetOnTabPress('Trade', 'TradeBoardMain')}
       />
       {LCS_ENABLED && (
         <Tab.Screen
@@ -224,6 +256,7 @@ const TabNavigator = () => {
             tabBarLabel: 'LCS',
             tabBarIcon: ({ color, size }) => <Ionicons name="storefront" size={size} color={color} />,
           }}
+          listeners={resetOnTabPress('LCS', 'LCSHome')}
         />
       )}
       <Tab.Screen
@@ -234,6 +267,7 @@ const TabNavigator = () => {
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: { backgroundColor: Colors.accent3, fontSize: 10 },
         }}
+        listeners={resetOnTabPress('Profile', 'ProfileMain')}
       />
     </Tab.Navigator>
   );

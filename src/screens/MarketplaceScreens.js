@@ -79,11 +79,18 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
             />
           )}
           ListEmptyComponent={
-            <EmptyState
-              icon="🛒"
-              title="Nothing here yet"
-              message={tab === 'feed' ? 'Add cards to your binders or want list to personalize this feed.' : 'Check back soon.'}
-            />
+            tab === 'feed' ? (
+              // 'For You' is personalization-driven — if it's empty,
+              // user hasn't built want lists yet. Different ask from
+              // the platform-wide "no listings exist" state.
+              <EmptyState
+                icon="✨"
+                title="Personalize your feed"
+                message="Add cards to your binders or want list and we'll surface listings that match."
+              />
+            ) : (
+              <MarketplaceFirstListingState onListCard={() => navigation.navigate('Profile', { screen: 'CreateListing' })} />
+            )
           }
         />
       )}
@@ -95,6 +102,72 @@ const TabButton = ({ title, active, onPress }) => (
   <TouchableOpacity onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
     <Text style={[styles.tabText, active && styles.tabTextActive]}>{title}</Text>
   </TouchableOpacity>
+);
+
+// Be-the-first invite shown when the marketplace has genuinely
+// zero listings. Replaces a flat "Nothing here yet" so the screen
+// reads as an opportunity instead of a dead end.
+const MarketplaceFirstListingState = ({ onListCard }) => (
+  <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
+    <View style={{
+      width: '100%',
+      maxWidth: 420,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      borderStyle: 'dashed',
+      borderRadius: 14,
+      padding: Spacing.lg,
+      backgroundColor: Colors.surface,
+      alignItems: 'center',
+    }}>
+      <Text style={{ fontSize: 44, marginBottom: 8 }}>🃏</Text>
+      <Text style={{ color: Colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 6 }}>
+        This marketplace starts with you.
+      </Text>
+      <Text style={{ color: Colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 16 }}>
+        Be the first card. Card Shop's marketplace is community-grown — every
+        listing pulls in the next collector. Tag a card, list it, set your price.
+      </Text>
+      <TouchableOpacity
+        onPress={onListCard}
+        style={{
+          backgroundColor: Colors.accent,
+          paddingHorizontal: Spacing.lg,
+          paddingVertical: Spacing.sm,
+          borderRadius: 10,
+          marginBottom: 4,
+        }}
+      >
+        <Text style={{ color: Colors.bg, fontWeight: '700', fontSize: 15 }}>
+          List the first card →
+        </Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Three value props anchored under the CTA */}
+    <View style={{ marginTop: Spacing.lg, width: '100%', maxWidth: 420, gap: Spacing.sm }}>
+      {[
+        { icon: '🔗', title: 'Verified ownership only', body: 'Every listing tied to a real account + chain-of-custody.' },
+        { icon: '💸', title: '$1 max platform fee', body: 'On a $500 card a 10%-fee marketplace takes $50. We cap at $1 + Stripe.' },
+        { icon: '🛡️', title: 'Transfer-on-default protection', body: 'Seller goes dark past the 5-day window? We transfer the card to the buyer anyway.' },
+      ].map((v) => (
+        <View key={v.title} style={{
+          backgroundColor: Colors.surface2,
+          borderRadius: 10,
+          padding: Spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: Spacing.sm,
+        }}>
+          <Text style={{ fontSize: 20 }}>{v.icon}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 }}>{v.title}</Text>
+            <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 16 }}>{v.body}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  </View>
 );
 
 const ListingCard = ({ listing, onPress }) => {
