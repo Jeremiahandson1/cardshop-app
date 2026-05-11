@@ -122,23 +122,68 @@ export const WalletScreen = ({ navigation }) => {
   );
 };
 
-const OnboardingCard = ({ status, requirements, onStart, loading }) => (
-  <View style={styles.kycCard}>
-    <Ionicons name="card-outline" size={36} color={Colors.accent} style={{ alignSelf: 'center' }} />
-    <Text style={styles.kycTitle}>Set up your wallet</Text>
-    <Text style={styles.kycBody}>
-      To sell on Card Shop, finish a quick verification with our payment partner Stripe.
-      Takes about 3 minutes — they'll ask for an ID and bank info to send you payouts.
-    </Text>
-    {status && status !== 'none' && (
-      <Text style={styles.kycStatus}>Status: {status}</Text>
-    )}
-    {requirements?.length > 0 && (
-      <Text style={styles.kycReqs}>Still needed: {requirements.join(', ')}</Text>
-    )}
-    <Button title={loading ? 'Opening Stripe…' : 'Start verification'} onPress={onStart} disabled={loading} />
-  </View>
-);
+const OnboardingCard = ({ status, requirements, onStart, loading }) => {
+  // Stripe Connect Express has several intermediate states between
+  // "never started" and "fully enabled." We render different copy
+  // for each so the user isn't told to "Start verification" when
+  // they already finished the form and Stripe is just reviewing.
+  //
+  //   'none'       — no Stripe account exists yet → start onboarding
+  //   'disabled'   — Stripe is reviewing the submitted KYC form
+  //                  (typical for 24h–3 business days post-submit)
+  //   'pending'    — Stripe needs more info from the user
+  //   'restricted' — Stripe restricted the account; needs attention
+  //   'enabled'    — fully onboarded (this card shouldn't render then)
+  const hasReqs = requirements?.length > 0;
+  const isReview = status === 'disabled' && !hasReqs;
+  const needsMoreInfo = status === 'pending' || hasReqs;
+  const isRestricted = status === 'restricted';
+
+  let title, body, ctaLabel, showCta;
+  if (isReview) {
+    title = "We're verifying your account";
+    body = "Stripe is reviewing your information. Payments and payouts unlock automatically once they approve — usually within 24 hours, sometimes up to 3 business days. You'll get an email when it's done.";
+    ctaLabel = null;
+    showCta = false;
+  } else if (needsMoreInfo) {
+    title = 'A few more details needed';
+    body = "Stripe needs additional information to finish verifying your account. Continue where you left off and they'll let you through.";
+    ctaLabel = 'Continue verification';
+    showCta = true;
+  } else if (isRestricted) {
+    title = 'Your account needs attention';
+    body = 'Stripe placed a hold on your seller account. Open Stripe to see what they need and resolve it.';
+    ctaLabel = 'Open Stripe';
+    showCta = true;
+  } else {
+    title = 'Set up your wallet';
+    body = "To sell on Card Shop, finish a quick verification with our payment partner Stripe. Takes about 3 minutes — they'll ask for an ID and bank info to send you payouts.";
+    ctaLabel = loading ? 'Opening Stripe…' : 'Start verification';
+    showCta = true;
+  }
+
+  return (
+    <View style={styles.kycCard}>
+      <Ionicons
+        name={isReview ? 'time-outline' : isRestricted ? 'warning-outline' : 'card-outline'}
+        size={36}
+        color={Colors.accent}
+        style={{ alignSelf: 'center' }}
+      />
+      <Text style={styles.kycTitle}>{title}</Text>
+      <Text style={styles.kycBody}>{body}</Text>
+      {status && status !== 'none' && !isReview && (
+        <Text style={styles.kycStatus}>Status: {status}</Text>
+      )}
+      {hasReqs && (
+        <Text style={styles.kycReqs}>Still needed: {requirements.join(', ')}</Text>
+      )}
+      {showCta && (
+        <Button title={ctaLabel} onPress={onStart} disabled={loading} />
+      )}
+    </View>
+  );
+};
 
 const BalanceCard = ({ available, pending, onWithdraw, onTopup, onDashboard, dashboardLoading }) => (
   <View style={styles.balanceCard}>
