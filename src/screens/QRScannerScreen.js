@@ -92,7 +92,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
       // explicitly so they don't mistakenly think the card has a
       // problem. Offer to jump to the current sticker's card if we
       // can resolve the owned_card_id. Never silently route to
-      // CardDetail — that would mask the provenance signal.
+      // CardDetail — that would mask the ownership-history signal.
       if (insert.status === 'superseded') {
         const supersededWhen = insert.superseded_at
           ? new Date(insert.superseded_at).toLocaleDateString() : 'earlier';
@@ -111,7 +111,7 @@ export const QRScannerScreen = ({ navigation, route }) => {
         Alert.alert(
           'Outdated sticker',
           `This sticker was replaced on ${supersededWhen}.\n\n` +
-          `${cardName} still lives in Card Shop — ask the current owner to scan their up-to-date sticker for full provenance.`,
+          `${cardName} still lives in Card Shop — ask the current owner to scan their up-to-date sticker to see the full ownership history.`,
           actions,
         );
         return;

@@ -27,7 +27,7 @@ Paste these into:
 ```
 Every card has a Carfax. Card Shop is the chain.
 
-Card theft, mail fraud, and "buyer claims it never arrived" disputes are weekly problems in this hobby. Card Shop solves them with provenance, not promises.
+Card theft, mail fraud, and "buyer claims it never arrived" disputes are weekly problems in this hobby. Card Shop solves them with a documented ownership history, not promises.
 
 How the chain works:
 
@@ -43,7 +43,7 @@ If any card you own surfaces somewhere it shouldn't, you'll know — and the cha
 
 WHAT ELSE CARD SHOP DOES
 
-• Marketplace — Sell to anyone, not just your trade circle. 10% capped at $1 plus Stripe processing — at $500 we take $1, CollX takes $50. Every sale flows through the chain so the next owner inherits documented provenance.
+• Marketplace — Sell to anyone, not just your trade circle. 10% capped at $1 plus Stripe processing — at $500 we take $1, CollX takes $50. Every sale flows through the chain so the next owner inherits the full ownership history.
 
 • AI scan — Photograph the back of any card. Identifies player, year, set, parallel, and card number in seconds.
 
