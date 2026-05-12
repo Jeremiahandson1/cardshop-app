@@ -1037,13 +1037,27 @@ export const PublicBinderScreen = ({ navigation, route }) => {
           ) : null}
           {/* Owner-only "+ Add card" — drops new cards into THIS
               binder. Pre-fills the binder picker on RegisterCard so
-              the user doesn't have to pick again. */}
+              the user doesn't have to pick again. Labeled pill (not
+              bare icon) because the bare "+" wasn't discoverable —
+              new users repeatedly asked "how do I add cards?" */}
           {isOwner ? (
             <TouchableOpacity
               onPress={() => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id })}
               accessibilityLabel="Add card to this binder"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1,
+                borderColor: Colors.accent + '66',
+              }}
             >
-              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+              <Ionicons name="add" size={16} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
@@ -1229,9 +1243,16 @@ export const PublicBinderScreen = ({ navigation, route }) => {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="📒"
-            title="No cards in this binder"
-            message="This binder doesn't have any cards yet."
+            icon="🃏"
+            title="No cards in this binder yet"
+            message={isOwner
+              ? 'Scan the back of a card, scan a slab cert, or enter one manually. Card Shop handles the rest.'
+              : 'This binder doesn\'t have any cards yet.'
+            }
+            action={isOwner ? {
+              label: '+ Add your first card',
+              onPress: () => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id }),
+            } : null}
           />
         }
       />

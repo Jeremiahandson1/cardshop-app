@@ -222,6 +222,34 @@ export const HomeHubScreen = ({ navigation }) => {
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
 
+        {/* Primary action — add or scan a card. Lives above the
+            navigation tiles because "add a card" was the #1 question
+            from new users and the bare "+" icon in the binder header
+            wasn't discoverable. Routes through the Binders stack
+            since RegisterCard isn't registered on the Home stack. */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            try {
+              navigation.navigate('Binders', { screen: 'RegisterCard' });
+            } catch (e) {
+              console.warn('[home] register-card navigate failed', e?.message);
+            }
+          }}
+          style={styles.primaryAction}
+        >
+          <View style={styles.primaryActionIcon}>
+            <Ionicons name="scan-outline" size={28} color="#0a0a14" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.primaryActionTitle}>Scan or add a card</Text>
+            <Text style={styles.primaryActionSubtitle}>
+              Photograph the back, scan a slab, or enter manually
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#0a0a14" />
+        </TouchableOpacity>
+
         {/* Push-permission warning — without notifications enabled,
             no trade-offer / sale push ever lands. Tapping fires the
             re-prompt (works on first attempt) or opens system
@@ -375,5 +403,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  primaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: '#e8c547',
+    marginBottom: Spacing.sm,
+  },
+  primaryActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(10,10,20,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionTitle: {
+    fontFamily: Typography.display,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0a0a14',
+    marginBottom: 2,
+    letterSpacing: -0.3,
+  },
+  primaryActionSubtitle: {
+    fontSize: 13,
+    color: 'rgba(10,10,20,0.65)',
+    lineHeight: 17,
   },
 });
