@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, Image, Alert, ActivityIndicator, Modal, Dimensions, Linking,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -679,9 +680,43 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // real data. Manual entry stays reachable as a fallback for cards
   // not yet catalogued; legacy `search` is still used by QR + deep
   // link entries that already know a catalog_id.
-  const [step, setStep] = useState(
+  const [step, setStepRaw] = useState(
     qrCode || catalogId ? 'search' : 'cascade'
   );
+  // Step history so every back-arrow tap pops exactly one step,
+  // never jumps multiple screens at once. Forward transitions
+  // (setStep) push the current step onto the stack; back arrows
+  // call goBackOneStep() which pops it (or exits the screen when
+  // the stack is empty). User complaint: "I was entering a card
+  // and pushed back and got sent back to the binder" — that's
+  // what this guards against.
+  const stepStackRef = React.useRef([]);
+  const setStep = React.useCallback((newStep) => {
+    setStepRaw((curr) => {
+      if (curr !== newStep) stepStackRef.current.push(curr);
+      return newStep;
+    });
+  }, []);
+  const goBackOneStep = React.useCallback(() => {
+    if (stepStackRef.current.length === 0) {
+      navigation.goBack();
+      return;
+    }
+    const prev = stepStackRef.current.pop();
+    setStepRaw(prev);
+  }, [navigation]);
+  // Android hardware-back: route through the same step-history logic
+  // as the visible back arrow so Android users get identical behavior
+  // (one step at a time, never multi-screen jump). returning true
+  // tells RN we handled it — without that, RN falls back to its own
+  // screen-pop which is the exact bug we just fixed.
+  React.useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBackOneStep();
+      return true;
+    });
+    return () => sub.remove();
+  }, [goBackOneStep]);
   // Cert-lookup local state — only matters while step === 'cert_entry'.
   const [certForm, setCertForm] = useState({ company: 'psa', cert_number: '' });
   const [certLookupBusy, setCertLookupBusy] = useState(false);
@@ -1390,7 +1425,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={goBackOneStep}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Register Card</Text>
@@ -1475,7 +1510,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => { setScanReview(null); setStep('cascade'); }}>
+          <TouchableOpacity onPress={() => { setScanReview(null); goBackOneStep(); }}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Review scan</Text>
@@ -1904,7 +1939,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setStep('cascade')}>
+          <TouchableOpacity onPress={goBackOneStep}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Graded Card</Text>
@@ -2173,7 +2208,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={goBackOneStep}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Card Details</Text>
@@ -2281,7 +2316,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setStep('search')}>
+          <TouchableOpacity onPress={goBackOneStep}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Parallel</Text>
@@ -2342,7 +2377,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setStep('parallel')}>
+          <TouchableOpacity onPress={goBackOneStep}>
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Serial Number</Text>
@@ -2415,7 +2450,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setStep('serial')}>
+        <TouchableOpacity onPress={goBackOneStep}>
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Card Details</Text>
