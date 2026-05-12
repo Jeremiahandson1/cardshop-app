@@ -19,12 +19,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform,
+  TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { billingApi } from '../services/api';
+import { billingApi, promoCodesApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, LoadingScreen } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -85,6 +86,11 @@ export const UpgradeScreen = ({ navigation, route }) => {
   const [selectedTier, setSelectedTier] = useState(
     route?.params?.tier === 'show_floor' ? 'show_floor' : 'collector_pro',
   );
+  // Promo-code redeem state — small inline form near the bottom of
+  // the screen. Separate from the buy flow because it's an alternate
+  // entry path, not part of the subscription purchase.
+  const [promoCode, setPromoCode] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
 
   const { data: status, isLoading } = useQuery({
     queryKey: ['billing-status'],
@@ -292,6 +298,63 @@ export const UpgradeScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
+        {/* Promo code redeem — alternate path to a comped tier
+            window. Hidden when the user already has a real paid
+            subscription since the redeem endpoint will reject. */}
+        {!isPro || status?.status === 'promo' ? (
+          <View style={styles.promoCard}>
+            <Text style={styles.promoTitle}>Have a promo code?</Text>
+            <Text style={styles.promoSub}>
+              Redeem for a free tier window — no card required.
+            </Text>
+            <View style={styles.promoRow}>
+              <TextInput
+                value={promoCode}
+                onChangeText={(v) => setPromoCode(v.toUpperCase())}
+                placeholder="ENTER CODE"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                style={styles.promoInput}
+                maxLength={40}
+              />
+              <TouchableOpacity
+                disabled={promoBusy || !promoCode.trim()}
+                onPress={async () => {
+                  setPromoBusy(true);
+                  try {
+                    const r = await promoCodesApi.redeem(promoCode.trim());
+                    const expires = new Date(r.data.expires_at).toLocaleDateString();
+                    Alert.alert(
+                      'Code redeemed',
+                      `You've got ${r.data.granted_tier.replace('_', ' ')} until ${expires}.`,
+                      [{ text: 'Nice', onPress: () => {
+                        setPromoCode('');
+                        queryClient.invalidateQueries({ queryKey: ['billing-status'] });
+                      }}],
+                    );
+                  } catch (err) {
+                    Alert.alert(
+                      'Could not redeem',
+                      err.response?.data?.error || 'Try again or check the code.',
+                    );
+                  } finally {
+                    setPromoBusy(false);
+                  }
+                }}
+                style={[
+                  styles.promoBtn,
+                  (promoBusy || !promoCode.trim()) && { opacity: 0.5 },
+                ]}
+              >
+                {promoBusy
+                  ? <ActivityIndicator color={Colors.bg} size="small" />
+                  : <Text style={styles.promoBtnText}>Redeem</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         {/* Restore link — required by App Store guidelines for any
             app selling subscriptions. Reads receipts from the
             user's Apple ID and unlocks if they already paid. */}
@@ -381,6 +444,39 @@ const styles = StyleSheet.create({
   comingSoonBody: { color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 20 },
   restoreLink: { alignItems: 'center', marginTop: Spacing.md, paddingVertical: Spacing.sm },
   restoreText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
+  promoCard: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  promoTitle: { color: Colors.text, fontSize: 15, fontWeight: '800', marginBottom: 2 },
+  promoSub: { color: Colors.textMuted, fontSize: 12, marginBottom: Spacing.sm },
+  promoRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  promoInput: {
+    flex: 1,
+    padding: 10,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    color: Colors.text,
+    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1,
+  },
+  promoBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.accent,
+    minWidth: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoBtnText: { color: Colors.bg, fontSize: 14, fontWeight: '800' },
   submitBar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     padding: Spacing.base, backgroundColor: Colors.bg,

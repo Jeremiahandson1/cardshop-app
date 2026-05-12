@@ -307,6 +307,12 @@ export const billingApi = {
   myWaitlist: () => api.get('/billing/waitlist'),
 };
 
+// Promo codes — user redeems a code to get a comped tier window.
+// Admin minting lives in the dashboard.
+export const promoCodesApi = {
+  redeem: (code) => api.post('/promo-codes/redeem', { code }),
+};
+
 // ============================================================
 // MESSAGES
 // ============================================================
