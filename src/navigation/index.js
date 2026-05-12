@@ -509,11 +509,24 @@ const AuthStack = () => (
 
 // ============================================================
 // DEEP LINKING CONFIG
-// cardshop://join?token=XXX   → TradeGroups › JoinTradeGroup with token param
-// cardshop://trade/<id>       → TradeListingDetail
+// cardshop://join?token=XXX             → TradeGroups › JoinTradeGroup w/ token
+// cardshop://trade/<id>                 → TradeListingDetail
+// cardshop://c/<code>                   → Scan tab, auto-process the sticker code
+// https://cs.twomiah.com/c/<code>       → same (when Universal/App Links land)
 // ============================================================
 const linkingConfig = {
-  prefixes: ['cardshop://', 'https://cardshopadmin.twomiah.com'],
+  prefixes: [
+    'cardshop://',
+    'https://cardshopadmin.twomiah.com',
+    // QR stickers encode https://cs.twomiah.com/c/<short_code>. The
+    // public-scan landing page also offers an "Open in Card Shop"
+    // button that fires cardshop://c/<short_code>. Both paths land
+    // here and route to the Scan tab, which runs the same lookup
+    // flow as an in-app scan (superseded handling, owner routing,
+    // attach-mode short-circuit, etc.) — see QRScannerScreen for
+    // the deepLinkCode useEffect that wires it up.
+    'https://cs.twomiah.com',
+  ],
   config: {
     screens: {
       Trade: {
@@ -529,6 +542,10 @@ const linkingConfig = {
           DealRadarSettings: 'deal-radar/settings',
         },
       },
+      // Scan tab is a top-level Tab.Screen (not nested), so the path
+      // attaches directly to the tab name. :deepLinkCode is consumed
+      // by QRScannerScreen's mount useEffect.
+      Scan: 'c/:deepLinkCode',
     },
   },
 };

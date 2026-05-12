@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Pressable
 } from 'react-native';
@@ -34,6 +34,11 @@ export const QRScannerScreen = ({ navigation, route }) => {
   const scanGuardRef = useRef(false);
   const mode = route?.params?.mode || 'register'; // 'register' | 'lookup' | 'transfer' | 'attach'
   const cardIdToAttach = route?.params?.cardId || null;
+  // Deep-link entry: cardshop://c/<code> and https://cs.twomiah.com/c/<code>
+  // both arrive here with deepLinkCode set. Skip the camera step and
+  // run the same scan-handler so we get superseded warnings, owner
+  // routing, and attach-mode behavior for free.
+  const deepLinkCode = route?.params?.deepLinkCode || null;
 
   const handleBarCodeScanned = async (event) => {
     if (scanGuardRef.current) return;
@@ -241,6 +246,20 @@ export const QRScannerScreen = ({ navigation, route }) => {
       scanGuardRef.current = false;
     }
   };
+
+  // Deep-link auto-process. Fires once if the user arrived via
+  // cardshop://c/<code> or https://cs.twomiah.com/c/<code> — sends
+  // the code through the same scanner pipeline so superseded / owner
+  // / attach handling all work identically to an in-app scan.
+  useEffect(() => {
+    if (!deepLinkCode) return;
+    // Clear the param immediately so re-renders / tab switches don't
+    // re-fire the lookup. React Navigation keeps params unless we
+    // setParams explicitly.
+    navigation.setParams?.({ deepLinkCode: null });
+    handleBarCodeScanned({ data: String(deepLinkCode) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkCode]);
 
   if (!permission) return <View style={styles.safe} />;
 
