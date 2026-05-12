@@ -59,8 +59,19 @@ export const DiscoverScreen = ({ navigation }) => {
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity style={styles.scanBtn} onPress={() => navigation.navigate('QRScanner', { mode: 'lookup' })}>
-          <Ionicons name="qr-code" size={20} color={Colors.accent} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('QRScanner', { mode: 'lookup' })}
+          accessibilityLabel="Scan a QR sticker to look up a card"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+            backgroundColor: Colors.accent + '22',
+            borderWidth: 1, borderColor: Colors.accent + '66',
+            marginLeft: 8,
+          }}
+        >
+          <Ionicons name="qr-code" size={16} color={Colors.accent} />
+          <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Scan</Text>
         </TouchableOpacity>
       </View>
 

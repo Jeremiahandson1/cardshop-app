@@ -44,8 +44,18 @@ export const AddressesScreen = ({ navigation }) => {
       <ScreenHeader
         title="Shipping addresses"
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('AddressForm', {})}>
-            <Ionicons name="add-circle" size={28} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('AddressForm', {})}
+            accessibilityLabel="Add a shipping address"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.accent + '22',
+              borderWidth: 1, borderColor: Colors.accent + '66',
+            }}
+          >
+            <Ionicons name="add" size={14} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
           </TouchableOpacity>
         }
       />

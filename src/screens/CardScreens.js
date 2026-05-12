@@ -266,8 +266,18 @@ const CascadePicker = ({
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Register Card</Text>
         {onScan ? (
-          <TouchableOpacity onPress={onScan} accessibilityLabel="Scan card">
-            <Ionicons name="scan-outline" size={22} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={onScan}
+            accessibilityLabel="Scan card"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.accent + '22',
+              borderWidth: 1, borderColor: Colors.accent + '66',
+            }}
+          >
+            <Ionicons name="scan-outline" size={16} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Scan</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 22 }} />

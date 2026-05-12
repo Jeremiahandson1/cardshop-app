@@ -33,8 +33,17 @@ export const TradeGroupsListScreen = ({ navigation }) => {
         title="Trade Groups"
         subtitle="Private invite-only trading circles"
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('CreateTradeGroup')}>
-            <Ionicons name="add-circle" size={28} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CreateTradeGroup')}
+            accessibilityLabel="Create a trade group"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+              backgroundColor: Colors.accent,
+            }}
+          >
+            <Ionicons name="add" size={14} color={Colors.bg} />
+            <Text style={{ color: Colors.bg, fontSize: 13, fontWeight: '800' }}>New group</Text>
           </TouchableOpacity>
         }
       />

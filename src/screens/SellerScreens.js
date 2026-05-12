@@ -53,8 +53,17 @@ export const MyListingsScreen = ({ navigation }) => {
       <ScreenHeader
         title="My listings"
         right={
-          <TouchableOpacity onPress={showBulkMenu}>
-            <Ionicons name="add-circle" size={28} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={showBulkMenu}
+            accessibilityLabel="List cards for sale"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+              backgroundColor: Colors.accent,
+            }}
+          >
+            <Ionicons name="add" size={14} color={Colors.bg} />
+            <Text style={{ color: Colors.bg, fontSize: 13, fontWeight: '800' }}>List for sale</Text>
           </TouchableOpacity>
         }
       />

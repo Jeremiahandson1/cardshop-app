@@ -1026,13 +1026,20 @@ export const PublicBinderScreen = ({ navigation, route }) => {
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{binder.name}</Text>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           {isOwner ? (
             <TouchableOpacity
               onPress={() => navigation.navigate('BinderEditor', { binderId: paramBinderId || binder.id })}
               accessibilityLabel="Edit binder"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
             >
-              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+              <Ionicons name="settings-outline" size={14} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Edit</Text>
             </TouchableOpacity>
           ) : null}
           {/* Owner-only "+ Add card" — drops new cards into THIS
@@ -1060,8 +1067,18 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-            <Ionicons name="options-outline" size={22} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={() => setShowFilters(!showFilters)}
+            accessibilityLabel="Filter cards in this binder"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.accent + '22',
+              borderWidth: 1, borderColor: Colors.accent + '66',
+            }}
+          >
+            <Ionicons name="options-outline" size={14} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Filter</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -363,17 +363,28 @@ export const TradeBoardScreen = ({ navigation, route }) => {
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
             <TouchableOpacity
               onPress={() => navigation.navigate('TradeOffersList')}
-              style={styles.headerIconButton}
               accessibilityLabel="My trade offers"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
             >
-              <Ionicons name="mail-outline" size={18} color={Colors.accent} />
+              <Ionicons name="mail-outline" size={14} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Offers</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate('CreateTradeListing')}
-              style={styles.newListingButton}
               accessibilityLabel="New listing"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+                backgroundColor: Colors.accent,
+              }}
             >
-              <Ionicons name="add" size={18} color={Colors.bg} />
+              <Ionicons name="add" size={14} color={Colors.bg} />
+              <Text style={{ color: Colors.bg, fontSize: 12, fontWeight: '800' }}>List</Text>
             </TouchableOpacity>
           </View>
         }

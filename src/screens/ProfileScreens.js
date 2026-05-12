@@ -427,8 +427,18 @@ export const WantListScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.simpleHeaderTitle}>Want List</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Discover')}>
-          <Ionicons name="add" size={22} color={Colors.accent} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Discover')}
+          accessibilityLabel="Add to want list"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+            backgroundColor: Colors.accent + '22',
+            borderWidth: 1, borderColor: Colors.accent + '66',
+          }}
+        >
+          <Ionicons name="add" size={14} color={Colors.accent} />
+          <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
         </TouchableOpacity>
       </View>
 

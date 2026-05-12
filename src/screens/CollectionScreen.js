@@ -81,19 +81,21 @@ export const CollectionScreen = ({ navigation }) => {
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <TouchableOpacity
-              style={styles.iconBtn}
+              style={styles.iconBtnPill}
               onPress={() => navigation.navigate('CollectionImportExport')}
               accessibilityLabel="Import / Export CSV"
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Ionicons name="swap-vertical" size={18} color={Colors.text} />
+              <Ionicons name="swap-vertical" size={14} color={Colors.text} />
+              <Text style={styles.iconBtnPillText}>Import</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.addBtn}
+              style={styles.addBtnPill}
               onPress={() => navigation.navigate('RegisterCard')}
               accessibilityLabel="Register a card"
             >
-              <Ionicons name="add" size={22} color={Colors.bg} />
+              <Ionicons name="add" size={16} color={Colors.bg} />
+              <Text style={styles.addBtnPillText}>Add card</Text>
             </TouchableOpacity>
           </View>
         }
@@ -201,6 +203,19 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
+  addBtnPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+    backgroundColor: Colors.accent,
+  },
+  addBtnPillText: { color: Colors.bg, fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  iconBtnPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+    backgroundColor: Colors.surface2,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  iconBtnPillText: { color: Colors.text, fontSize: 12, fontWeight: '700' },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface2,
