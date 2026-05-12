@@ -2525,7 +2525,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 
         {/* Photos */}
         <View>
-          <SectionHeader title="Photos" action={{ label: '+ Add', onPress: pickPhoto }} />
+          <SectionHeader title="Photos" action={{ label: 'Add photo', onPress: pickPhoto }} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
             <TouchableOpacity style={styles.photoAdd} onPress={pickPhoto}>
               <Ionicons name="camera" size={24} color={Colors.textMuted} />
@@ -4289,11 +4289,11 @@ export const EditCardScreen = ({ navigation, route }) => {
 
         {/* Photos */}
         <View>
-          <SectionHeader title="Photos" action={{ label: '+ Add', onPress: addPhoto }} />
+          <SectionHeader title="Photos" action={{ label: 'Add photo', onPress: addPhoto }} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
             <TouchableOpacity style={styles.photoAdd} onPress={addPhoto}>
               <Ionicons name="camera" size={24} color={Colors.textMuted} />
-              <Text style={styles.photoAddText}>Add</Text>
+              <Text style={styles.photoAddText}>Add photo</Text>
             </TouchableOpacity>
             {existingPhotos.map((uri, i) => (
               <View key={`ex-${i}`} style={styles.photoThumb}>

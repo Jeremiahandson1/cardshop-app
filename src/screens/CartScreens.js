@@ -373,7 +373,7 @@ export const CheckoutScreen = ({ navigation, route }) => {
               onPress={() => navigation.navigate('AddressForm', {})}
               style={[styles.savedAddrChip, { borderStyle: 'dashed' }]}
             >
-              <Text style={styles.savedAddrLabel}>+ New</Text>
+              <Text style={styles.savedAddrLabel}>Add address</Text>
             </TouchableOpacity>
           </ScrollView>
         )}

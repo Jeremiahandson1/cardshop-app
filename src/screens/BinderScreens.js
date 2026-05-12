@@ -438,7 +438,7 @@ export const BinderEditorScreen = ({ navigation, route }) => {
         {/* Sections (editing only) */}
         {isEditing && (
           <View>
-            <SectionHeader title="Sections" action={{ label: '+ Add', onPress: () => {
+            <SectionHeader title="Sections" action={{ label: 'Add section', onPress: () => {
               if (!newSectionName.trim()) return;
               addSectionMutation.mutate({ name: newSectionName.trim() });
             }}} />
@@ -1072,7 +1072,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               }}
             >
               <Ionicons name="add" size={16} color={Colors.accent} />
-              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
+              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add card</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
@@ -1275,7 +1275,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               : 'This binder doesn\'t have any cards yet.'
             }
             action={isOwner ? {
-              label: '+ Add your first card',
+              label: 'Add card',
               onPress: () => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id }),
             } : null}
           />
@@ -1580,7 +1580,7 @@ export const MakeOfferScreen = ({ navigation, route }) => {
           <View>
             <SectionHeader
               title="Your Trade Cards"
-              action={{ label: '+ Add', onPress: () => setShowTradePicker(true) }}
+              action={{ label: 'Add card', onPress: () => setShowTradePicker(true) }}
             />
             {tradeCards.length === 0 ? (
               <TouchableOpacity style={styles.addTradeBtn} onPress={() => setShowTradePicker(true)}>

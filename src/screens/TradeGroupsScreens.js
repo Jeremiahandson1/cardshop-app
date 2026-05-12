@@ -404,7 +404,7 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
           title="Invite links"
           action={
             <TouchableOpacity onPress={() => setCreateInviteOpen(true)}>
-              <Text style={styles.linkText}>+ New</Text>
+              <Text style={styles.linkText}>New invite</Text>
             </TouchableOpacity>
           }
         />

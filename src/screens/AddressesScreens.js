@@ -55,7 +55,7 @@ export const AddressesScreen = ({ navigation }) => {
             }}
           >
             <Ionicons name="add" size={14} color={Colors.accent} />
-            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add</Text>
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Add address</Text>
           </TouchableOpacity>
         }
       />
