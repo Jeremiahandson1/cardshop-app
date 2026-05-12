@@ -148,9 +148,17 @@ export const DealRadarFeedScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Deal Radar</Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('DealRadarSettings')}
+          accessibilityLabel="Deal Radar settings"
           hitSlop={12}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+            backgroundColor: Colors.accent + '22',
+            borderWidth: 1, borderColor: Colors.accent + '66',
+          }}
         >
-          <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+          <Ionicons name="settings-outline" size={14} color={Colors.accent} />
+          <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Settings</Text>
         </TouchableOpacity>
       </View>
 

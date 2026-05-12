@@ -134,8 +134,18 @@ export const ManageBoothScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>Manage my booth</Text>
-        <TouchableOpacity onPress={shareBooth}>
-          <Ionicons name="share-outline" size={22} color={Colors.text} />
+        <TouchableOpacity
+          onPress={shareBooth}
+          accessibilityLabel="Share your booth link"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+            backgroundColor: Colors.surface2,
+            borderWidth: 1, borderColor: Colors.border,
+          }}
+        >
+          <Ionicons name="share-outline" size={14} color={Colors.text} />
+          <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>Share</Text>
         </TouchableOpacity>
       </View>
 

@@ -84,24 +84,54 @@ export const AddressesScreen = ({ navigation }) => {
                 <Text style={styles.line}>{item.line1}{item.line2 ? `, ${item.line2}` : ''}</Text>
                 <Text style={styles.line}>{item.city}, {item.state} {item.zip}</Text>
               </View>
-              <View style={{ gap: 8 }}>
-                <TouchableOpacity onPress={() => navigation.navigate('AddressForm', { id: item.id })}>
-                  <Ionicons name="create-outline" size={20} color={Colors.text} />
+              <View style={{ gap: 6, alignItems: 'flex-end' }}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('AddressForm', { id: item.id })}
+                  accessibilityLabel="Edit this address"
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                    backgroundColor: Colors.surface2,
+                    borderWidth: 1, borderColor: Colors.border,
+                  }}
+                >
+                  <Ionicons name="create-outline" size={12} color={Colors.text} />
+                  <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Edit</Text>
                 </TouchableOpacity>
                 {!item.is_default && (
-                  <TouchableOpacity onPress={() => promoteMut.mutate(item.id)}>
-                    <Ionicons name="star-outline" size={20} color={Colors.accent} />
+                  <TouchableOpacity
+                    onPress={() => promoteMut.mutate(item.id)}
+                    accessibilityLabel="Set as default address"
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 4,
+                      paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                      backgroundColor: Colors.accent + '22',
+                      borderWidth: 1, borderColor: Colors.accent + '66',
+                    }}
+                  >
+                    <Ionicons name="star-outline" size={12} color={Colors.accent} />
+                    <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Default</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => Alert.alert(
-                  'Delete address?',
-                  '',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => deleteMut.mutate(item.id) },
-                  ],
-                )}>
-                  <Ionicons name="trash-outline" size={20} color={Colors.accent3} />
+                <TouchableOpacity
+                  onPress={() => Alert.alert(
+                    'Delete address?',
+                    '',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteMut.mutate(item.id) },
+                    ],
+                  )}
+                  accessibilityLabel="Delete this address"
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                    backgroundColor: 'transparent',
+                    borderWidth: 1, borderColor: Colors.accent3 + '66',
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={12} color={Colors.accent3} />
+                  <Text style={{ color: Colors.accent3, fontSize: 12, fontWeight: '700' }}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>

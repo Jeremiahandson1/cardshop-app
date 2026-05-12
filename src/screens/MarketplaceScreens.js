@@ -43,15 +43,45 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safe}>
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Marketplace</Text>
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <TouchableOpacity onPress={() => navigation.navigate('MarketplaceSearch')}>
-            <Ionicons name="search" size={22} color={Colors.text} />
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('MarketplaceSearch')}
+            accessibilityLabel="Search the marketplace"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.surface2,
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="search" size={13} color={Colors.text} />
+            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Search</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SavedSearches')}>
-            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SavedSearches')}
+            accessibilityLabel="Saved searches and alerts"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.surface2,
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="notifications-outline" size={13} color={Colors.text} />
+            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Alerts</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('CartList')}>
-            <Ionicons name="cart-outline" size={22} color={Colors.text} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CartList')}
+            accessibilityLabel="View your cart"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.surface2,
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="cart-outline" size={13} color={Colors.text} />
+            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Cart</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -371,12 +401,29 @@ export const ListingDetailScreen = ({ navigation, route }) => {
                 <Text style={styles.sellerTrust}>Trust score {Number(listing.seller_trust_score).toFixed(2)}</Text>
               ) : null}
             </View>
-            <TouchableOpacity onPress={() => watchMut.mutate()}>
+            <TouchableOpacity
+              onPress={() => watchMut.mutate()}
+              accessibilityLabel={listing.watching ? 'Stop watching this listing' : 'Watch this listing'}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: listing.watching ? Colors.accent3 + '22' : 'transparent',
+                borderWidth: 1,
+                borderColor: listing.watching ? Colors.accent3 + '66' : Colors.border,
+              }}
+            >
               <Ionicons
                 name={listing.watching ? 'heart' : 'heart-outline'}
-                size={26}
+                size={14}
                 color={listing.watching ? Colors.accent3 : Colors.textMuted}
               />
+              <Text style={{
+                color: listing.watching ? Colors.accent3 : Colors.textMuted,
+                fontSize: 12,
+                fontWeight: '700',
+              }}>
+                {listing.watching ? 'Watching' : 'Watch'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -489,12 +536,22 @@ export const SavedSearchesScreen = ({ navigation }) => {
                   {item.match_count} match{item.match_count === 1 ? '' : 'es'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => Alert.alert(
-                'Remove saved search?',
-                '',
-                [{ text: 'Keep', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => deleteMut.mutate(item.id) }],
-              )}>
-                <Ionicons name="trash-outline" size={22} color={Colors.accent3} />
+              <TouchableOpacity
+                onPress={() => Alert.alert(
+                  'Remove saved search?',
+                  '',
+                  [{ text: 'Keep', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => deleteMut.mutate(item.id) }],
+                )}
+                accessibilityLabel="Remove this saved search"
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                  backgroundColor: 'transparent',
+                  borderWidth: 1, borderColor: Colors.accent3 + '66',
+                }}
+              >
+                <Ionicons name="trash-outline" size={12} color={Colors.accent3} />
+                <Text style={{ color: Colors.accent3, fontSize: 12, fontWeight: '700' }}>Remove</Text>
               </TouchableOpacity>
             </View>
           )}

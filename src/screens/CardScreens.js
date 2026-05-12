@@ -3072,20 +3072,60 @@ export const CardDetailScreen = ({ navigation, route }) => {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {card.player_name}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {card?.owner_id === currentUserId ? (
-            <TouchableOpacity onPress={promptMoveToBinder} accessibilityLabel="Add to binder">
-              <Ionicons name="folder-open-outline" size={22} color={Colors.accent} />
+            <TouchableOpacity
+              onPress={promptMoveToBinder}
+              accessibilityLabel="Move card to a different binder"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
+            >
+              <Ionicons name="folder-open-outline" size={13} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Move</Text>
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity onPress={() => navigation.navigate('EditCard', { cardId })}>
-            <Ionicons name="create-outline" size={22} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditCard', { cardId })}
+            accessibilityLabel="Edit card details"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.accent + '22',
+              borderWidth: 1, borderColor: Colors.accent + '66',
+            }}
+          >
+            <Ionicons name="create-outline" size={13} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={confirmDelete}>
-            <Ionicons name="trash-outline" size={20} color={Colors.textMuted} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
+            accessibilityLabel="Transfer ownership to another user"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.accent + '22',
+              borderWidth: 1, borderColor: Colors.accent + '66',
+            }}
+          >
+            <Ionicons name="swap-horizontal" size={13} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Transfer</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('InitiateTransfer', { cardId })}>
-            <Ionicons name="swap-horizontal" size={22} color={Colors.accent} />
+          <TouchableOpacity
+            onPress={confirmDelete}
+            accessibilityLabel="Delete this card"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: 'transparent',
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="trash-outline" size={13} color={Colors.textMuted} />
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '700' }}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>

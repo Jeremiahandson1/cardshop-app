@@ -470,8 +470,16 @@ export const BinderEditorScreen = ({ navigation, route }) => {
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Delete', style: 'destructive', onPress: () => deleteSectionMutation.mutate(section.id) },
                   ])}
+                  accessibilityLabel={`Delete section ${section.name}`}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+                    backgroundColor: 'transparent',
+                    borderWidth: 1, borderColor: Colors.accent3 + '66',
+                  }}
                 >
-                  <Ionicons name="trash-outline" size={16} color={Colors.accent3} />
+                  <Ionicons name="trash-outline" size={11} color={Colors.accent3} />
+                  <Text style={{ color: Colors.accent3, fontSize: 11, fontWeight: '700' }}>Delete</Text>
                 </TouchableOpacity>
               </View>
             ))}

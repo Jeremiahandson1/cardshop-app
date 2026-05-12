@@ -154,10 +154,19 @@ export const SearchScreen = ({ navigation }) => {
           ) : null}
         </View>
         <TouchableOpacity
-          style={styles.sortToggle}
           onPress={() => setShowSort(!showSort)}
+          accessibilityLabel="Sort search results"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999,
+            backgroundColor: showSort ? Colors.accent + '22' : Colors.surface2,
+            borderWidth: 1,
+            borderColor: showSort ? Colors.accent + '66' : Colors.border,
+            marginLeft: 8,
+          }}
         >
-          <Ionicons name="funnel-outline" size={18} color={showSort ? Colors.accent : Colors.textMuted} />
+          <Ionicons name="funnel-outline" size={14} color={showSort ? Colors.accent : Colors.textMuted} />
+          <Text style={{ color: showSort ? Colors.accent : Colors.textMuted, fontSize: 12, fontWeight: '700' }}>Sort</Text>
         </TouchableOpacity>
       </View>
 

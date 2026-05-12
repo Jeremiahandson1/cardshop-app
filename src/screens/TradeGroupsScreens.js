@@ -197,8 +197,18 @@ export const TradeGroupDetailScreen = ({ navigation, route }) => {
         subtitle={`${group.members.length} members`}
         right={
           isAdmin ? (
-            <TouchableOpacity onPress={() => navigation.navigate('TradeGroupManage', { groupId })}>
-              <Ionicons name="settings-outline" size={22} color={Colors.accent} />
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TradeGroupManage', { groupId })}
+              accessibilityLabel="Manage this group"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
+            >
+              <Ionicons name="settings-outline" size={14} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Manage</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -421,9 +431,16 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
               <>
                 <TouchableOpacity
                   onPress={() => copyInvite(inv.token)}
-                  style={styles.inviteAction}
+                  accessibilityLabel="Copy invite link"
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                    backgroundColor: Colors.accent + '22',
+                    borderWidth: 1, borderColor: Colors.accent + '66',
+                  }}
                 >
-                  <Ionicons name="copy-outline" size={18} color={Colors.accent} />
+                  <Ionicons name="copy-outline" size={12} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Copy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => Alert.alert(
@@ -434,9 +451,16 @@ export const TradeGroupManageScreen = ({ navigation, route }) => {
                       { text: 'Revoke', style: 'destructive', onPress: () => revokeInvite.mutate(inv.token) },
                     ]
                   )}
-                  style={styles.inviteAction}
+                  accessibilityLabel="Revoke invite link"
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4,
+                    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                    backgroundColor: 'transparent',
+                    borderWidth: 1, borderColor: Colors.error + '66',
+                  }}
                 >
-                  <Ionicons name="trash-outline" size={18} color={Colors.error} />
+                  <Ionicons name="trash-outline" size={12} color={Colors.error} />
+                  <Text style={{ color: Colors.error, fontSize: 12, fontWeight: '700' }}>Revoke</Text>
                 </TouchableOpacity>
               </>
             ) : null}
