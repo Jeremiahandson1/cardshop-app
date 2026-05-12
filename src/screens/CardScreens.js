@@ -3169,6 +3169,33 @@ export const CardDetailScreen = ({ navigation, route }) => {
       if (res?.data?.needs_listing) {
         navigation.navigate('CreateTradeListing', { ownedCardId: cardId });
       }
+      // Marketplace auto-publish feedback — quick toast so the user
+      // knows what just happened. priced + photos → instant listing;
+      // priced + too few photos → nudge to add another; intent moved
+      // off priced → withdraw confirmation.
+      const d = res?.data || {};
+      if (d.marketplace_published) {
+        showMessage({
+          message: 'Listed on the marketplace',
+          description: 'Buyers can purchase this card right now.',
+          type: 'success',
+          duration: 3500,
+        });
+      } else if (d.marketplace_needs_photos) {
+        showMessage({
+          message: 'Priced — add 1 more photo to publish',
+          description: 'The marketplace requires at least 2 photos. Tap Edit → Photos.',
+          type: 'warning',
+          duration: 4500,
+        });
+      } else if (d.marketplace_withdrawn) {
+        showMessage({
+          message: 'Pulled from the marketplace',
+          description: 'Buyers can\'t buy this card anymore.',
+          type: 'info',
+          duration: 3000,
+        });
+      }
     },
     onError: (err) => Alert.alert('Could not update intent', err?.response?.data?.error || 'Try again.'),
   });

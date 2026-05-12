@@ -73,14 +73,20 @@ const TILES = [
     // subtitle is computed at render from counts.active_trade_offers
   },
   {
-    key: 'marketplace-sales',
+    key: 'marketplace',
     icon: 'cart',
     iconColor: '#4ade80',
-    title: 'Marketplace Sales',
+    title: 'Marketplace',
     bg: 'rgba(74,222,128,0.10)',
     border: 'rgba(74,222,128,0.45)',
-    target: { tab: 'Profile', screen: 'MyOrders' },
+    // Public marketplace browse — listings from every seller. Users
+    // who want their own sales / orders go via Profile → My orders
+    // (the home tile used to land there, but that was unreachable
+    // from "I want to shop the marketplace" intent).
+    target: { tab: 'Profile', screen: 'MarketplaceHome' },
     // subtitle is computed at render from counts.marketplace_sales
+    // — surfaces pending sales as a badge even though the tile now
+    // opens the public browse rather than the orders screen.
   },
 ];
 
@@ -151,8 +157,8 @@ export const HomeHubScreen = ({ navigation }) => {
     } else if (tile.key === 'local-lcs') {
       target = { tab: 'LCS' };
     } else if (tile.target) {
-      // trade-offers + marketplace-sales tiles ship with explicit
-      // targets in the static metadata — no per-key branching needed.
+      // trade-offers + marketplace tiles ship with explicit targets
+      // in the static metadata — no per-key branching needed.
       target = tile.target;
     } else {
       return;
@@ -179,10 +185,10 @@ export const HomeHubScreen = ({ navigation }) => {
         ? '0 active trades'
         : `${tradeOffersCount} active trade${tradeOffersCount === 1 ? '' : 's'}`;
     }
-    if (tile.key === 'marketplace-sales') {
+    if (tile.key === 'marketplace') {
       return marketplaceCount === 0
-        ? '0 marketplace sales pending'
-        : `${marketplaceCount} marketplace sale${marketplaceCount === 1 ? '' : 's'} pending`;
+        ? 'Browse — every listing flows through the chain'
+        : `${marketplaceCount} sale${marketplaceCount === 1 ? '' : 's'} pending · tap to browse`;
     }
     return tile.subtitle;
   };
