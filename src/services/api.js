@@ -156,6 +156,11 @@ export const catalogApi = {
   // Example: filterValues({ dimension: 'set_name', sport: 'football', year: 2025, manufacturer: 'Panini' })
   //   → { values: ['Prizm', 'Mosaic', ...] }
   filterValues: (params) => api.get('/catalog/filter-values', { params }),
+  // User-flagged catalog gap. Submitted from the cascade dead-end
+  // ("can't find my card"). Admin triages in /admin/catalog/gaps and
+  // queues a targeted TCDB scrape or accepts the user's manual entry
+  // as the canonical row.
+  reportGap: (data) => api.post('/catalog/gap-report', data),
   // POST a base64 card photo, get ranked catalog candidates.
   // Returns 503 + code='ocr_not_configured' when GOOGLE_VISION_API_KEY
   // isn't set on the API — the Scan button stays visible but

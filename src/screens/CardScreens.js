@@ -54,6 +54,14 @@ const CascadePicker = ({
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
+  // Catalog gap-report state — modal opens from the cascade footer
+  // when the user can't find their set/variant. Separate from manual
+  // entry: manual entry adds the card to YOUR collection, gap report
+  // tells admin the catalog is missing a set so they can scrape it.
+  const [gapReportOpen, setGapReportOpen] = useState(false);
+  const [gapNotes, setGapNotes] = useState('');
+  const [gapSubmitting, setGapSubmitting] = useState(false);
+
   // Year is generated locally, not queried from the catalog. The
   // catalog is sparse for vintage years (we don't have 1952 Topps
   // seeded yet) — querying would clip the dropdown to "years that
@@ -502,7 +510,135 @@ const CascadePicker = ({
             Card not in catalog? Enter manually →
           </Text>
         </TouchableOpacity>
+        {/* Gap report — separate from manual entry. Manual entry adds
+            the card to YOUR collection now. Gap report tells admin
+            the catalog is missing this set so they can scrape it. */}
+        <TouchableOpacity onPress={() => setGapReportOpen(true)}>
+          <Text style={{ textAlign: 'center', color: Colors.textMuted, fontSize: 13 }}>
+            Set or variant not listed? Tell us what's missing →
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Gap-report modal — pre-fills with whatever the user has
+          already picked in the cascade so they don't retype it. */}
+      <Modal
+        visible={gapReportOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGapReportOpen(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          justifyContent: 'center',
+          padding: Spacing.base,
+        }}>
+          <View style={{
+            backgroundColor: Colors.surface,
+            borderRadius: Radius.lg,
+            padding: Spacing.lg,
+            gap: Spacing.md,
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: Colors.text }}>
+              Tell us what's missing
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, lineHeight: 18 }}>
+              We'll add the set or variant to the catalog. You picked:
+            </Text>
+            <View style={{
+              backgroundColor: Colors.surface2,
+              borderRadius: Radius.md,
+              padding: Spacing.md,
+              gap: 4,
+            }}>
+              {['sport','year','manufacturer','set_name','player_name','card_number','parallel'].map((k) =>
+                cascade[k] !== undefined ? (
+                  <Text key={k} style={{ fontSize: 13, color: Colors.text }}>
+                    <Text style={{ color: Colors.textMuted }}>{cascadeLabel[k] || k}: </Text>
+                    {String(cascade[k])}
+                  </Text>
+                ) : null
+              )}
+              {Object.keys(cascade).length === 0 ? (
+                <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                  (Nothing picked yet — add details below)
+                </Text>
+              ) : null}
+            </View>
+            <Input
+              label="What's missing? (e.g. set name, parallel, year)"
+              value={gapNotes}
+              onChangeText={setGapNotes}
+              placeholder="e.g. 2025 Bowman Chrome Mega refractor /99"
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs }}>
+              <TouchableOpacity
+                onPress={() => { setGapReportOpen(false); setGapNotes(''); }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: Radius.md,
+                  alignItems: 'center',
+                  backgroundColor: Colors.surface2,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text style={{ color: Colors.text, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={gapSubmitting || (!gapNotes.trim() && Object.keys(cascade).length === 0)}
+                onPress={async () => {
+                  // Need at least *something* — either picked cascade fields
+                  // or written notes. Sport defaults from cascade or 'unknown'
+                  // if even sport wasn't picked.
+                  setGapSubmitting(true);
+                  try {
+                    await catalogApi.reportGap({
+                      sport: cascade.sport || 'unknown',
+                      year: cascade.year != null ? String(cascade.year) : null,
+                      manufacturer: cascade.manufacturer || null,
+                      set_name: cascade.set_name || null,
+                      player_name: cascade.player_name || null,
+                      card_number: cascade.card_number || null,
+                      parallel: cascade.parallel || null,
+                      notes: gapNotes.trim() || null,
+                    });
+                    setGapReportOpen(false);
+                    setGapNotes('');
+                    showMessage({
+                      message: 'Thanks — we got it',
+                      description: "We'll add the set as soon as we can.",
+                      type: 'success',
+                      duration: 3000,
+                    });
+                  } catch (e) {
+                    Alert.alert('Could not submit', e?.response?.data?.error || 'Please try again.');
+                  } finally {
+                    setGapSubmitting(false);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: Radius.md,
+                  alignItems: 'center',
+                  backgroundColor: Colors.accent,
+                  opacity: gapSubmitting ? 0.6 : 1,
+                }}
+              >
+                {gapSubmitting ? (
+                  <ActivityIndicator color={Colors.bg} />
+                ) : (
+                  <Text style={{ color: Colors.bg, fontSize: 14, fontWeight: '800' }}>Submit</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
