@@ -23,12 +23,19 @@ export const QRScannerScreen = ({ navigation, route }) => {
   // Three steps, taps cycle: 2× → 5× → 10× → back to 2×.
   // expo-camera zoom is 0..1; values mapped empirically to those
   // visible factors on iPhone 14 / Pixel 7.
+  // TEMP DIAGNOSTIC (Samsung camera-freeze test): a genuine 1× (zoom 0)
+  // step prepended so the camera now MOUNTS at zoom 0 — full sensor, no
+  // digital crop, no lens-switch. Goal: confirm whether opening at a
+  // non-zero zoom is what freezes the Samsung. Cycle is now
+  // 1× → 2× → 5× → 10×. To revert: delete the { v: 0 } line and this
+  // comment, restore `useState(0)` semantics (still 0, just back to 2×).
   const ZOOM_STEPS = [
+    { v: 0,    label: '1×' },
     { v: 0.2,  label: '2×' },
     { v: 0.5,  label: '5×' },
     { v: 0.85, label: '10×' },
   ];
-  const [zoomIdx, setZoomIdx] = useState(0); // 0 = 2× (start zoomed)
+  const [zoomIdx, setZoomIdx] = useState(0); // 0 = 1× (mount at full sensor — diagnostic)
   const cycleZoom = () => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length);
   const currentZoom = ZOOM_STEPS[zoomIdx];
   const scanGuardRef = useRef(false);
