@@ -292,6 +292,7 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="ConversationList" component={ConversationListScreen} />
     <CollectionStackNav.Screen name="Conversation" component={ConversationScreen} />
     <CollectionStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <CollectionStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <CollectionStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <CollectionStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
@@ -308,6 +309,7 @@ const BinderStack = () => (
   <BinderStackNav.Navigator screenOptions={screenOptions}>
     <BinderStackNav.Screen name="BinderList" component={BinderListScreen} />
     <BinderStackNav.Screen name="BinderEditor" component={BinderEditorScreen} />
+    <BinderStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <BinderStackNav.Screen name="BinderCardPicker" component={BinderCardPickerScreen} />
     <BinderStackNav.Screen name="BinderAnalytics" component={BinderAnalyticsScreen} />
     <BinderStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
@@ -345,6 +347,7 @@ const SearchStack = () => (
     <SearchStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <SearchStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
     <SearchStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
+    <SearchStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <SearchStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
   </SearchStackNav.Navigator>
 );

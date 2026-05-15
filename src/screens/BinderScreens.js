@@ -365,7 +365,10 @@ export const BinderEditorScreen = ({ navigation, route }) => {
           </Text>
           <Button
             title="See upgrade options"
-            onPress={() => navigation.navigate('Profile', { screen: 'Upgrade' })}
+            // Upgrade is registered in BinderStack (and ProfileStack)
+            // so this is always a local push — no fragile cross-tab
+            // bubbling, which was gray-screening / crashing here.
+            onPress={() => navigation.navigate('Upgrade')}
             style={{ marginTop: Spacing.sm, alignSelf: 'stretch' }}
           />
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: Spacing.sm }}>

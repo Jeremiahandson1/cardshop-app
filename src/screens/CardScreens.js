@@ -1829,7 +1829,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               'Upgrade to Card Shop Pro to scan cards with the camera. You can still register cards manually using the cascade picker.',
               [
                 { text: 'Maybe later', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Upgrade' }) },
+                { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade') },
               ],
             );
             return;
