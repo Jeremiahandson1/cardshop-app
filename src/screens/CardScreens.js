@@ -884,6 +884,22 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // agreement, and surfaces conflicts when the photos disagree.
   // Replaces the prior single-back flow; the optional-front path
   // is gone because we always want both for chain-of-custody.
+  // Shown when a free user is out of daily AI scans — either caught
+  // up-front from the quota endpoint or from the server's 403.
+  const scanQuotaExhaustedAlert = (info = {}) => {
+    const limit = info.limit ?? 2;
+    Alert.alert(
+      'Out of free scans today',
+      `You've used your ${limit} free AI scans for today. They reset at midnight. `
+        + 'Upgrade to Card Shop Pro for unlimited scanning, or add this card manually.',
+      [
+        { text: 'Maybe later', style: 'cancel' },
+        { text: 'Add manually', onPress: () => setStep('manual_entry') },
+        { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade') },
+      ],
+    );
+  };
+
   const runBackScan = async () => {
     setScanDebug('capture FRONT…');
     const frontCap = await captureAndResize();
@@ -981,6 +997,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       const errMsg = err?.response?.data?.error || err?.message || 'unknown';
       const status = err?.response?.status;
       setScanDebug(`SCAN FAILED • status=${status || 'NONE'} • ${errMsg}`);
+      if (code === 'free_scan_quota_exhausted') {
+        scanQuotaExhaustedAlert(err?.response?.data);
+        return;
+      }
       if (code === 'vision_not_configured') {
         try {
           const fallback = await catalogApi.ocrSuggest(`data:image/jpeg;base64,${(backCap || frontCap).b64}`);
@@ -1819,32 +1839,39 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         cascadeOrder={CASCADE_ORDER}
         cascadeLabel={CASCADE_LABEL}
         onScan={async () => {
-          // Pro gate FIRST — before camera permission, before
-          // taking the photo, before uploading.
+          // Scanning is no longer Pro-only: free users get a small
+          // daily allowance, pro/admin are unlimited. Check the quota
+          // up front so we can warn before the camera opens. The
+          // server still meters authoritatively (analyzeAndReview
+          // handles the 403), so a fetch failure here just falls
+          // through and lets the user try.
           const tier = currentUser?.subscription_tier;
           const isPro = tier === 'collector_pro' || tier === 'store_pro' || currentUser?.is_admin;
+          let scanNote = null;
           if (!isPro) {
-            Alert.alert(
-              'Card scanning is a Pro feature',
-              'Upgrade to Card Shop Pro to scan cards with the camera. You can still register cards manually using the cascade picker.',
-              [
-                { text: 'Maybe later', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade') },
-              ],
-            );
-            return;
+            try {
+              const q = (await catalogApi.aiScanQuota()).data || {};
+              if (!q.unlimited) {
+                if ((q.remaining ?? 0) <= 0) {
+                  scanQuotaExhaustedAlert(q);
+                  return;
+                }
+                const left = q.remaining;
+                scanNote = `\n\nThis uses 1 of your ${left} free AI scan${left === 1 ? '' : 's'} left today (resets at midnight). Pro is unlimited.`;
+              }
+            } catch {
+              // Quota endpoint unreachable — proceed; server decides.
+            }
           }
           // Pair-vision flow: capture FRONT first (player photo,
           // foil treatment, set logo, front-stamped serials),
           // then BACK (card #, copyright, back-stamped serials).
           // The model cross-references both for confidence and
-          // parallel disambiguation. Old single-back flow used
-          // to land here saying "scan the BACK" — kept the runBackScan
-          // function name but updated the prompt to match the
-          // actual two-step capture order.
+          // parallel disambiguation.
           Alert.alert(
             'Scan front + back',
-            'We\'ll capture two photos — front first, then back. The pair lets us identify the card and any parallel/serial accurately.',
+            'We\'ll capture two photos — front first, then back. The pair lets us identify the card and any parallel/serial accurately.'
+              + (scanNote || ''),
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Start with front', onPress: () => runBackScan() },

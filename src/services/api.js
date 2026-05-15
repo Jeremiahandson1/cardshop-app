@@ -165,6 +165,10 @@ export const catalogApi = {
   // Returns 503 + code='ocr_not_configured' when GOOGLE_VISION_API_KEY
   // isn't set on the API — the Scan button stays visible but
   // raises an alert explaining it's coming soon.
+  // Free users get a small daily AI-scan allowance; pro/admin are
+  // unlimited ({ unlimited: true }). Used to show "N free scans left"
+  // and to pre-warn before a scan.
+  aiScanQuota: () => api.get('/catalog/ai-scan-quota'),
   ocrSuggest: (image_base64) => api.post('/catalog/ocr-suggest', { image_base64 }, { timeout: 60_000 }),
   // Claude vision-based scan — preferred over ocrSuggest. Returns
   // { fields, candidates } where fields is structured metadata
