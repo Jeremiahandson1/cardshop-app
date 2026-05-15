@@ -299,6 +299,7 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <CollectionStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <CollectionStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <CollectionStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <CollectionStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
   </CollectionStackNav.Navigator>
 );
@@ -312,6 +313,7 @@ const BinderStack = () => (
     <BinderStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <BinderStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
     <BinderStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <BinderStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <BinderStackNav.Screen name="CardDetail" component={CardDetailScreen} />
     <BinderStackNav.Screen name="CardChain" component={CardChainScreen} />
     <BinderStackNav.Screen name="EditCard" component={EditCardScreen} />
@@ -340,6 +342,7 @@ const SearchStack = () => (
     <SearchStackNav.Screen name="Conversation" component={ConversationScreen} />
     <SearchStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <SearchStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <SearchStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <SearchStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
     <SearchStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <SearchStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
@@ -352,6 +355,8 @@ const TransferStack = () => (
     <TransferStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <TransferStackNav.Screen name="CardDetail" component={CardDetailScreen} />
     <TransferStackNav.Screen name="EditCard" component={EditCardScreen} />
+    <TransferStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <TransferStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
   </TransferStackNav.Navigator>
 );
 
@@ -369,6 +374,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Conversation" component={ConversationScreen} />
     <ProfileStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <ProfileStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <ProfileStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <ProfileStackNav.Screen name="OffersList" component={OffersListScreen} />
     <ProfileStackNav.Screen name="OfferDetail" component={OfferDetailScreen} />
     <ProfileStackNav.Screen name="Transaction" component={TransactionScreen} />

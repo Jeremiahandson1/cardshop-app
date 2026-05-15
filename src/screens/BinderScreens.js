@@ -180,12 +180,28 @@ export const BinderEditorScreen = ({ navigation, route }) => {
   const binderId = route.params?.binderId;
   const isEditing = !!binderId;
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
 
   const { data: existingBinder, isLoading: loadingBinder } = useQuery({
     queryKey: ['binder', binderId],
     queryFn: () => bindersApi.get(binderId).then((r) => r.data),
     enabled: isEditing,
   });
+
+  // Creating a new binder is gated: free users get exactly one active
+  // binder. Check this on entry (mirrors the API rule in
+  // POST /api/binders) so we don't let someone fill out the whole
+  // form and only reject them on submit.
+  const { data: binderListData, isLoading: loadingBinderList } = useQuery({
+    queryKey: ['my-binders'],
+    queryFn: () => bindersApi.list().then((r) => r.data),
+    enabled: !isEditing,
+  });
+  const isFreeTier = !user?.subscription_tier || user.subscription_tier === 'free';
+  const isAdmin = user?.is_admin === true || user?.role === 'admin';
+  const activeBinderCount = (binderListData?.binders || [])
+    .filter((b) => b.status === 'active').length;
+  const blockedNewBinder = !isEditing && isFreeTier && !isAdmin && activeBinderCount >= 1;
 
   const [form, setForm] = useState({
     name: '',
@@ -326,6 +342,39 @@ export const BinderEditorScreen = ({ navigation, route }) => {
   };
 
   if (isEditing && loadingBinder) return <LoadingScreen />;
+  if (!isEditing && loadingBinderList) return <LoadingScreen />;
+
+  if (blockedNewBinder) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>New Binder</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={{ flex: 1, padding: Spacing.lg, alignItems: 'center', justifyContent: 'center', gap: Spacing.md }}>
+          <Ionicons name="lock-closed-outline" size={48} color={Colors.accent} />
+          <Text style={{ color: Colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' }}>
+            One binder on the free plan
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>
+            You already have an active binder. Upgrade to Collector Pro to create
+            unlimited binders, timed drops, and Show Floor binders.
+          </Text>
+          <Button
+            title="See upgrade options"
+            onPress={() => navigation.navigate('Profile', { screen: 'Upgrade' })}
+            style={{ marginTop: Spacing.sm, alignSelf: 'stretch' }}
+          />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: Spacing.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 14 }}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const LINK_TYPES = [
     { key: 'permanent', label: 'Permanent' },

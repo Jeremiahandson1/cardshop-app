@@ -15,12 +15,13 @@ const { width } = Dimensions.get('window'); // Note: static at module load, use 
 const COLUMN_GAP = Spacing.sm;
 const CARD_WIDTH = (width - Spacing.base * 2 - COLUMN_GAP) / 2;
 
+// key → query params for cardsApi.mine. Availability is the two
+// booleans now; 'listed' stays a lifecycle status filter.
 const STATUS_FILTERS = [
-  { key: null, label: 'All' },
-  { key: 'nft', label: 'NFT' },
-  { key: 'lets_talk', label: "Let's Talk" },
-  { key: 'listed', label: 'Listed' },
-  { key: 'nfs', label: 'NFS' },
+  { key: 'all', label: 'All', params: {} },
+  { key: 'for_sale', label: 'For sale', params: { for_sale: 'true' } },
+  { key: 'for_trade', label: 'For trade', params: { for_trade: 'true' } },
+  { key: 'listed', label: 'Listed', params: { status: 'listed' } },
 ];
 
 // Top-of-screen view selector. 'cards' keeps the existing grid; 'intel' swaps in
@@ -32,12 +33,15 @@ const VIEW_MODES = [
 
 export const CollectionScreen = ({ navigation }) => {
   const [viewMode, setViewMode] = useState('cards');
-  const [statusFilter, setStatusFilter] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['my-cards', statusFilter],
-    queryFn: () => cardsApi.mine({ status: statusFilter, limit: 100 }).then((r) => r.data),
+    queryFn: () => {
+      const f = STATUS_FILTERS.find((x) => x.key === statusFilter) || STATUS_FILTERS[0];
+      return cardsApi.mine({ ...f.params, limit: 100 }).then((r) => r.data);
+    },
     // Only fetch owned-cards when the Cards view is visible — avoids a pointless
     // request when the user is on the Intelligence tab.
     enabled: viewMode === 'cards',

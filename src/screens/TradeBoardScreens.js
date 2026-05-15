@@ -1289,7 +1289,9 @@ export const TradeCardPickerScreen = ({ navigation, route }) => {
     queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
   });
 
-  const cards = (data?.cards || []).filter((c) => c.status !== 'nft' && c.status !== 'pending_transfer');
+  const cards = (data?.cards || []).filter(
+    (c) => !['pending_transfer', 'sold', 'traded'].includes(c.status)
+  );
 
   if (isLoading) return <LoadingScreen message="Loading your cards..." />;
 
@@ -1382,7 +1384,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
   });
 
   const eligibleCards = (myCardsData?.cards || []).filter(
-    (c) => c.status !== 'nft' && c.status !== 'pending_transfer'
+    (c) => !['pending_transfer', 'sold', 'traded'].includes(c.status)
   );
 
   const createOffer = useMutation({

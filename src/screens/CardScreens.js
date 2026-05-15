@@ -785,7 +785,8 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     condition: 'near_mint',
     cert_number: '',
     grade: '',
-    status: 'nfs',
+    for_sale: false,
+    for_trade: false,
     asking_price: '',
     condition_notes: '',
     serial_number: '',
@@ -1210,11 +1211,29 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       });
       const payload = res.data || {};
       setCertLookupResult(payload);
-      // Stay on the cert_entry screen — the preview block
-      // renders below the form so the user can confirm this is
-      // their card before we proceed. Duplicate-claim warning
-      // also shows there; any next-step routing happens via the
-      // "Confirm & continue" button in the preview.
+
+      // SGC / CSG / HGA have no first-party lookup, so a clean
+      // result is all-null: no slab to preview, no provider error,
+      // no claim. The old UI then rendered nothing but a quiet
+      // secondary button far down the scroll, so "Look up cert"
+      // looked dead. The only thing the lookup verified for these
+      // graders is that the cert isn't already claimed — that
+      // passed, so take the user straight to manual entry with
+      // cert + company prefilled.
+      const isAutoGrader = ['psa', 'bgs'].includes(certForm.company);
+      if (!isAutoGrader && !payload.already_claimed && !payload.slab) {
+        setForm((f) => ({
+          ...f,
+          grading_company: certForm.company,
+          cert_number: cert,
+        }));
+        setStep('manual_entry');
+        return;
+      }
+      // Otherwise stay on cert_entry — the preview block renders
+      // below the form so the user can confirm this is their card.
+      // Duplicate-claim warning and provider-error messaging also
+      // show there; next-step routing is via "Confirm & continue".
     } catch (err) {
       Alert.alert('Lookup failed', err?.response?.data?.error || err?.message || 'Try again.');
     } finally {
@@ -1337,7 +1356,8 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         condition: form.grading_company === 'raw' ? form.condition : undefined,
         cert_number: form.cert_number || undefined,
         grade: form.grade ? parseFloat(form.grade) : undefined,
-        status: form.status,
+        for_sale: form.for_sale,
+        for_trade: form.for_trade,
         asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
         serial_number: form.serial_number ? parseInt(form.serial_number) : undefined,
         purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
@@ -1414,11 +1434,6 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       desc: 'PSA 1. Major damage — tears, water damage, heavy staining, missing paper, writing, or pin-holes. Still the correct card but barely presentable.' },
   ];
   const [conditionDescFor, setConditionDescFor] = useState(null);
-  const STATUSES = [
-    { key: 'nfs', label: 'NFS', desc: 'Not For Sale' },
-    { key: 'nft', label: 'NFT', desc: 'Not For Trade' },
-    { key: 'lets_talk', label: "Let's Talk", desc: 'Open to offers' },
-  ];
 
   // Step 1: Search catalog
   if (step === 'search' || step === 'scan_or_search') {
@@ -2558,20 +2573,29 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Status */}
+        {/* Availability — two independent toggles. Off/off = the
+            card is private (not for sale or trade). */}
         <View>
           <SectionHeader title="Availability" />
           <View style={styles.statusRow}>
-            {STATUSES.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.statusBtn, form.status === s.key && styles.statusBtnActive]}
-                onPress={() => set('status')(s.key)}
-              >
-                <Text style={[styles.statusBtnLabel, form.status === s.key && { color: Colors.accent }]}>{s.label}</Text>
-                <Text style={styles.statusBtnDesc}>{s.desc}</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[styles.statusBtn, form.for_sale && styles.statusBtnActive]}
+              onPress={() => set('for_sale')(!form.for_sale)}
+            >
+              <Text style={[styles.statusBtnLabel, form.for_sale && { color: Colors.accent }]}>
+                {form.for_sale ? '✓ For sale' : 'For sale'}
+              </Text>
+              <Text style={styles.statusBtnDesc}>Open to cash offers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.statusBtn, form.for_trade && styles.statusBtnActive]}
+              onPress={() => set('for_trade')(!form.for_trade)}
+            >
+              <Text style={[styles.statusBtnLabel, form.for_trade && { color: Colors.accent }]}>
+                {form.for_trade ? '✓ For trade' : 'For trade'}
+              </Text>
+              <Text style={styles.statusBtnDesc}>Lists it on the trade board</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -2633,8 +2657,8 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           ) : null}
         </View>
 
-        {/* Price if lets_talk */}
-        {form.status === 'lets_talk' && (
+        {/* Asking price — only meaningful when for sale */}
+        {form.for_sale && (
           <Input
             label="Asking Price (optional)"
             value={form.asking_price}
@@ -3255,11 +3279,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
   if (isLoading || !card) return <LoadingScreen />;
 
-  const STATUSES = [
-    { key: 'nfs', label: 'NFS' },
-    { key: 'nft', label: 'NFT' },
-    { key: 'lets_talk', label: "Let's Talk" },
-  ];
+  const isOwner = !!currentUserId && card?.owner_id === currentUserId;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -3286,6 +3306,8 @@ export const CardDetailScreen = ({ navigation, route }) => {
               <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Move</Text>
             </TouchableOpacity>
           ) : null}
+          {isOwner ? (
+          <>
           <TouchableOpacity
             onPress={() => navigation.navigate('EditCard', { cardId })}
             accessibilityLabel="Edit card details"
@@ -3325,6 +3347,8 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Ionicons name="trash-outline" size={13} color={Colors.textMuted} />
             <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '700' }}>Delete</Text>
           </TouchableOpacity>
+          </>
+          ) : null}
         </View>
       </View>
 
@@ -3734,21 +3758,53 @@ export const CardDetailScreen = ({ navigation, route }) => {
 
           <Divider />
 
-          {/* Status controls */}
+          {/* Availability. Owner gets two independent toggles
+              (for sale / for trade) — they're orthogonal, so a card
+              can be both, either, or neither. Non-owners see the
+              same state read-only; the buy/trade CTAs below act on
+              it. */}
           <SectionHeader title="Availability" />
-          <View style={styles.statusRow}>
-            {STATUSES.map((s) => (
+          {isOwner ? (
+            <View style={styles.statusRow}>
               <TouchableOpacity
-                key={s.key}
-                style={[styles.statusBtn, card.status === s.key && styles.statusBtnActive]}
-                onPress={() => updateMutation.mutate({ status: s.key })}
+                style={[styles.statusBtn, card.for_sale && styles.statusBtnActive]}
+                onPress={() => updateMutation.mutate({ for_sale: !card.for_sale })}
               >
-                <Text style={[styles.statusBtnLabel, card.status === s.key && { color: Colors.accent }]}>
-                  {s.label}
+                <Text style={[styles.statusBtnLabel, card.for_sale && { color: Colors.accent }]}>
+                  {card.for_sale ? '✓ For sale' : 'For sale'}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
+              <TouchableOpacity
+                style={[styles.statusBtn, card.for_trade && styles.statusBtnActive]}
+                onPress={() => updateMutation.mutate({ for_trade: !card.for_trade })}
+              >
+                <Text style={[styles.statusBtnLabel, card.for_trade && { color: Colors.accent }]}>
+                  {card.for_trade ? '✓ For trade' : 'For trade'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.statusRow}>
+              {!card.for_sale && !card.for_trade ? (
+                <View style={[styles.statusBtn, { opacity: 0.6 }]}>
+                  <Text style={styles.statusBtnLabel}>Not for sale or trade</Text>
+                </View>
+              ) : (
+                <>
+                  {card.for_sale ? (
+                    <View style={[styles.statusBtn, styles.statusBtnActive]}>
+                      <Text style={[styles.statusBtnLabel, { color: Colors.accent }]}>For sale</Text>
+                    </View>
+                  ) : null}
+                  {card.for_trade ? (
+                    <View style={[styles.statusBtn, styles.statusBtnActive]}>
+                      <Text style={[styles.statusBtnLabel, { color: Colors.accent }]}>For trade</Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </View>
+          )}
 
           <Divider />
 
@@ -3872,29 +3928,92 @@ export const CardDetailScreen = ({ navigation, route }) => {
                   </Text>
                 </View>
               ) : (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Conversation', {
-                    startWith: {
-                      to_user_id: card.owner_id,
-                      to_username: card.owner_username,
-                      owned_card_id: card.id,
-                    },
-                    otherName: card.owner_display_name || card.owner_username,
-                    otherUsername: card.owner_username,
-                    ownedCardId: card.id,
-                    cardTitle: `${card.year} ${card.set_name}`,
-                  })}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                    gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
-                    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
-                  }}
-                >
-                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.accent} />
-                  <Text style={{ color: Colors.accent, fontWeight: '600' }}>
-                    Message {card.owner_display_name || card.owner_username}
-                  </Text>
-                </TouchableOpacity>
+                <>
+                  {card.for_sale && card.offer_binder_id ? (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('MakeOffer', {
+                        cards: [{ ...card, id: card.id }],
+                        binderId: card.offer_binder_id,
+                        binderOwnerId: card.owner_id,
+                      })}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                        gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                        borderRadius: Radius.md, backgroundColor: Colors.accent,
+                      }}
+                    >
+                      <Ionicons name="pricetag-outline" size={18} color={Colors.background} />
+                      <Text style={{ color: Colors.background, fontWeight: '700' }}>
+                        Make an offer
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {card.for_trade ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (card.trade_listing_id) {
+                          navigation.navigate('MakeTradeOffer', { listingId: card.trade_listing_id });
+                        } else {
+                          // for_trade but no board listing yet — don't
+                          // dead-end; route the offerer to message the
+                          // owner so the trade can still start.
+                          Alert.alert(
+                            'Marked for trade',
+                            "This card is open to trade but isn't on a trade board yet. Message the owner to work out a trade.",
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Message owner',
+                                onPress: () => navigation.navigate('Conversation', {
+                                  startWith: { to_user_id: card.owner_id, to_username: card.owner_username, owned_card_id: card.id },
+                                  otherName: card.owner_display_name || card.owner_username,
+                                  otherUsername: card.owner_username,
+                                  ownedCardId: card.id,
+                                  cardTitle: `${card.year} ${card.set_name}`,
+                                }),
+                              },
+                            ]
+                          );
+                        }
+                      }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                        gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                        borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+                      }}
+                    >
+                      <Ionicons name="swap-horizontal" size={18} color={Colors.accent} />
+                      <Text style={{ color: Colors.accent, fontWeight: '700' }}>
+                        Make trade offer
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Conversation', {
+                      startWith: {
+                        to_user_id: card.owner_id,
+                        to_username: card.owner_username,
+                        owned_card_id: card.id,
+                      },
+                      otherName: card.owner_display_name || card.owner_username,
+                      otherUsername: card.owner_username,
+                      ownedCardId: card.id,
+                      cardTitle: `${card.year} ${card.set_name}`,
+                    })}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.md,
+                      borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+                    }}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.text} />
+                    <Text style={{ color: Colors.text, fontWeight: '600' }}>
+                      Message {card.owner_display_name || card.owner_username}
+                    </Text>
+                  </TouchableOpacity>
+                </>
               )
           ) : null}
 
@@ -4181,7 +4300,8 @@ export const EditCardScreen = ({ navigation, route }) => {
   React.useEffect(() => {
     if (!card || form) return;
     setForm({
-      status: card.status || 'nfs',
+      for_sale: !!card.for_sale,
+      for_trade: !!card.for_trade,
       condition: card.condition || 'near_mint',
       condition_notes: card.condition_notes || '',
       asking_price: card.asking_price != null ? String(card.asking_price) : '',
@@ -4301,7 +4421,8 @@ export const EditCardScreen = ({ navigation, route }) => {
         ? parseFloat(form.display_asking_price)
         : null;
       return cardsApi.update(cardId, {
-        status: form.status,
+        for_sale: form.for_sale,
+        for_trade: form.for_trade,
         condition: form.condition,
         condition_notes: form.condition_notes || undefined,
         asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
@@ -4418,24 +4539,28 @@ export const EditCardScreen = ({ navigation, route }) => {
         <View>
           <SectionHeader title="Availability" />
           <View style={styles.statusRow}>
-            {[
-              { key: 'nfs', label: 'NFS', desc: 'Not For Sale' },
-              { key: 'nft', label: 'NFT', desc: 'Not For Trade' },
-              { key: 'lets_talk', label: "Let's Talk", desc: 'Open to offers' },
-            ].map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.statusBtn, form.status === s.key && styles.statusBtnActive]}
-                onPress={() => set('status')(s.key)}
-              >
-                <Text style={[styles.statusBtnLabel, form.status === s.key && { color: Colors.accent }]}>{s.label}</Text>
-                <Text style={styles.statusBtnDesc}>{s.desc}</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[styles.statusBtn, form.for_sale && styles.statusBtnActive]}
+              onPress={() => set('for_sale')(!form.for_sale)}
+            >
+              <Text style={[styles.statusBtnLabel, form.for_sale && { color: Colors.accent }]}>
+                {form.for_sale ? '✓ For sale' : 'For sale'}
+              </Text>
+              <Text style={styles.statusBtnDesc}>Open to cash offers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.statusBtn, form.for_trade && styles.statusBtnActive]}
+              onPress={() => set('for_trade')(!form.for_trade)}
+            >
+              <Text style={[styles.statusBtnLabel, form.for_trade && { color: Colors.accent }]}>
+                {form.for_trade ? '✓ For trade' : 'For trade'}
+              </Text>
+              <Text style={styles.statusBtnDesc}>Lists it on the trade board</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {form.status === 'lets_talk' && (
+        {form.for_sale && (
           <View style={{ gap: Spacing.xs }}>
             <Input label="Asking Price" value={form.asking_price} onChangeText={set('asking_price')} placeholder="0.00" keyboardType="decimal-pad" />
             <Input

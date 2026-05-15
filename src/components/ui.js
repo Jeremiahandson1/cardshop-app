@@ -170,14 +170,21 @@ const inputStyles = StyleSheet.create({
 // ============================================================
 // CARD STATUS BADGE
 // ============================================================
-export const StatusBadge = ({ status }) => {
-  const config = {
-    nfs: { label: 'NFS', color: Colors.nfs },
-    nft: { label: 'NFT', color: Colors.nft },
-    lets_talk: { label: "Let's Talk", color: Colors.lets_talk },
+// Availability now comes from the for_sale / for_trade booleans;
+// `status` only carries lifecycle (listed / pending_transfer / sold /
+// traded). Lifecycle wins over availability when both could apply.
+export const StatusBadge = ({ status, forSale, forTrade }) => {
+  const lifecycle = {
     listed: { label: 'Listed', color: Colors.listed },
     pending_transfer: { label: 'Pending', color: Colors.pending },
-  }[status] || { label: status, color: Colors.textMuted };
+    sold: { label: 'Sold', color: Colors.textMuted },
+    traded: { label: 'Traded', color: Colors.textMuted },
+  }[status];
+  const config = lifecycle
+    || (forSale && forTrade && { label: 'Sale / Trade', color: Colors.lets_talk })
+    || (forSale && { label: 'For sale', color: Colors.lets_talk })
+    || (forTrade && { label: 'For trade', color: Colors.lets_talk })
+    || { label: 'Private', color: Colors.textMuted };
 
   return (
     <View style={[badgeStyles.container, { borderColor: config.color }]}>
@@ -289,7 +296,7 @@ export const CardTile = ({ card, onPress, style }) => {
         {card.year} {card.set_name}{card.parallel ? ` · ${card.parallel}` : ''}
       </Text>
       <View style={cardTileStyles.footer}>
-        {card.status && <StatusBadge status={card.status} />}
+        <StatusBadge status={card.status} forSale={card.for_sale} forTrade={card.for_trade} />
         {card.asking_price && (
           <Text style={cardTileStyles.price}>${card.asking_price}</Text>
         )}
