@@ -1668,9 +1668,13 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           {scanReview.candidates?.length ? (
             <View style={{ gap: Spacing.xs }}>
               <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Catalog matches
+                Pick the exact variant
               </Text>
-              {scanReview.candidates.slice(0, 6).map((c) => {
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 4 }}>
+                If the scan missed the parallel or insert, choose it here — every
+                variant of this card is listed so you don't have to type it.
+              </Text>
+              {scanReview.candidates.slice(0, 25).map((c) => {
                 // These candidates are usually the SAME player/set in
                 // different products / subsets / parallels — so the
                 // set+subset line and the parallel line are what the
