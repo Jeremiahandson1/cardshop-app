@@ -1670,30 +1670,66 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, textTransform: 'uppercase', letterSpacing: 1 }}>
                 Catalog matches
               </Text>
-              {scanReview.candidates.slice(0, 5).map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  onPress={() => {
-                    commitScanPhotos();
-                    setSelectedCatalog(c);
-                    setStep('serial');
-                  }}
-                  style={{
-                    padding: Spacing.sm,
-                    backgroundColor: Colors.surface2,
-                    borderRadius: Radius.md,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                  }}
-                >
-                  <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
-                    {c.player_name} {c.year} {c.set_name}
-                  </Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
-                    {c.manufacturer ? `${c.manufacturer} · ` : ''}#{c.card_number || '?'} · {Math.round((c.confidence || 0) * 100)}% match
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {scanReview.candidates.slice(0, 6).map((c) => {
+                // These candidates are usually the SAME player/set in
+                // different products / subsets / parallels — so the
+                // set+subset line and the parallel line are what the
+                // user actually picks on. Lead with those, not the
+                // player name (which is identical across all of them).
+                const setLine = [c.year, c.set_name, c.subset_name].filter(Boolean).join(' ');
+                const chips = [];
+                if (c.is_autograph) chips.push('AUTO');
+                if (c.is_rookie) chips.push('RC');
+                if (c.is_relic) chips.push('RELIC');
+                if (c.is_one_of_one) chips.push('1/1');
+                else if (c.print_run) chips.push(`/${c.print_run}`);
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => {
+                      commitScanPhotos();
+                      setSelectedCatalog(c);
+                      setStep('serial');
+                    }}
+                    style={{
+                      padding: Spacing.md,
+                      backgroundColor: Colors.surface2,
+                      borderRadius: Radius.md,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      gap: 3,
+                    }}
+                  >
+                    <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
+                      {setLine || c.set_name || 'Unknown set'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <Text style={{ color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold }}>
+                        {c.parallel ? c.parallel : 'Base'}
+                      </Text>
+                      {chips.map((ch) => (
+                        <View
+                          key={ch}
+                          style={{
+                            paddingHorizontal: 6, paddingVertical: 1,
+                            borderRadius: 4,
+                            backgroundColor: Colors.accent + '22',
+                            borderWidth: 1, borderColor: Colors.accent + '55',
+                          }}
+                        >
+                          <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+                            {ch}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+                      {c.player_name ? `${c.player_name} · ` : ''}#{c.card_number || '?'}
+                      {c.manufacturer ? ` · ${c.manufacturer}` : ''} · {Math.round((c.confidence || 0) * 100)}% match
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ) : null}
         </ScrollView>
