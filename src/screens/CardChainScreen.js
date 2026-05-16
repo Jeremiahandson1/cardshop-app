@@ -119,12 +119,35 @@ export const CardChainScreen = ({ navigation, route }) => {
           {events.map((e, i) => (
             <View key={i} style={styles.event}>
               <View style={styles.eventGutter}>
-                <View style={[styles.eventDot, e.kind === 'stolen_report' && styles.eventDotAlert]} />
+                <View style={[
+                  styles.eventDot,
+                  e.kind === 'stolen_report' && styles.eventDotAlert,
+                  e.self_reported && { backgroundColor: Colors.textMuted, borderColor: Colors.textMuted },
+                ]}
+                />
                 {i < events.length - 1 && <View style={styles.eventLine} />}
               </View>
               <View style={styles.eventBody}>
                 <Text style={styles.eventTitle}>{e.title}</Text>
+                {e.self_reported && (
+                  <View style={{
+                    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4,
+                    backgroundColor: Colors.textMuted + '22', borderColor: Colors.textMuted + '66',
+                    borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginVertical: 4,
+                  }}
+                  >
+                    <Ionicons name="information-circle-outline" size={11} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+                      SELF-REPORTED · NOT VERIFIED BY CARD SHOP
+                    </Text>
+                  </View>
+                )}
                 {e.detail && <Text style={styles.eventDetail}>{e.detail}</Text>}
+                {e.evidence_url && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
+                    <Image source={{ uri: e.evidence_url }} style={styles.photo} resizeMode="cover" />
+                  </ScrollView>
+                )}
                 <Text style={styles.eventDate}>{fmt(e.at)}</Text>
                 {Array.isArray(e.photos) && e.photos.length > 0 && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
