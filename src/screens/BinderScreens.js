@@ -957,6 +957,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
   const [filterPlayer, setFilterPlayer] = useState('');
   const [sortBy, setSortBy] = useState('recent');
   const [showFilters, setShowFilters] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const { data: binder, isLoading } = useQuery({
     queryKey: ['public-binder', linkToken],
@@ -1077,6 +1078,20 @@ export const PublicBinderScreen = ({ navigation, route }) => {
   // Compare against the resolved owner.id from the API response so we
   // don't depend on the link_token alone (which could be public).
   const isOwner = !!user && !!binder?.owner?.id && binder.owner.id === user.id;
+  const shareToken = linkToken || binder?.link_token;
+  const shareUrl = shareToken ? `https://cs.twomiah.com/b/${shareToken}` : null;
+
+  const handleCopyShare = async () => {
+    if (!shareUrl) return;
+    await Clipboard.setStringAsync(shareUrl);
+    Alert.alert('Copied', 'Binder link copied to clipboard.');
+  };
+  const handleShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await Share.share({ message: `Check out my binder: ${shareUrl}`, url: shareUrl });
+    } catch {}
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -1087,6 +1102,21 @@ export const PublicBinderScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{binder.name}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
+          {isOwner && shareToken ? (
+            <TouchableOpacity
+              onPress={() => setShowShare(true)}
+              accessibilityLabel="Share binder / QR code"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
+            >
+              <Ionicons name="qr-code-outline" size={14} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '700' }}>Share</Text>
+            </TouchableOpacity>
+          ) : null}
           {isOwner ? (
             <TouchableOpacity
               onPress={() => navigation.navigate('BinderEditor', { binderId: paramBinderId || binder.id })}
@@ -1333,6 +1363,69 @@ export const PublicBinderScreen = ({ navigation, route }) => {
           />
         }
       />
+
+      {/* Share / QR — reachable in one tap from the binder itself,
+          not buried in the editor. The QR endpoint now returns a
+          real PNG so <Image> actually renders it. */}
+      <Modal
+        visible={showShare}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowShare(false)}
+      >
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Share this binder</Text>
+            <TouchableOpacity onPress={() => setShowShare(false)} accessibilityLabel="Close share">
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
+            <View style={styles.qrCard}>
+              <Image
+                source={{ uri: `https://cs.twomiah.com/b/${shareToken}/qr.png?size=600` }}
+                style={styles.qrImage}
+              />
+              <Text style={styles.qrHint}>
+                Anyone who scans this opens your binder — no app needed.{'\n'}
+                Print it for a show table, or display it on a tablet at your booth.
+              </Text>
+              <View style={styles.qrBtnRow}>
+                <TouchableOpacity
+                  style={styles.qrBtn}
+                  onPress={() => Linking.openURL(`https://cs.twomiah.com/b/${shareToken}/sign.html`)}
+                >
+                  <Ionicons name="print-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.qrBtnText}>Print sign</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.qrBtn}
+                  onPress={() => Linking.openURL(`https://cs.twomiah.com/b/${shareToken}/qr.png?size=2400`)}
+                >
+                  <Ionicons name="download-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.qrBtnText}>Download PNG</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.shareLinkCard, { marginTop: Spacing.lg }]}>
+              <Text style={styles.shareLinkUrl} numberOfLines={1}>
+                cs.twomiah.com/b/{shareToken}
+              </Text>
+              <View style={styles.shareLinkBtns}>
+                <TouchableOpacity style={styles.shareLinkBtn} onPress={handleCopyShare}>
+                  <Ionicons name="copy-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.shareLinkBtnText}>Copy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareLinkBtn} onPress={handleShareLink}>
+                  <Ionicons name="share-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.shareLinkBtnText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
