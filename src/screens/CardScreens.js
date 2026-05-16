@@ -794,6 +794,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     personal_valuation: '',
     notes: '',
     public_notes: '',
+    // Self-reported acquisition (chain genesis context).
+    acquired_source: '',
+    acquired_reference: '',
+    acquired_at: '',
+    acquired_evidence_url: '',
     // Vault state — when set, verification_level becomes
     // 'vault_verified' and live photos are optional. The card
     // shows as 'Vaulted at X' on public scan instead of 'In-hand'.
@@ -1384,6 +1389,13 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
+        // Self-reported acquisition — feeds the chain genesis as an
+        // unverified "Acquired via X" event. Only sent when a
+        // source was chosen; reference/date/evidence ride along.
+        acquired_source: form.acquired_source || undefined,
+        acquired_reference: form.acquired_source ? (form.acquired_reference || undefined) : undefined,
+        acquired_at: form.acquired_source ? (form.acquired_at || undefined) : undefined,
+        acquired_evidence_url: form.acquired_source ? (form.acquired_evidence_url || undefined) : undefined,
         photo_urls: uploaded,
         // Per-photo source flags ('camera' | 'gallery') so the
         // server can grant single_scan verification when at least
@@ -1429,6 +1441,36 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       Alert.alert('Error', err.response?.data?.error || 'Failed to register card');
     },
   });
+
+  // Single-image picker for the acquisition receipt/screenshot.
+  // Same compress→base64 path the rest of the screen uses; stored
+  // on form.acquired_evidence_url and uploaded server-side.
+  const pickAcquisitionEvidence = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Allow photo access to attach the order screenshot.');
+        return;
+      }
+      const r = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8,
+      });
+      if (r.canceled || !r.assets?.length) return;
+      const m = await ImageManipulator.manipulateAsync(
+        r.assets[0].uri,
+        [{ resize: { width: 1400 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      if (m.base64) set('acquired_evidence_url')(`data:image/jpeg;base64,${m.base64}`);
+    } catch (e) {
+      Alert.alert('Could not add image', e.message || 'Try again.');
+    }
+  };
+  const ACQ_SOURCES = [
+    { k: 'ebay', label: 'eBay' }, { k: 'lcs', label: 'Local shop' },
+    { k: 'show', label: 'Card show' }, { k: 'private', label: 'Private sale' },
+    { k: 'pack', label: 'Pulled it' }, { k: 'other', label: 'Other' },
+  ];
 
   // Condition definitions mirror eBay's Trading Card grading
   // language so listings here and listings there read the same —
@@ -2783,6 +2825,77 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             placeholder="Personal notes about this card..."
             multiline
           />
+        </View>
+
+        {/* How did you get this? — self-reported chain genesis.
+            Optional. Stamped on the chain as an UNVERIFIED
+            "Acquired via X" event, distinct from verified links. */}
+        <View>
+          <SectionHeader title="How did you get this?" />
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
+            Optional. Starts this card's chain of custody. Shown as self-reported —
+            it doesn't replace a verified Card Shop transfer.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+            {ACQ_SOURCES.map((s) => {
+              const on = form.acquired_source === s.k;
+              return (
+                <TouchableOpacity
+                  key={s.k}
+                  onPress={() => set('acquired_source')(on ? '' : s.k)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: on ? Colors.accent : Colors.border,
+                    backgroundColor: on ? Colors.accent : 'transparent',
+                  }}
+                >
+                  <Text style={{ color: on ? Colors.bg : Colors.text, fontSize: Typography.sm, fontWeight: '700' }}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {form.acquired_source ? (
+            <>
+              <Input
+                label={form.acquired_source === 'ebay' ? 'eBay order / item number' : 'Reference (optional)'}
+                value={form.acquired_reference}
+                onChangeText={set('acquired_reference')}
+                placeholder={form.acquired_source === 'ebay' ? 'e.g. 12-34567-89012' : 'Receipt #, seller, etc.'}
+              />
+              <Input
+                label="Date acquired (YYYY-MM-DD)"
+                value={form.acquired_at}
+                onChangeText={set('acquired_at')}
+                placeholder="2026-05-10"
+              />
+              <TouchableOpacity
+                onPress={pickAcquisitionEvidence}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                  padding: 12, borderWidth: 1, borderColor: Colors.border,
+                  borderRadius: 8, borderStyle: 'dashed', marginTop: Spacing.sm,
+                }}
+              >
+                <Ionicons
+                  name={form.acquired_evidence_url ? 'checkmark-circle' : 'receipt-outline'}
+                  size={20}
+                  color={form.acquired_evidence_url ? Colors.accent : Colors.textMuted}
+                />
+                <Text style={{ color: form.acquired_evidence_url ? Colors.accent : Colors.textMuted, fontSize: Typography.sm, fontWeight: '600', flex: 1 }}>
+                  {form.acquired_evidence_url ? 'Receipt attached — tap to replace' : 'Attach order/receipt screenshot (optional)'}
+                </Text>
+              </TouchableOpacity>
+              {form.acquired_evidence_url ? (
+                <Image
+                  source={{ uri: form.acquired_evidence_url }}
+                  style={{ width: 90, height: 90, borderRadius: 8, marginTop: Spacing.sm }}
+                />
+              ) : null}
+            </>
+          ) : null}
         </View>
 
         {/* Photos */}
