@@ -403,7 +403,11 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="BinderAnalytics" component={BinderAnalyticsScreen} />
     <ProfileStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <ProfileStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
-    <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    {/* NOTE: MakeOffer is registered once above (with the offers
+        cluster). A second registration here was a duplicate —
+        React Navigation v7 fatally throws on duplicate screen
+        names, which crashed the entire Profile tab (the Show
+        Floor tile is what builds ProfileStack). Do not re-add. */}
     <ProfileStackNav.Screen name="Help" component={HelpScreen} />
     <ProfileStackNav.Screen name="DealRadarSettings" component={DealRadarSettingsScreen} />
     <ProfileStackNav.Screen name="DealRadarFeed" component={DealRadarFeedScreen} />
