@@ -27,6 +27,7 @@ if (typeof ErrorUtils !== 'undefined' && ErrorUtils.setGlobalHandler) {
 }
 
 import { RootNavigator } from './src/navigation';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useAuthStore } from './src/store/authStore';
 import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
@@ -143,7 +144,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AppInner />
+        <ErrorBoundary>
+          <AppInner />
+        </ErrorBoundary>
       </QueryClientProvider>
     </SafeAreaProvider>
   );
