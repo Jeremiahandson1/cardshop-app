@@ -1435,7 +1435,16 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
-      navigation.replace('CardDetail', { cardId: res.data?.id });
+      const go = () => navigation.replace('CardDetail', { cardId: res.data?.id });
+      if (res.data?.stolen_flagged) {
+        Alert.alert(
+          'This card matches a stolen report',
+          "It's registered, but it matched a confirmed stolen-card report and is now flagged for review and hidden from the marketplace. If you bought this in good faith, Card Shop staff will reach out — keep your purchase records.",
+          [{ text: 'Understood', onPress: go }],
+        );
+      } else {
+        go();
+      }
     },
     onError: (err) => {
       Alert.alert('Error', err.response?.data?.error || 'Failed to register card');
