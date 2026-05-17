@@ -901,3 +901,11 @@ export const listingOffersApi = {
     api.post(`/listing-offers/${id}/reject`, { reason }).then((r) => r.data),
   withdraw: (id) => api.post(`/listing-offers/${id}/withdraw`).then((r) => r.data),
 };
+
+// Admin-only. Used by the in-app "Act as user" (impersonation)
+// flow for show-floor intake. Backend enforces admin + blocks
+// impersonating other admins + audit-logs every call.
+export const adminApi = {
+  searchUsers: (q) => api.get('/admin/users', { params: q ? { q } : {} }),
+  impersonate: (id) => api.post(`/admin/users/${id}/impersonate`),
+};

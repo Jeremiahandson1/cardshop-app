@@ -28,6 +28,7 @@ if (typeof ErrorUtils !== 'undefined' && ErrorUtils.setGlobalHandler) {
 
 import { RootNavigator } from './src/navigation';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import ImpersonationBanner from './src/components/ImpersonationBanner';
 import { useAuthStore } from './src/store/authStore';
 import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
@@ -135,6 +136,7 @@ const AppInner = () => {
     <>
       <StatusBar style="light" backgroundColor={Colors.bg} />
       <RootNavigator />
+      <ImpersonationBanner />
       <FlashMessage position="top" />
     </>
   );
