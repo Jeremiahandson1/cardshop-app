@@ -3121,17 +3121,34 @@ function ZoomableImage({ uri, onZoomChange }) {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Bridge zoom state out to the parent so it can disable the
-  // pagingEnabled ScrollView's horizontal scroll while we're
-  // zoomed in. Without this the inner Pan gesture consumes the
-  // horizontal swipe even when at 1x, and the parent never sees
-  // it — that's why "Swipe to switch" looked broken.
+  // Displayed image box (matches the <Animated.Image> style below).
+  const IMG_W = SCREEN_W;
+  const IMG_H = SCREEN_H * 0.8;
+
+  // Max pan offset at a given scale so the image edge can reach the
+  // screen edge but not fly off into the void. worklet-safe.
+  const clamp = (val, min, max) => {
+    'worklet';
+    return Math.min(Math.max(val, min), max);
+  };
+  const maxX = (s) => {
+    'worklet';
+    return Math.max(0, (IMG_W * s - SCREEN_W) / 2);
+  };
+  const maxY = (s) => {
+    'worklet';
+    return Math.max(0, (IMG_H * s - SCREEN_H) / 2);
+  };
+
+  // Drive the parent pager-disable off the LIVE scale, not the
+  // post-gesture savedScale. Keying off savedScale meant the
+  // horizontal pager was still eating the drag while/just after
+  // zooming, so pan never got the touch — the "can't move around
+  // when zoomed" bug.
   useAnimatedReaction(
-    () => savedScale.value,
-    (current, prev) => {
-      if (current !== prev && onZoomChange) {
-        runOnJS(onZoomChange)(current > 1);
-      }
+    () => scale.value > 1.01,
+    (zoomed, prev) => {
+      if (zoomed !== prev && onZoomChange) runOnJS(onZoomChange)(zoomed);
     },
   );
 
@@ -3151,23 +3168,34 @@ function ZoomableImage({ uri, onZoomChange }) {
     .onEnd(() => {
       savedScale.value = scale.value;
       if (scale.value <= 1.05) {
-        // Snap back to 1x when close — pan stays centered.
         scale.value = withTiming(1);
         savedScale.value = 1;
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
         savedTranslateX.value = 0;
         savedTranslateY.value = 0;
+      } else {
+        // Re-clamp into bounds after a zoom so a pre-zoom pan can't
+        // leave the image parked off-screen.
+        const mx = maxX(scale.value);
+        const my = maxY(scale.value);
+        translateX.value = withTiming(clamp(translateX.value, -mx, mx));
+        translateY.value = withTiming(clamp(translateY.value, -my, my));
+        savedTranslateX.value = clamp(translateX.value, -mx, mx);
+        savedTranslateY.value = clamp(translateY.value, -my, my);
       }
     });
 
   const pan = Gesture.Pan()
     .onUpdate((e) => {
-      // Pan only when zoomed, otherwise the parent swipe-between-
-      // images gesture handles horizontal motion.
-      if (savedScale.value > 1) {
-        translateX.value = savedTranslateX.value + e.translationX;
-        translateY.value = savedTranslateY.value + e.translationY;
+      // Gate on the LIVE scale so panning works the instant you're
+      // zoomed (incl. mid-pinch and after double-tap), and clamp so
+      // you can actually move to every edge of the image.
+      if (scale.value > 1) {
+        const mx = maxX(scale.value);
+        const my = maxY(scale.value);
+        translateX.value = clamp(savedTranslateX.value + e.translationX, -mx, mx);
+        translateY.value = clamp(savedTranslateY.value + e.translationY, -my, my);
       }
     })
     .onEnd(() => {
@@ -3178,7 +3206,7 @@ function ZoomableImage({ uri, onZoomChange }) {
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      if (savedScale.value > 1) {
+      if (scale.value > 1) {
         runOnJS(resetToOneX)();
       } else {
         scale.value = withTiming(2.5);
