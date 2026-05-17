@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
-import { Alert, AppState } from 'react-native';
+import { Alert, AppState, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -133,12 +133,14 @@ const AppInner = () => {
   if (isLoading) return <LoadingScreen message="Card Shop by Twomiah" />;
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: Colors.bg }}>
       <StatusBar style="light" backgroundColor={Colors.bg} />
-      <RootNavigator />
       <ImpersonationBanner />
+      <View style={{ flex: 1 }}>
+        <RootNavigator />
+      </View>
       <FlashMessage position="top" />
-    </>
+    </View>
   );
 };
 
