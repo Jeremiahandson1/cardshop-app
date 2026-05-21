@@ -146,6 +146,10 @@ export const catalogApi = {
   create: (data) => api.post('/catalog', data),
   priceHistory: (id, params) => api.get(`/catalog/${id}/price-history`, { params }),
   parallels: (id) => api.get(`/catalog/${id}/parallels`),
+  // Sibling variants — other parallels of the same exact (mfr, year,
+  // set, card#). Used in the scan_review step so the user can swap
+  // when the AI picked the wrong /25 variant.
+  siblings: (id) => api.get(`/catalog/${id}/siblings`),
   // Browse-by-set endpoints, used after the manufacturer-checklist
   // importer fills card_catalog. Distinct (mfr, year, set) + full
   // card list for a specific set.

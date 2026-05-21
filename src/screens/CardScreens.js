@@ -647,6 +647,127 @@ const CascadePicker = ({
 // ============================================================
 // REGISTER CARD
 // ============================================================
+// ============================================================
+// SiblingRows — full-width row list of OTHER parallels of the
+// same exact card (same mfr/year/set/card#). Renders in the
+// scan_review step under the AI's top pick so the user can swap
+// one tap when the AI got the parallel wrong (the canonical
+// "marked it as Refractor but it was actually the /25 Color
+// Rush" case). Rows show: thumbnail · #cardnum + parallel name ·
+// badges (RC/AUTO/RELIC/print run) · player+team+set context.
+// Matching print_run floats to the top — a /25 scan surfaces
+// other /25 parallels first.
+// ============================================================
+const SiblingRows = ({ topCandidate, onPick }) => {
+  const topId = topCandidate?.id;
+  const { data, isLoading } = useQuery({
+    queryKey: ['catalog-siblings', topId],
+    queryFn: () => catalogApi.siblings(topId).then((r) => r.data),
+    enabled: !!topId,
+    staleTime: 5 * 60_000,
+  });
+  const siblings = data?.siblings || [];
+  if (!topId) return null;
+  if (isLoading) {
+    return (
+      <View style={{ paddingVertical: Spacing.sm }}>
+        <ActivityIndicator color={Colors.accent} />
+      </View>
+    );
+  }
+  if (!siblings.length) return null;
+
+  // Header copy phrases as "/25" only when every sibling shares the
+  // top pick's print run — otherwise the strip is mixed and we use
+  // the generic phrasing.
+  const tpr = topCandidate?.print_run || null;
+  const allMatchPr = tpr && siblings.every((s) => s.print_run === tpr);
+  const header = allMatchPr
+    ? `Other /${tpr} variants of this card`
+    : 'Other variants of this card';
+
+  return (
+    <View style={{ gap: Spacing.xs, marginTop: Spacing.sm }}>
+      <Text style={{
+        color: Colors.textMuted, fontSize: Typography.sm,
+        textTransform: 'uppercase', letterSpacing: 1,
+      }}>
+        {header}
+      </Text>
+      <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 4 }}>
+        Same player, year, set, and card #. Pick the right variant if
+        the scan landed on the wrong one.
+      </Text>
+      {siblings.map((s) => {
+        const chips = [];
+        if (s.is_one_of_one) chips.push('1/1');
+        else if (s.print_run) chips.push(`/${s.print_run}`);
+        if (s.is_autograph) chips.push('AUTO');
+        if (s.is_rookie) chips.push('RC');
+        if (s.is_relic) chips.push('RELIC');
+        return (
+          <TouchableOpacity
+            key={s.id}
+            onPress={() => onPick(s)}
+            style={{
+              flexDirection: 'row',
+              padding: Spacing.sm,
+              gap: Spacing.sm,
+              backgroundColor: Colors.surface2,
+              borderRadius: Radius.md,
+              borderWidth: 1,
+              borderColor: Colors.border,
+            }}
+          >
+            {s.front_image_url ? (
+              <Image
+                source={{ uri: s.front_image_url }}
+                style={{ width: 56, height: 56, borderRadius: Radius.sm, backgroundColor: Colors.surface }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{
+                width: 56, height: 56, borderRadius: Radius.sm,
+                backgroundColor: Colors.surface,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="image-outline" size={20} color={Colors.textMuted} />
+              </View>
+            )}
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ color: Colors.text, fontWeight: Typography.semibold }} numberOfLines={2}>
+                #{s.card_number || '?'} · {s.parallel || 'Base'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {chips.map((ch) => (
+                  <View key={ch} style={{
+                    paddingHorizontal: 6, paddingVertical: 1,
+                    borderRadius: 4,
+                    backgroundColor: Colors.accent + '22',
+                    borderWidth: 1, borderColor: Colors.accent + '55',
+                  }}>
+                    <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
+                      {ch}
+                    </Text>
+                  </View>
+                ))}
+                {s.subset_name ? (
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+                    {s.subset_name}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }} numberOfLines={1}>
+                {[s.player_name, s.team, s.manufacturer].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
 export const RegisterCardScreen = ({ navigation, route }) => {
   const qrCode = route.params?.qrCode;
   const catalogId = route.params?.catalogId;
@@ -971,6 +1092,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         parallel_evidence: fields.parallel_evidence || '',
         print_run: fields.print_run || null,
         serial_number: fields.serial_number || '',
+        // Topps/Bowman CODE# (e.g. "CMP112169") — null on other
+        // manufacturers. When set + recognized by the server, the
+        // top candidate is the deterministically correct parallel.
+        topps_code: fields.topps_code || null,
+        code_mapping: res.data?.code_mapping || null,
         // Slab fields — vision now extracts grading_company / grade /
         // cert_number from the slab label so the user doesn't have to
         // type a 9-digit cert by hand. Pre-fills the owned-card form
@@ -1427,6 +1553,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           ai_top_picked: Array.isArray(scanReview.candidates) && scanReview.candidates.length > 0
             ? scanReview.candidates[0]?.id === selectedCatalog?.id
             : null,
+          // Topps/Bowman CODE# from the back legal text. The server
+          // attributes this to the (mfr, year, set, parallel) of the
+          // confirmed catalog row, so the next scan of any card with
+          // the same code identifies the parallel deterministically.
+          ai_topps_code: scanReview.topps_code || null,
           front_image_url: scanReview.frontUri || null,
           back_image_url: scanReview.backUri || null,
           vision_mode: scanReview.backUri ? 'pair' : 'front_only',
@@ -1714,6 +1845,38 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               />
             </View>
           </View>
+
+          {/* Deterministic-identification badge — visible only when
+              vision read a Topps/Bowman CODE# AND the server matched
+              it to a known (set, parallel). Earns trust by showing
+              the scan landed on ground truth, not a fuzzy guess. */}
+          {scanReview.code_mapping ? (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              padding: Spacing.sm, backgroundColor: Colors.accent + '15',
+              borderRadius: Radius.sm,
+              borderWidth: 1, borderColor: Colors.accent + '55',
+            }}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontSize: Typography.sm, flex: 1 }}>
+                Identified by CODE#{scanReview.topps_code} — {scanReview.code_mapping.parallel || 'Base'}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Sibling variants of the exact same card — full-width
+              rows so each variant carries its own thumbnail, badges,
+              and player/team/set context. The rows are sourced from
+              /api/catalog/:id/siblings off the top auto-picked
+              candidate; matching print_run floats to the top. */}
+          <SiblingRows
+            topCandidate={scanReview.candidates?.[0]}
+            onPick={(s) => {
+              commitScanPhotos();
+              setSelectedCatalog(s);
+              setStep('serial');
+            }}
+          />
 
           {/* Catalog candidates from OCR — let the user pick if any matched */}
           {scanReview.candidates?.length ? (
