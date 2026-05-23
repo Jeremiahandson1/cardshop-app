@@ -678,7 +678,12 @@ export const MyOrdersScreen = ({ navigation }) => {
 
 function orderStatusLabel(s) {
   return ({
-    pending: '⏳ Pending payment',
+    // The buyer lands here right after Stripe checkout, before our
+    // payment_intent.amount_capturable_updated webhook has flipped
+    // the row to authorized. "Verifying payment…" reads as "Stripe
+    // is confirming" instead of the old "Pending payment" which
+    // made buyers think their card never charged.
+    pending: '⏳ Verifying payment…',
     authorized: '✅ Paid — awaiting ship',
     captured: '📦 Awaiting ship',
     shipped: '🚚 Shipped',
@@ -701,6 +706,14 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersApi.get(id),
+    // Stripe's amount_capturable_updated webhook usually fires within
+    // a couple seconds of checkout completion, but mobile users
+    // landing on this screen mid-flight see status='pending' and
+    // assume their payment failed. Poll every 3s while pending so the
+    // label flips to "Paid — awaiting ship" without a manual refresh.
+    // Stop once status moves off pending; React Query treats false as
+    // "no polling" so the query goes idle.
+    refetchInterval: (q) => (q.state.data?.order?.status === 'pending' ? 3000 : false),
   });
 
   const buyLabelMut = useMutation({
