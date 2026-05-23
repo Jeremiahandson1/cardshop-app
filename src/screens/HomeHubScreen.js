@@ -79,14 +79,12 @@ const TILES = [
     title: 'Marketplace',
     bg: 'rgba(74,222,128,0.10)',
     border: 'rgba(74,222,128,0.45)',
-    // Public marketplace browse — listings from every seller. Users
-    // who want their own sales / orders go via Profile → My orders
-    // (the home tile used to land there, but that was unreachable
-    // from "I want to shop the marketplace" intent).
+    // Routing is resolved at tap time (see onTilePress): if the user
+    // has pending sales we send them to MyOrders so they can ship;
+    // otherwise we send them to the public browse. Tile target left
+    // here as the no-count default so the static fallback in
+    // onTilePress doesn't have to special-case it.
     target: { tab: 'Profile', screen: 'MarketplaceHome' },
-    // subtitle is computed at render from counts.marketplace_sales
-    // — surfaces pending sales as a badge even though the tile now
-    // opens the public browse rather than the orders screen.
   },
 ];
 
@@ -156,8 +154,15 @@ export const HomeHubScreen = ({ navigation }) => {
       target = { tab: 'Binders' };
     } else if (tile.key === 'local-lcs') {
       target = { tab: 'LCS' };
+    } else if (tile.key === 'marketplace') {
+      // Marketplace tile is dual-mode: with pending sales the user's
+      // intent is "I need to ship a card", route to MyOrders. With
+      // none, intent is "shop", route to the public browse.
+      target = marketplaceCount > 0
+        ? { tab: 'Profile', screen: 'MyOrders' }
+        : tile.target;
     } else if (tile.target) {
-      // trade-offers + marketplace tiles ship with explicit targets
+      // trade-offers and other tiles ship with explicit targets
       // in the static metadata — no per-key branching needed.
       target = tile.target;
     } else {
@@ -188,7 +193,7 @@ export const HomeHubScreen = ({ navigation }) => {
     if (tile.key === 'marketplace') {
       return marketplaceCount === 0
         ? 'Browse — every listing flows through the chain'
-        : `${marketplaceCount} sale${marketplaceCount === 1 ? '' : 's'} pending · tap to browse`;
+        : `${marketplaceCount} sale${marketplaceCount === 1 ? '' : 's'} pending · tap to ship`;
     }
     return tile.subtitle;
   };
