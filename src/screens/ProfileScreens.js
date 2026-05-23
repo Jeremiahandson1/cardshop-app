@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, Alert, KeyboardAvoidingView, Platform, Linking,
+  FlatList, Alert, KeyboardAvoidingView, Platform, Linking, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { showMessage } from 'react-native-flash-message';
 import * as Updates from 'expo-updates';
@@ -212,6 +213,7 @@ export const ProfileScreen = ({ navigation }) => {
       // collection.
       section: 'Account',
       items: [
+        { icon: 'person-circle-outline', label: 'Profile & brand', onPress: () => navigation.navigate('BrandProfile') },
         { icon: 'home-outline', label: 'Shipping addresses', onPress: () => navigation.navigate('Addresses') },
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
@@ -343,11 +345,22 @@ export const ProfileScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Profile header */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?'}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={() => navigation.navigate('BrandProfile')}
+            activeOpacity={0.75}
+          >
+            {(user?.brand_logo_url || user?.avatar_url) ? (
+              <Image
+                source={{ uri: user.brand_logo_url || user.avatar_url }}
+                style={{ width: '100%', height: '100%', borderRadius: 9999 }}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?'}
+              </Text>
+            )}
+          </TouchableOpacity>
           <Text style={styles.displayName}>{user?.display_name || user?.username}</Text>
           <Text style={styles.username}>@{user?.username}</Text>
 
@@ -1016,4 +1029,167 @@ const styles = StyleSheet.create({
   },
   dangerTitle: { color: Colors.accent3, fontSize: Typography.base, fontWeight: Typography.bold },
   dangerText: { color: Colors.text, fontSize: Typography.sm, lineHeight: 19 },
+  brandRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border, padding: Spacing.base,
+    marginBottom: Spacing.md,
+  },
+  brandThumb: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  brandThumbImg: { width: '100%', height: '100%' },
+  brandPlaceholder: { color: Colors.textMuted, fontSize: Typography.xs },
+  brandLabel: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
+  brandHint: { color: Colors.textMuted, fontSize: Typography.xs, marginTop: 4, lineHeight: 16 },
+  brandActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  brandActionBtn: {
+    paddingVertical: 6, paddingHorizontal: 12, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  brandActionText: { color: Colors.text, fontSize: Typography.xs, fontWeight: Typography.semibold },
+  brandClearText: { color: Colors.textMuted, fontSize: Typography.xs },
 });
+
+// ============================================================
+// BRAND / PROFILE EDITOR
+// ============================================================
+// One place for the things that appear on the user's public surfaces:
+// display name, avatar (the face), and brand logo (the brand mark).
+// avatar shows up on profile circles, messaging, trust profile.
+// brand_logo wins on binder header, scan landing seller block, and
+// show-floor banner; falls back to avatar_url server-side when unset.
+export const BrandProfileScreen = ({ navigation }) => {
+  const user = useAuthStore((s) => s.user);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const [displayName, setDisplayName] = useState(user?.display_name || '');
+  // null = not yet touched (keep existing). '' = explicit clear.
+  // string starting with data: = pending base64 upload.
+  // string starting with http = already-uploaded URL (no-op on save).
+  const [avatar, setAvatar] = useState(user?.avatar_url || null);
+  const [logo, setLogo] = useState(user?.brand_logo_url || null);
+  const [saving, setSaving] = useState(false);
+
+  const pickImage = async (which) => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Allow photo access to pick an image.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        // Square crop for both — avatars and brand logos display in a
+        // circle/round mask on every surface, so non-square art gets
+        // clipped at the corners. Forcing the crop step at pick time
+        // means the user picks the framing, not us.
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const a = result.assets[0];
+      const dataUrl = `data:image/jpeg;base64,${a.base64}`;
+      if (which === 'avatar') setAvatar(dataUrl);
+      else setLogo(dataUrl);
+    } catch (err) {
+      Alert.alert('Image picker failed', err?.message || 'Try again.');
+    }
+  };
+
+  const clearImage = (which) => {
+    if (which === 'avatar') setAvatar('');
+    else setLogo('');
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const body = { display_name: displayName.trim() || undefined };
+      // Only send keys the user actually touched. State === null means
+      // "untouched, leave alone." '' means explicit clear. data: / http
+      // both pass through to the server (uploadIfBase64 short-circuits
+      // on https URLs).
+      if (avatar !== user?.avatar_url) body.avatar_url = avatar;
+      if (logo !== user?.brand_logo_url) body.brand_logo_url = logo;
+      await authApi.updateProfile(body);
+      await refreshUser();
+      showMessage({ message: 'Profile saved', type: 'success', duration: 1500 });
+      navigation.goBack();
+    } catch (err) {
+      Alert.alert('Save failed', err?.response?.data?.error || err?.message || 'Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderRow = (which, value, label, hint) => {
+    const hasImage = value && value !== '';
+    return (
+      <View style={styles.brandRow}>
+        <TouchableOpacity style={styles.brandThumb} onPress={() => pickImage(which)} activeOpacity={0.75}>
+          {hasImage
+            ? <Image source={{ uri: value }} style={styles.brandThumbImg} />
+            : <Text style={styles.brandPlaceholder}>Tap</Text>}
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.brandLabel}>{label}</Text>
+          <Text style={styles.brandHint}>{hint}</Text>
+          <View style={styles.brandActions}>
+            <TouchableOpacity style={styles.brandActionBtn} onPress={() => pickImage(which)}>
+              <Text style={styles.brandActionText}>{hasImage ? 'Replace' : 'Choose image'}</Text>
+            </TouchableOpacity>
+            {hasImage ? (
+              <TouchableOpacity style={styles.brandActionBtn} onPress={() => clearImage(which)}>
+                <Text style={styles.brandClearText}>Remove</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={styles.simpleHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.simpleHeaderTitle}>Profile & brand</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }} keyboardShouldPersistTaps="handled">
+          <Text style={styles.accountBlurb}>
+            Your avatar shows up on messages and your profile circle. Your brand
+            logo shows on your binder header, every card you list, and the
+            show-floor banner when you check in to a show.
+          </Text>
+
+          <Input
+            label="Display name"
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder={user?.username || ''}
+          />
+
+          {renderRow('avatar', avatar, 'Avatar', 'Square JPG/PNG. Used in messaging and your profile circle.')}
+          {renderRow('logo',   logo,   'Brand logo', 'Optional. Shows on binders, cards, and the show floor. Falls back to your avatar if not set.')}
+
+          <Button
+            title={saving ? 'Saving…' : 'Save'}
+            onPress={handleSave}
+            loading={saving}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};

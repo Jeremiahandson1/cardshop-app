@@ -41,6 +41,7 @@ import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens'
 import {
   ProfileScreen, WantListScreen,
   ChangeEmailScreen, DownloadDataScreen, DeleteAccountScreen,
+  BrandProfileScreen,
 } from '../screens/ProfileScreens';
 import { ProTaggingScreen } from '../screens/ProTaggingScreen';
 import { AdminActAsScreen } from '../screens/AdminActAsScreen';
@@ -414,6 +415,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="DealRadarFeed" component={DealRadarFeedScreen} />
     <ProfileStackNav.Screen name="Integrations" component={IntegrationsScreen} />
     <ProfileStackNav.Screen name="ChangeEmail" component={ChangeEmailScreen} />
+    <ProfileStackNav.Screen name="BrandProfile" component={BrandProfileScreen} />
     <ProfileStackNav.Screen name="DownloadData" component={DownloadDataScreen} />
     <ProfileStackNav.Screen name="DeleteAccount" component={DeleteAccountScreen} />
     <ProfileStackNav.Screen name="Upgrade" component={UpgradeScreen} />
