@@ -24,6 +24,22 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 // type/data. Centralized here so the Profile banner and the full
 // Notifications screen can agree on behavior. The destination
 // defaults to the Notifications inbox if we don't recognize the type.
+// Keep these destinations in sync with the OS push handler in
+// services/pushRegistration.js — tapping an in-app notification row
+// must land in the same place as tapping the OS push for the same
+// type. If the type isn't here, the fall-through default navigates
+// to 'Notifications' which is a silent no-op when the user is already
+// on that screen ("tap does nothing" bug).
+const tradeOfferDest = (n, nav) => n.data?.offer_id
+  ? nav.navigate('Trade', { screen: 'TradeOfferDetail', params: { offerId: n.data.offer_id } })
+  : nav.navigate('Notifications');
+const listingOfferDest = (n, nav) => n.data?.offer_id
+  ? nav.navigate('ListingOfferDetail', { id: n.data.offer_id })
+  : nav.navigate('Notifications');
+const transactionDest = (n, nav) => n.data?.cstx_id
+  ? nav.navigate('Transaction', { transactionId: n.data.cstx_id })
+  : nav.navigate('Notifications');
+
 const NOTIFICATION_MAP = {
   message:           { icon: 'mail',              color: '#4ecdc4', dest: (n, nav) => n.data?.conversation_id ? nav.navigate('Conversation', { conversationId: n.data.conversation_id }) : nav.navigate('ConversationList') },
   transfer_request:  { icon: 'swap-horizontal',   color: '#e8c547', dest: (n, nav) => nav.navigate('Transfers') },
@@ -33,6 +49,59 @@ const NOTIFICATION_MAP = {
   dispute:           { icon: 'warning',           color: '#f87171', dest: (n, nav) => nav.navigate('DisputeList') },
   tracking_update:   { icon: 'cube',              color: '#60a5fa', dest: (n, nav) => nav.navigate('Transfers') },
   counter_claim:     { icon: 'git-compare',       color: '#f87171', dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+
+  // Trade-board + binder offer family. All route to TradeOfferDetail
+  // (the unified offers table covers both surfaces).
+  trade_offer:                { icon: 'swap-horizontal', color: '#e8c547', dest: tradeOfferDest },
+  trade_offer_countered:      { icon: 'swap-horizontal', color: '#e8c547', dest: tradeOfferDest },
+  trade_offer_accepted:       { icon: 'checkmark-circle', color: '#4ade80', dest: tradeOfferDest },
+  trade_offer_declined:       { icon: 'close-circle',    color: '#f87171', dest: tradeOfferDest },
+  trade_offer_withdrawn:      { icon: 'close-circle',    color: Colors.textMuted, dest: tradeOfferDest },
+  trade_offer_updated:        { icon: 'swap-horizontal', color: '#e8c547', dest: tradeOfferDest },
+  binder_offer:               { icon: 'pricetag',        color: '#e8c547', dest: tradeOfferDest },
+  binder_offer_countered:     { icon: 'pricetag',        color: '#e8c547', dest: tradeOfferDest },
+  binder_offer_accepted:      { icon: 'checkmark-circle', color: '#4ade80', dest: tradeOfferDest },
+  binder_offer_declined:      { icon: 'close-circle',    color: '#f87171', dest: tradeOfferDest },
+
+  // Marketplace listing offer family — different detail screen.
+  offer_received:             { icon: 'pricetag',         color: '#4ecdc4', dest: listingOfferDest },
+  offer_countered:            { icon: 'pricetag',         color: '#4ecdc4', dest: listingOfferDest },
+  offer_accepted:             { icon: 'checkmark-circle', color: '#4ade80', dest: listingOfferDest },
+  offer_rejected:             { icon: 'close-circle',     color: '#f87171', dest: listingOfferDest },
+
+  // Transfers / SLA / video-waiver / stalled-transfer — all land on
+  // the CSTX transaction screen so the user can take the next action.
+  sla_nudge_2d:               { icon: 'time',     color: '#e8c547', dest: transactionDest },
+  sla_nudge_4d:               { icon: 'time',     color: '#f87171', dest: transactionDest },
+  sla_overdue:                { icon: 'warning',  color: '#f87171', dest: transactionDest },
+  video_waiver_proposed:      { icon: 'videocam', color: '#60a5fa', dest: transactionDest },
+  stalled_transfer_report:    { icon: 'warning',  color: '#f87171', dest: transactionDest },
+  stalled_transfer_response:  { icon: 'warning',  color: '#e8c547', dest: transactionDest },
+  stalled_transfer_resolved:  { icon: 'checkmark-circle', color: '#4ade80', dest: transactionDest },
+
+  // Show floor — followed seller went live, or your own session is
+  // ending. Both land on the show floor hub (ShowFloorEvent when we
+  // have a specific event slug).
+  show_floor_live:            { icon: 'flash',    color: '#e8c547',
+    dest: (n, nav) => nav.navigate('Profile', {
+      screen: n.data?.event_slug ? 'ShowFloorEvent' : 'ShowFloorHub',
+      params: n.data?.event_slug ? { slug: n.data.event_slug } : undefined,
+    }),
+  },
+  show_floor_ending:          { icon: 'flash',    color: '#f87171', dest: (_, nav) => nav.navigate('ShowFloorHub') },
+
+  // Marketplace order dispute / saved-search match / deal radar.
+  order_dispute_opened:       { icon: 'warning',  color: '#f87171',
+    dest: (n, nav) => n.data?.order_id ? nav.navigate('OrderDetail', { id: n.data.order_id }) : nav.navigate('Notifications'),
+  },
+  saved_search_match:         { icon: 'search',   color: '#4ecdc4',
+    dest: (n, nav) => n.data?.listing_id ? nav.navigate('ListingDetail', { id: n.data.listing_id }) : nav.navigate('Notifications'),
+  },
+  deal_radar_match:           { icon: 'flame',    color: '#ff6b6b', dest: (_, nav) => nav.navigate('DealRadarFeed') },
+
+  // Stolen-card matches — admin escalations the cardholder reviews.
+  stolen_match_for_review:    { icon: 'shield',   color: '#f87171', dest: (_, nav) => nav.navigate('StolenMatchReview') },
+  stolen_match_pending:       { icon: 'shield',   color: '#e8c547', dest: (_, nav) => nav.navigate('Notifications') },
 };
 const defaultNotifCfg = { icon: 'notifications', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') };
 
