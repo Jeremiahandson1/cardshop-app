@@ -616,10 +616,12 @@ export const addCardToBinder = (cardId, binder_id) =>
 export const moveCardToBinder = addCardToBinder;
 
 // Set the binder-level intent_signal for an owned card (across all
-// of the user's binders that hold it). Returns { needs_listing } —
-// when true, the mobile UI should launch the CreateTradeListing
-// flow because the new intent is tradeable but no active listing
-// exists yet.
+// of the user's binders that hold it). Server syncs the trade_listings
+// + marketplace listings rows so the card actually appears on the
+// right feeds. Returns { ok, intent_signal, feeds: { trade_board,
+// marketplace } } on success, or 422 with code 'intent_preconditions_unmet'
+// and a `requires: { price?, photos? }` object when the new intent
+// needs more info than the card currently has.
 export const setCardIntent = (cardId, intent_signal) =>
   api.post(`/cards/${cardId}/intent`, { intent_signal });
 

@@ -3557,16 +3557,22 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.'),
   });
 
-  // Setting the binder-level intent IS the trade-board switch.
-  // When the API tells us the card needs a listing (tradeable
-  // intent + no active trade_listing yet), launch the listing
-  // flow so the user picks visibility / takes photos.
+  // Setting the binder-level intent IS the feed switch — server
+  // syncs trade_listings + marketplace listings rows to match.
+  // Showcase = neither feed; Let's talk = both; Trade only = trade
+  // board; Priced = marketplace.
+  //
+  // Server returns 422 with code 'intent_preconditions_unmet' when
+  // the target intent needs a price and/or app-captured photos the
+  // card doesn't have yet. We surface that as an Alert that bounces
+  // the user to EditCard to fix it, rather than silently failing.
   const setIntentMutation = useMutation({
     mutationFn: (intent_signal) => setCardIntent(cardId, intent_signal),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
       queryClient.invalidateQueries({ queryKey: ['trade-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['marketplace-feed'] });
       // Per-binder views render the intent_signal as an image
       // overlay ("Let's talk", "Priced", etc.). Invalidate them
       // too — without this, the overlay keeps showing the old
@@ -3574,38 +3580,56 @@ export const CardDetailScreen = ({ navigation, route }) => {
       queryClient.invalidateQueries({ predicate: (q) =>
         q.queryKey?.[0] === 'binder' || q.queryKey?.[0] === 'public-binder'
       });
-      if (res?.data?.needs_listing) {
-        navigation.navigate('CreateTradeListing', { ownedCardId: cardId });
-      }
-      // Marketplace auto-publish feedback — quick toast so the user
-      // knows what just happened. priced + photos → instant listing;
-      // priced + too few photos → nudge to add another; intent moved
-      // off priced → withdraw confirmation.
-      const d = res?.data || {};
-      if (d.marketplace_published) {
+      const feeds = res?.data?.feeds || {};
+      if (feeds.trade_board && feeds.marketplace) {
+        showMessage({
+          message: 'Live on the trade board and marketplace',
+          description: 'Buyers see your price and can also send offers.',
+          type: 'success', duration: 3500,
+        });
+      } else if (feeds.trade_board) {
+        showMessage({
+          message: 'On the trade board',
+          description: 'Other collectors can find this card for trade.',
+          type: 'success', duration: 3000,
+        });
+      } else if (feeds.marketplace) {
         showMessage({
           message: 'Listed on the marketplace',
-          description: 'Buyers can purchase this card right now.',
-          type: 'success',
-          duration: 3500,
+          description: 'Buyers can purchase or make an offer.',
+          type: 'success', duration: 3500,
         });
-      } else if (d.marketplace_needs_photos) {
+      } else {
         showMessage({
-          message: 'Priced — add 1 more photo to publish',
-          description: 'The marketplace requires at least 2 photos. Tap Edit → Photos.',
-          type: 'warning',
-          duration: 4500,
-        });
-      } else if (d.marketplace_withdrawn) {
-        showMessage({
-          message: 'Pulled from the marketplace',
-          description: 'Buyers can\'t buy this card anymore.',
-          type: 'info',
-          duration: 3000,
+          message: 'Off the feeds',
+          description: 'Card is in your binder only — display mode.',
+          type: 'info', duration: 2500,
         });
       }
     },
-    onError: (err) => Alert.alert('Could not update intent', err?.response?.data?.error || 'Try again.'),
+    onError: (err) => {
+      const data = err?.response?.data;
+      if (err?.response?.status === 422 && data?.code === 'intent_preconditions_unmet') {
+        const needsPrice  = !!data.requires?.price;
+        const needsPhotos = !!data.requires?.photos;
+        const title = needsPrice && needsPhotos
+          ? 'Set a price and take fresh photos'
+          : needsPrice
+            ? 'Set an asking price first'
+            : 'Take fresh in-app photos';
+        const body = needsPrice && needsPhotos
+          ? 'Marketplace listings need a price, and feeds need photos you took live in the app (gallery imports don’t count for fraud-prevention).'
+          : needsPrice
+            ? 'A marketplace card has to have a price — buyers can also make offers on top of it. Add one now.'
+            : 'For trust, feed photos have to be taken live in-app. Open Edit and tap Take photo to add fresh shots.';
+        Alert.alert(title, body, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Edit', onPress: () => navigation.navigate('EditCard', { cardId }) },
+        ]);
+        return;
+      }
+      Alert.alert('Could not update intent', data?.error || 'Try again.');
+    },
   });
 
   const promptMoveToBinder = () => {
