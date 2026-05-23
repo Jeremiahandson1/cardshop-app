@@ -203,6 +203,21 @@ export function registerNotificationResponseHandler(navigationRef) {
         }
         return;
       }
+
+      // Generic deal lifecycle (trade complete, meetup switched,
+      // counterparty confirmed, shipped, etc.). Routes to the
+      // transaction screen so review prompts + next-step UI are
+      // visible. Without this, "Trade complete!" pushed the user
+      // to the Notifications screen and they never saw the review
+      // prompt — manifesting as "only one side leaves a review."
+      if (data?.type === 'binder_deal_update' && data.cstx_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'Transaction', params: { transactionId: data.cstx_id },
+          });
+        }
+        return;
+      }
     } catch (err) {
       console.warn('notification response handler error', err?.message);
     }

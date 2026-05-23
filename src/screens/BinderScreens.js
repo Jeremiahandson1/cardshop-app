@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { showMessage } from 'react-native-flash-message';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi, reviewsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -2276,33 +2277,85 @@ export const TransactionScreen = ({ navigation, route }) => {
   });
 
   // ── In-person meetup path ────────────────────────────────────
+  // Optimistic updates so the UI flips instantly on tap. Without
+  // these, every tap waits ~500ms for the API round-trip + refetch,
+  // which feels broken (user wonders "did it work?" then UI catches
+  // up). onError rolls back to the prior cache value.
+  const txKey = ['transaction', transactionId];
   const meetInPersonMutation = useMutation({
     mutationFn: () => cstxApi.meetInPerson(transactionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: txKey });
+      const prev = queryClient.getQueryData(txKey);
+      queryClient.setQueryData(txKey, (old) => old ? { ...old, in_person_meet: true } : old);
+      return { prev };
     },
-    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to switch to in-person meetup'),
+    onError: (err, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(txKey, ctx.prev);
+      Alert.alert('Error', err.response?.data?.error || 'Failed to switch to in-person meetup');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: txKey }),
   });
   const confirmReceivedMutation = useMutation({
     mutationFn: () => cstxApi.confirmReceived(transactionId),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: txKey });
+      const prev = queryClient.getQueryData(txKey);
+      const me = user?.id;
+      queryClient.setQueryData(txKey, (old) => {
+        if (!old) return old;
+        const isSeller = old.seller_user_id === me;
+        return {
+          ...old,
+          seller_confirmed_received_at: isSeller && !old.seller_confirmed_received_at
+            ? new Date().toISOString() : old.seller_confirmed_received_at,
+          buyer_confirmed_received_at: !isSeller && !old.buyer_confirmed_received_at
+            ? new Date().toISOString() : old.buyer_confirmed_received_at,
+        };
+      });
+      return { prev };
+    },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] });
-      // Always invalidate the chain query — receipt confirmation
-      // may have flipped the transaction to complete + transferred
-      // ownership, in which case the chain timeline grew.
+      // Receipt confirmation may have completed the trade — invalidate
+      // the chain query so the timeline picks up the new transfer event.
       queryClient.invalidateQueries({ queryKey: ['card-chain'] });
       if (res?.data?.status === 'complete') {
-        Alert.alert('Trade complete', 'Ownership transferred. Chain of custody is closed.');
+        showMessage({
+          message: 'Trade complete',
+          description: 'Ownership transferred. Chain of custody is closed.',
+          type: 'success', duration: 3500,
+        });
       } else {
-        Alert.alert('Got it', 'Waiting for the other party to confirm receipt.');
+        showMessage({
+          message: 'Got it',
+          description: 'Waiting for the other party to confirm receipt.',
+          type: 'info', duration: 2500,
+        });
       }
     },
-    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to confirm receipt'),
+    onError: (err, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(txKey, ctx.prev);
+      Alert.alert('Error', err.response?.data?.error || 'Failed to confirm receipt');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: txKey }),
   });
   const cancelMeetupMutation = useMutation({
     mutationFn: () => cstxApi.cancelMeetup(transactionId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] }),
-    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to cancel meetup'),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: txKey });
+      const prev = queryClient.getQueryData(txKey);
+      queryClient.setQueryData(txKey, (old) => old ? {
+        ...old, in_person_meet: false,
+        seller_confirmed_received_at: null,
+        buyer_confirmed_received_at: null,
+      } : old);
+      return { prev };
+    },
+    onError: (err, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(txKey, ctx.prev);
+      Alert.alert('Error', err.response?.data?.error || 'Failed to cancel meetup');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: txKey }),
   });
 
   if (isLoading || !tx) return <LoadingScreen />;

@@ -102,6 +102,16 @@ const NOTIFICATION_MAP = {
   // Stolen-card matches — admin escalations the cardholder reviews.
   stolen_match_for_review:    { icon: 'shield',   color: '#f87171', dest: (_, nav) => nav.navigate('StolenMatchReview') },
   stolen_match_pending:       { icon: 'shield',   color: '#e8c547', dest: (_, nav) => nav.navigate('Notifications') },
+
+  // Generic deal lifecycle (trade complete, counterparty confirmed
+  // receipt, meetup switched, shipped, etc.). Carries cstx_id in
+  // data and routes to the Transaction screen — that's where the
+  // review prompt and next-step UI live.
+  binder_deal_update:         { icon: 'receipt',  color: Colors.accent, dest: transactionDest },
+
+  // Card-traded-away — losing offerer notification when the listing
+  // owner picked someone else.
+  trade_listing_traded_away:  { icon: 'close-circle', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') },
 };
 const defaultNotifCfg = { icon: 'notifications', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') };
 
