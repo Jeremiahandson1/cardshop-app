@@ -2,6 +2,22 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, adminApi } from '../services/api';
 
+// React Query cache handle, registered from App.js after construction.
+// We can't import queryClient directly here — App.js imports authStore
+// at module-load, so that would be a circular import. Instead App.js
+// calls registerQueryClient(queryClient) once on startup, and we use
+// it to clear cached per-user data on every account swap (login,
+// register, logout, impersonate, stopImpersonating). Without this,
+// queries keyed ['my-binders'] / ['cards'] / etc. cached under user
+// A keep returning A's data to user B until React Query happens to
+// refetch — manifests as "two accounts show identical binders".
+let _queryClient = null;
+export const registerQueryClient = (qc) => { _queryClient = qc; };
+const wipeQueryCache = () => {
+  try { _queryClient?.clear(); }
+  catch (err) { console.warn('[auth] queryClient.clear failed:', err?.message); }
+};
+
 export const useAuthStore = create((set, get) => ({
   user: null,
   isLoading: true,
@@ -90,6 +106,7 @@ export const useAuthStore = create((set, get) => ({
     const { user, accessToken, refreshToken, deletion_cancelled } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);
+    wipeQueryCache();
     set({ user, isAuthenticated: true });
     // Return the full login payload so the caller can surface welcome-back
     // messaging when the server cancelled a pending deletion.
@@ -101,6 +118,7 @@ export const useAuthStore = create((set, get) => ({
     const { user, accessToken, refreshToken } = res.data || {};
     await SecureStore.setItemAsync('access_token', accessToken);
     await SecureStore.setItemAsync('refresh_token', refreshToken);
+    wipeQueryCache();
     set({ user, isAuthenticated: true });
     return user;
   },
@@ -113,6 +131,7 @@ export const useAuthStore = create((set, get) => ({
     await SecureStore.deleteItemAsync('_admin_access_token').catch(() => {});
     await SecureStore.deleteItemAsync('_admin_refresh_token').catch(() => {});
     await SecureStore.deleteItemAsync('_impersonating').catch(() => {});
+    wipeQueryCache();
     set({ user: null, isAuthenticated: false, isLoading: false, impersonating: null });
   },
 
@@ -148,6 +167,7 @@ export const useAuthStore = create((set, get) => ({
       adminUsername: me.username || me.display_name || 'admin',
     };
     await SecureStore.setItemAsync('_impersonating', JSON.stringify(ctx));
+    wipeQueryCache();
     set({ user: asUser, isAuthenticated: true, impersonating: ctx });
     return asUser;
   },
@@ -163,6 +183,7 @@ export const useAuthStore = create((set, get) => ({
     await SecureStore.deleteItemAsync('_admin_access_token').catch(() => {});
     await SecureStore.deleteItemAsync('_admin_refresh_token').catch(() => {});
     await SecureStore.deleteItemAsync('_impersonating').catch(() => {});
+    wipeQueryCache();
     set({ impersonating: null });
     // Re-resolve the admin user from the restored token. If this
     // flakes (network), we still cleared impersonation; the next

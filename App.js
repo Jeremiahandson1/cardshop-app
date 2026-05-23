@@ -29,7 +29,7 @@ if (typeof ErrorUtils !== 'undefined' && ErrorUtils.setGlobalHandler) {
 import { RootNavigator } from './src/navigation';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import ImpersonationBanner from './src/components/ImpersonationBanner';
-import { useAuthStore } from './src/store/authStore';
+import { useAuthStore, registerQueryClient } from './src/store/authStore';
 import { LoadingScreen } from './src/components/ui';
 import { Colors } from './src/theme';
 import { registerForPushNotificationsAsync } from './src/services/pushRegistration';
@@ -49,6 +49,13 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Hand the client to authStore so it can wipe per-user cached data
+// on every account swap (login / register / logout / impersonate /
+// stopImpersonating). Without this, queries keyed ['my-binders'] /
+// ['cards'] / etc. cached under user A keep returning A's data after
+// user B logs in until each query happens to refetch.
+registerQueryClient(queryClient);
 
 const AppInner = () => {
   const initialize = useAuthStore((s) => s.initialize);
