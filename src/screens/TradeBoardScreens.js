@@ -2245,14 +2245,18 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   scopeTab: {
-    // Slightly more vertical padding + flexShrink: 0 so the pill
-    // sizes to its label and never gets squeezed by the parent row.
-    // Was clipping descenders ("g" in Global, "p" in Groups) on
-    // Android because the default Text line-height was taller than
-    // (paddingVertical 8 + fontSize 13).
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: Radius.full,
+    // Fixed height + center alignment is more reliable than
+    // padding-based sizing for short pills. The earlier
+    // paddingVertical approach kept clipping descenders ("g" in
+    // Global, "p" in Groups) on Android even with explicit
+    // lineHeight and includeFontPadding off. A fixed 36px pill
+    // with content centered renders identically across Android +
+    // iOS regardless of font metrics.
+    height: 36,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -2266,11 +2270,8 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.sm,
     fontWeight: Typography.semibold,
-    // Explicit lineHeight + includeFontPadding:false stops Android
-    // from cropping descenders inside small pill heights.
-    lineHeight: 16,
+    lineHeight: 18,
     includeFontPadding: false,
-    textAlignVertical: 'center',
   },
   scopeTabTextActive: {
     color: Colors.bg,
