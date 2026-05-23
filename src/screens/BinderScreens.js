@@ -2277,17 +2277,35 @@ export const TransactionScreen = ({ navigation, route }) => {
 
   if (isLoading || !tx) return <LoadingScreen />;
 
-  const isBuyer = tx.buyer_id === user?.id;
-  const isSeller = tx.seller_id === user?.id;
+  // API returns the DB columns verbatim (bt.*) — buyer_user_id /
+  // seller_user_id. The legacy buyer_id / seller_id alias never
+  // existed on this payload, so isBuyer / isSeller were ALWAYS
+  // false here and every gated section ("submit payment", "add
+  // tracking", "confirm delivery", etc.) silently never rendered.
+  const isBuyer = tx.buyer_user_id === user?.id;
+  const isSeller = tx.seller_user_id === user?.id;
 
-  const STEPS = [
-    { key: 'pending_payment', label: 'Pending Payment' },
-    { key: 'payment_submitted', label: 'Payment Submitted' },
-    { key: 'payment_confirmed', label: 'Confirmed' },
-    { key: 'shipped', label: 'Shipped' },
-    { key: 'delivered', label: 'Delivered' },
-    { key: 'complete', label: 'Complete' },
-  ];
+  // Pure trades skip the payment steps — there's no cash to send,
+  // confirm, or receive. They land at payment_confirmed on accept
+  // and progress through shipping. trade_plus_cash and cash still
+  // use the full ladder because the cash side needs the existing
+  // payment-handle flow.
+  const isTrade = tx.transaction_type === 'trade';
+  const STEPS = isTrade
+    ? [
+        { key: 'payment_confirmed', label: 'Accepted' },
+        { key: 'shipped',            label: 'Shipped' },
+        { key: 'delivered',          label: 'Delivered' },
+        { key: 'complete',           label: 'Complete' },
+      ]
+    : [
+        { key: 'pending_payment',   label: 'Pending Payment' },
+        { key: 'payment_submitted', label: 'Payment Submitted' },
+        { key: 'payment_confirmed', label: 'Confirmed' },
+        { key: 'shipped',           label: 'Shipped' },
+        { key: 'delivered',         label: 'Delivered' },
+        { key: 'complete',          label: 'Complete' },
+      ];
   const currentStepIndex = STEPS.findIndex((s) => s.key === tx.status);
 
   const copyToClipboard = async (text) => {
