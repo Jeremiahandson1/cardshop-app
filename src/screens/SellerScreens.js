@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listingsApi, ordersApi, shippingApi, cardsApi, bindersApi,
+  walletApi, listingDefaultsApi,
 } from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -146,11 +147,49 @@ export const CreateListingScreen = ({ navigation, route }) => {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [acceptsOffers, setAcceptsOffers] = useState(false);
 
-  // Pull user's owned cards as the source for "pick card" step.
-  const { data: cardsData } = useQuery({
-    queryKey: ['my-cards-for-listing'],
-    queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
-    enabled: step === 0,
+  // Wallet / Stripe Connect pre-check. The backend rejects listing
+  // creation when charges_enabled = false (see routes/listings.js
+  // "Stripe Connect gate"). Checking on mount lets us route the user
+  // to onboarding before they fill out the form and hit a rejection
+  // at the very last step. summary.onboarded reflects the same
+  // charges_enabled column server-side.
+  const { data: walletSummary, isLoading: walletLoading, refetch: refetchWallet } = useQuery({
+    queryKey: ['wallet-summary-for-listing'],
+    queryFn: () => walletApi.summary(),
+  });
+  const needsOnboarding = walletSummary && walletSummary.configured && !walletSummary.onboarded;
+
+  // Saved listing defaults — pre-fill the shipping picker so a repeat
+  // seller doesn't re-pick the same tiers every time. First-timers see
+  // an empty picker; the standard SHIP-OPTIONS template kicks in for
+  // them and saves on success.
+  const { data: defaultsData } = useQuery({
+    queryKey: ['listing-defaults'],
+    queryFn: () => listingDefaultsApi.get().then((r) => r.data),
+  });
+  React.useEffect(() => {
+    const saved = defaultsData?.defaults?.shipping_options;
+    if (Array.isArray(saved) && saved.length && shippingOptions.length === 0) {
+      setShippingOptions(saved);
+    }
+  // shippingOptions intentionally omitted — we only want the prefill
+  // once, when the user lands on this screen with an empty picker.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultsData]);
+
+  const onboardMut = useMutation({
+    mutationFn: () => walletApi.startOnboarding({
+      return_url: 'cardshop://wallet/return',
+      refresh_url: 'cardshop://wallet/refresh',
+    }),
+    onSuccess: (out) => {
+      if (out?.url) {
+        Linking.openURL(out.url);
+      } else {
+        Alert.alert('Onboarding unavailable', out?.detail || 'Try again in a minute.');
+      }
+    },
+    onError: (err) => Alert.alert('Onboarding failed', err?.response?.data?.error || err.message),
   });
 
   const createMut = useMutation({
@@ -167,6 +206,10 @@ export const CreateListingScreen = ({ navigation, route }) => {
       accepts_offers: acceptsOffers,
     }),
     onSuccess: (out) => {
+      // Save the shipping tiers as the user's new default. Fire and
+      // forget — a failed save here doesn't invalidate the listing
+      // that just succeeded.
+      listingDefaultsApi.save({ shipping_options: shippingOptions }).catch(() => {});
       Alert.alert(
         'Listed!',
         out.warnings?.length
@@ -177,6 +220,22 @@ export const CreateListingScreen = ({ navigation, route }) => {
     },
     onError: (err) => {
       const data = err.response?.data;
+      // Fallback: server rejected because Connect isn't set up. This
+      // shouldn't happen if the pre-check fired correctly, but it
+      // protects against race conditions (e.g. account disabled
+      // between mount and submit).
+      if (data?.error === 'connect_required') {
+        Alert.alert(
+          'Set up payouts first',
+          data.detail || 'You need a connected account to list cards.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Set up now', onPress: () => onboardMut.mutate() },
+          ],
+        );
+        refetchWallet();
+        return;
+      }
       const msg = data?.errors
         ? data.errors.map((e) => e.message).join('\n')
         : data?.error || err.message;
@@ -185,6 +244,65 @@ export const CreateListingScreen = ({ navigation, route }) => {
   });
 
   const cards = cardsData?.cards || [];
+
+  // Loading the wallet status pre-empts the form. Brief blocking
+  // spinner > letting the user fill out the wizard and then bouncing
+  // them at submit time.
+  if (walletLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScreenHeader title="Sell" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={Colors.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Stripe Connect gate. Funds need a place to land before a listing
+  // can exist. "Lite onboarding" is in effect — the seller only has
+  // to provide the minimum KYC fields up front (legal name, DOB,
+  // last-4 SSN). Bank account / full SSN is deferred until they
+  // actually want to withdraw.
+  if (needsOnboarding) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScreenHeader title="Sell" />
+        <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.lg }}>
+          <View style={{
+            backgroundColor: Colors.surface,
+            borderRadius: Radius.lg,
+            borderWidth: 1, borderColor: Colors.border,
+            padding: Spacing.lg, gap: Spacing.md,
+          }}>
+            <Ionicons name="card-outline" size={32} color={Colors.accent} />
+            <Text style={{ fontSize: Typography.lg, fontWeight: Typography.semibold, color: Colors.text }}>
+              Set up payouts to start selling
+            </Text>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 20 }}>
+              Card Shop uses Stripe to hold your sale proceeds in your wallet until you
+              choose to withdraw. You'll need to share your legal name, date of birth,
+              and the last four digits of your SSN. Adding a bank account is optional now
+              and only required when you withdraw.
+            </Text>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, lineHeight: 18 }}>
+              Takes about two minutes. Card Shop never sees your SSN or bank details — Stripe handles that directly.
+            </Text>
+            <Button
+              title={onboardMut.isPending ? 'Opening Stripe…' : 'Set up payouts'}
+              onPress={() => onboardMut.mutate()}
+              loading={onboardMut.isPending}
+            />
+            <TouchableOpacity onPress={() => refetchWallet()}>
+              <Text style={{ color: Colors.accent, textAlign: 'center', fontSize: Typography.sm }}>
+                Already finished? Refresh status
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
