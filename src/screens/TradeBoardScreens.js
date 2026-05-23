@@ -1607,6 +1607,7 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterNote, setCounterNote] = useState('');
   const [valueGap, setValueGap] = useState('');
+  const [messageDraft, setMessageDraft] = useState('');
 
   const { data: offer, isLoading } = useQuery({
     queryKey: ['offer-detail', offerId],
@@ -1624,12 +1625,13 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
     onSuccess: (res) => {
       analytics.track(Events.OFFER_ACCEPTED, { offer_id: offerId });
       refetchAll();
-      // Jump straight into the transaction screen so the next steps
-      // (tracking, shipping, transfer ownership) are obvious. Falls
-      // back to an alert if the API didn't return a transaction id.
+      // Push the transaction screen so next steps (tracking,
+      // shipping, transfer ownership) are obvious. Push, not replace
+      // — back returns to the offer thread, which doubles as the
+      // long-running message log for the deal.
       const txId = res?.data?.transaction_id;
       if (txId) {
-        navigation.replace('Transaction', { transactionId: txId });
+        navigation.navigate('Transaction', { transactionId: txId });
       } else {
         Alert.alert('Accepted', 'Trade accepted. Open the transaction from your offers list to add tracking.');
       }
@@ -1710,6 +1712,19 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
         err?.response?.data?.error || err?.message || 'Try again in a moment.',
       );
     },
+  });
+
+  // Message thread — both parties can append messages to the
+  // offer's thread before AND after acceptance. The trade offer
+  // screen doubles as the message log for the full life of the
+  // deal so the user has one stable place to coordinate.
+  const sendMessage = useMutation({
+    mutationFn: (text) => offersApi.message(offerId, { message: text }),
+    onSuccess: () => {
+      setMessageDraft('');
+      refetchAll();
+    },
+    onError: (err) => Alert.alert('Could not send', err?.response?.data?.error || 'Try again.'),
   });
 
   const counter = useMutation({
@@ -1868,7 +1883,31 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
             ) : null}
           </View>
         ))}
-        {!offer.thread?.length && <Text style={styles.threadEmpty}>No messages.</Text>}
+        {!offer.thread?.length && <Text style={styles.threadEmpty}>No messages yet.</Text>}
+
+        {/* Compose. Both parties can send messages at any point in
+            the offer life cycle (pending, countered, accepted) so
+            the offer screen is the single coordination surface for
+            the trade. */}
+        {(amIRecipient || amISender) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                value={messageDraft}
+                onChangeText={setMessageDraft}
+                placeholder="Send a message…"
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+            <Button
+              title="Send"
+              onPress={() => sendMessage.mutate(messageDraft.trim())}
+              disabled={!messageDraft.trim() || sendMessage.isPending}
+              loading={sendMessage.isPending}
+            />
+          </View>
+        ) : null}
 
         {/* Trade Fairness Scoring — rendered for any active party. Hides
             itself on 409/403. Rate-limited (429) shows a compact notice but
