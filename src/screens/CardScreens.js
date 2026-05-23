@@ -1083,6 +1083,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         year: fields.year ? String(fields.year) : '',
         card_number: fields.card_number ? String(fields.card_number) : '',
         set_name: fields.set_name || '',
+        subset_name: fields.subset || '',
         manufacturer: fields.manufacturer || '',
         team: fields.team || '',
         sport: fields.sport || '',
@@ -1814,6 +1815,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <Input label="Year" value={scanReview.year} onChangeText={updateField('year')} keyboardType="number-pad" />
           <Input label="Card #" value={scanReview.card_number} onChangeText={updateField('card_number')} />
           <Input label="Set name (optional)" value={scanReview.set_name} onChangeText={updateField('set_name')} />
+          <Input label="Subset / insert (optional)" value={scanReview.subset_name} onChangeText={updateField('subset_name')} placeholder="Mirror Signatures, Color Blast..." />
           <Input label="Manufacturer (optional)" value={scanReview.manufacturer} onChangeText={updateField('manufacturer')} />
           <Input label="Parallel / variant" value={scanReview.parallel} onChangeText={updateField('parallel')} />
           {scanReview.parallel_evidence ? (
@@ -1962,7 +1964,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                 year: scanReview.year ? Number(scanReview.year) || scanReview.year : cascade.year,
                 manufacturer: scanReview.manufacturer || cascade.manufacturer,
                 set_name: scanReview.set_name || cascade.set_name,
-                subset_name: cascade.subset_name,
+                subset_name: scanReview.subset_name || cascade.subset_name,
                 player_name: scanReview.player_name || cascade.player_name,
                 card_number: scanReview.card_number || cascade.card_number,
                 parallel: scanReview.parallel || cascade.parallel,
@@ -1996,6 +1998,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                     year: newCascade.year,
                     manufacturer: newCascade.manufacturer,
                     set_name: newCascade.set_name,
+                    subset_name: newCascade.subset_name,
                     player_name: newCascade.player_name,
                     parallel: newCascade.parallel,
                     limit: 5,
@@ -2019,6 +2022,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   year: newCascade.year ? String(newCascade.year) : f.year,
                   manufacturer: newCascade.manufacturer || f.manufacturer,
                   set_name: newCascade.set_name || f.set_name,
+                  subset_name: newCascade.subset_name || f.subset_name,
                   player_name: newCascade.player_name || f.player_name,
                   card_number: newCascade.card_number || f.card_number,
                   parallel: newCascade.parallel || f.parallel,
