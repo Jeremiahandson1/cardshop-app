@@ -508,6 +508,14 @@ const TradeStack = () => (
     {/* CardDetail registered in this stack so trade offer rows can
         navigate into full card inspection without leaving the Trade tab. */}
     <TradeStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    {/* CardDetail has Transfer + View-chain buttons that previously
+        silently no-op'd on this stack because these screens were only
+        registered under Profile/Collection/Binder. Also Transaction so
+        accepted-offer banners can jump straight into ship/tracking. */}
+    <TradeStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <TradeStackNav.Screen name="CardChain" component={CardChainScreen} />
+    <TradeStackNav.Screen name="Transaction" component={TransactionScreen} />
+    <TradeStackNav.Screen name="EditCard" component={EditCardScreen} />
   </TradeStackNav.Navigator>
 );
 

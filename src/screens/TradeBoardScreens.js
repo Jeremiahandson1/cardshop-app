@@ -1621,10 +1621,18 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
 
   const accept = useMutation({
     mutationFn: () => offersApi.accept(offerId),
-    onSuccess: () => {
+    onSuccess: (res) => {
       analytics.track(Events.OFFER_ACCEPTED, { offer_id: offerId });
       refetchAll();
-      Alert.alert('Accepted', 'Trade accepted. Arrange the meetup or shipping off-platform.');
+      // Jump straight into the transaction screen so the next steps
+      // (tracking, shipping, transfer ownership) are obvious. Falls
+      // back to an alert if the API didn't return a transaction id.
+      const txId = res?.data?.transaction_id;
+      if (txId) {
+        navigation.replace('Transaction', { transactionId: txId });
+      } else {
+        Alert.alert('Accepted', 'Trade accepted. Open the transaction from your offers list to add tracking.');
+      }
     },
     onError: (err) => {
       Alert.alert(
@@ -1732,6 +1740,10 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
   const amIRecipient = offer.recipient_user_id === user?.id;
   const amISender = offer.sender_user_id === user?.id;
   const canRespond = ['pending', 'countered'].includes(offer.status);
+  // Once accepted the offer becomes a CSTX (binder_transaction).
+  // Surface a deep-link banner so the user has a clear next step —
+  // tracking, ship-confirm, etc. live on the Transaction screen.
+  const acceptedTransactionId = offer.status === 'accepted' ? offer.transaction_id : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
@@ -1751,6 +1763,33 @@ export const TradeOfferDetailScreen = ({ navigation, route }) => {
             Status: <Text style={{ fontWeight: Typography.bold }}>{offer.status}</Text>
           </Text>
         </View>
+
+        {/* Post-accept CTA: the trade is now a CSTX with tracking,
+            shipping, and ownership-transfer surfaces. Without this
+            banner the screen ends at "Status: accepted" and the user
+            has no idea where to go next. */}
+        {acceptedTransactionId ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Transaction', { transactionId: acceptedTransactionId })}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              padding: Spacing.base, marginBottom: Spacing.base,
+              borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+              backgroundColor: Colors.accent + '15',
+            }}
+          >
+            <Ionicons name="receipt" size={20} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
+                Manage this trade
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                Add tracking, confirm shipment, complete the transfer.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
+          </TouchableOpacity>
+        ) : null}
 
         {/* Both sides of the trade — listing card ("For") + offered
             cards ("Offering"). Each row is tappable into CardDetail so

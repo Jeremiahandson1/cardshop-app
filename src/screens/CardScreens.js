@@ -3688,6 +3688,13 @@ export const CardDetailScreen = ({ navigation, route }) => {
   if (isLoading || !card) return <LoadingScreen />;
 
   const isOwner = !!currentUserId && card?.owner_id === currentUserId;
+  // Card is locked into a pending CSTX (offer accepted, transfer not
+  // yet complete). While locked we hide every control that would
+  // change the card's listed/vault/ebay state — those decisions
+  // belong on the Transaction screen now, not here. View-chain stays
+  // visible because it's always informational.
+  const tradeLocked = !!card?.pending_cstx_id;
+  const goToTransaction = () => navigation.navigate('Transaction', { transactionId: card.pending_cstx_id });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -3729,19 +3736,35 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Ionicons name="create-outline" size={13} color={Colors.accent} />
             <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
-            accessibilityLabel="Transfer ownership to another user"
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
-              backgroundColor: Colors.accent + '22',
-              borderWidth: 1, borderColor: Colors.accent + '66',
-            }}
-          >
-            <Ionicons name="swap-horizontal" size={13} color={Colors.accent} />
-            <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Transfer</Text>
-          </TouchableOpacity>
+          {tradeLocked ? (
+            <TouchableOpacity
+              onPress={goToTransaction}
+              accessibilityLabel="Open transaction for this trade"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
+            >
+              <Ionicons name="receipt" size={13} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Trade</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
+              accessibilityLabel="Transfer ownership to another user"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+                backgroundColor: Colors.accent + '22',
+                borderWidth: 1, borderColor: Colors.accent + '66',
+              }}
+            >
+              <Ionicons name="swap-horizontal" size={13} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Transfer</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={confirmDelete}
             accessibilityLabel="Delete this card"
@@ -3761,6 +3784,33 @@ export const CardDetailScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Trade-in-progress banner. When the card is part of an
+            active CSTX, every "list / unlist / make offer / vault /
+            eBay" control below is suppressed and the user is pointed
+            at the Transaction screen for the next step. */}
+        {tradeLocked ? (
+          <TouchableOpacity
+            onPress={goToTransaction}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              marginHorizontal: Spacing.base, marginTop: Spacing.base,
+              padding: Spacing.base,
+              borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+              backgroundColor: Colors.accent + '15',
+            }}
+          >
+            <Ionicons name="receipt" size={20} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
+                Trade in progress · {card.pending_cstx_id}
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                Add tracking, confirm shipment, complete the transfer.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
+          </TouchableOpacity>
+        ) : null}
         {/* Card image — prefer the owner's uploaded photos (photo_urls
             first, then the dedicated image_front/back fields) because
             most Panini/Topps catalog rows ship with no stock image.
@@ -4021,8 +4071,9 @@ export const CardDetailScreen = ({ navigation, route }) => {
               active listing exists; setting Showcase archives any
               existing listing via the migration-028 trigger. The
               user thinks "is this card tradeable?" and the data
-              model follows. */}
-          {card?.owner_id === currentUserId ? (
+              model follows. Hidden while a trade is in progress —
+              intent can't change while the card is mid-CSTX. */}
+          {card?.owner_id === currentUserId && !tradeLocked ? (
             <View style={{ marginTop: Spacing.lg }}>
               <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.sm }}>
                 Trade status
@@ -4335,6 +4386,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
                     Show-floor sales are in-person only — walk to the table to make an offer.
                   </Text>
                 </View>
+              ) : tradeLocked ? (
+                // Card is in a pending CSTX — third parties (and the
+                // counterparty) can't open another offer on it.
+                null
               ) : (
                 <>
                   {card.for_sale && card.offer_binder_id ? (
@@ -4490,8 +4545,9 @@ export const CardDetailScreen = ({ navigation, route }) => {
               an action button to move into / out of vault. The
               chain-of-custody story: when card moves to vault we
               drop verification to vault_verified; when shipped out,
-              user is prompted to pair-scan to re-establish gold. */}
-          {card.vault_provider ? (
+              user is prompted to pair-scan to re-establish gold.
+              Hidden during a pending CSTX (can't vault a card mid-deal). */}
+          {tradeLocked ? null : card.vault_provider ? (
             <View style={{
               marginTop: Spacing.md,
               padding: Spacing.md,
@@ -4637,46 +4693,54 @@ export const CardDetailScreen = ({ navigation, route }) => {
             </SafeAreaView>
           </Modal>
 
-          {/* Transfer button */}
-          <Button
-            title="Transfer Ownership"
-            onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
-            style={{ marginTop: Spacing.lg }}
-          />
+          {/* Manual transfer button. Hidden during a pending CSTX —
+              ownership transfers automatically when the trade
+              completes, so a manual InitiateTransfer would either
+              double-send or lock the card out of the in-progress
+              deal. Surface the Transaction CTA instead. */}
+          {tradeLocked ? null : (
+            <Button
+              title="Transfer Ownership"
+              onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
+              style={{ marginTop: Spacing.lg }}
+            />
+          )}
 
-          {/* List on eBay — gated until the feature flag flips on.
-              Integrations lives only in the Profile stack; if this screen
-              is reached from another stack we surface a hint Alert. */}
-          <View style={{ marginTop: Spacing.md }}>
-            {!ebayEnabled ? (
-              <View style={styles.ebayDisabled}>
-                <Ionicons name="pricetags-outline" size={16} color={Colors.textMuted} />
-                <Text style={styles.ebayDisabledText}>List on eBay</Text>
-                <View style={styles.ebayComingSoon}>
-                  <Text style={styles.ebayComingSoonText}>Coming Soon</Text>
+          {/* List on eBay — gated until the feature flag flips on,
+              and suppressed entirely when the card is locked in a
+              pending CSTX (can't list a card you're already moving). */}
+          {tradeLocked ? null : (
+            <View style={{ marginTop: Spacing.md }}>
+              {!ebayEnabled ? (
+                <View style={styles.ebayDisabled}>
+                  <Ionicons name="pricetags-outline" size={16} color={Colors.textMuted} />
+                  <Text style={styles.ebayDisabledText}>List on eBay</Text>
+                  <View style={styles.ebayComingSoon}>
+                    <Text style={styles.ebayComingSoonText}>Coming Soon</Text>
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <Button
-                title="List on eBay"
-                variant="teal"
-                onPress={() => {
-                  if (!ebayConnected) {
-                    try {
-                      navigation.navigate('Integrations');
-                    } catch (_e) {
-                      Alert.alert(
-                        'Connect eBay',
-                        'Open Profile › Integrations to connect your eBay account first.'
-                      );
+              ) : (
+                <Button
+                  title="List on eBay"
+                  variant="teal"
+                  onPress={() => {
+                    if (!ebayConnected) {
+                      try {
+                        navigation.navigate('Integrations');
+                      } catch (_e) {
+                        Alert.alert(
+                          'Connect eBay',
+                          'Open Profile › Integrations to connect your eBay account first.'
+                        );
+                      }
+                      return;
                     }
-                    return;
-                  }
-                  Alert.alert('Coming Soon', 'Listing flow coming soon.');
-                }}
-              />
-            )}
-          </View>
+                    Alert.alert('Coming Soon', 'Listing flow coming soon.');
+                  }}
+                />
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
