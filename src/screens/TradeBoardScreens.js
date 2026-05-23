@@ -489,7 +489,16 @@ export const TradeBoardScreen = ({ navigation, route }) => {
 
 const ScopeTab = ({ label, active, onPress }) => (
   <TouchableOpacity style={[styles.scopeTab, active && styles.scopeTabActive]} onPress={onPress}>
-    <Text style={[styles.scopeTabText, active && styles.scopeTabTextActive]}>{label}</Text>
+    {/* numberOfLines={1} ensures the label stays single-line; the
+        pill is in a horizontal ScrollView so overflow scrolls
+        rather than wrapping or truncating. */}
+    <Text
+      style={[styles.scopeTabText, active && styles.scopeTabTextActive]}
+      numberOfLines={1}
+      ellipsizeMode="clip"
+    >
+      {label}
+    </Text>
   </TouchableOpacity>
 );
 
@@ -2236,12 +2245,18 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   scopeTab: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    // Slightly more vertical padding + flexShrink: 0 so the pill
+    // sizes to its label and never gets squeezed by the parent row.
+    // Was clipping descenders ("g" in Global, "p" in Groups) on
+    // Android because the default Text line-height was taller than
+    // (paddingVertical 8 + fontSize 13).
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: Radius.full,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    flexShrink: 0,
   },
   scopeTabActive: {
     backgroundColor: Colors.accent,
@@ -2251,6 +2266,11 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.sm,
     fontWeight: Typography.semibold,
+    // Explicit lineHeight + includeFontPadding:false stops Android
+    // from cropping descenders inside small pill heights.
+    lineHeight: 16,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   scopeTabTextActive: {
     color: Colors.bg,
