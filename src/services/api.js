@@ -468,6 +468,14 @@ export const cstxApi = {
   waiveVideo: (id) => api.post(`/transactions/${id}/video/waive`),
   // Theme E1 — carrier tracking link-out
   trackingUrl: (id) => api.get(`/transactions/${id}/tracking-url`),
+  // In-person meetup path. meetInPerson flips the flag (notifies
+  // the other party). confirmReceived stamps the caller's receipt
+  // timestamp; once both parties have confirmed the transaction
+  // completes + ownership transfers. cancelMeetup reverts to the
+  // shipping path.
+  meetInPerson: (id) => api.post(`/transactions/${id}/meet-in-person`),
+  confirmReceived: (id) => api.post(`/transactions/${id}/confirm-received`),
+  cancelMeetup: (id) => api.post(`/transactions/${id}/cancel-meetup`),
 };
 
 // ============================================================

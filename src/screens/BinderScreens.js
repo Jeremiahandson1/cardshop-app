@@ -2275,6 +2275,36 @@ export const TransactionScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to confirm delivery'),
   });
 
+  // ── In-person meetup path ────────────────────────────────────
+  const meetInPersonMutation = useMutation({
+    mutationFn: () => cstxApi.meetInPerson(transactionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] });
+    },
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to switch to in-person meetup'),
+  });
+  const confirmReceivedMutation = useMutation({
+    mutationFn: () => cstxApi.confirmReceived(transactionId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] });
+      // Always invalidate the chain query — receipt confirmation
+      // may have flipped the transaction to complete + transferred
+      // ownership, in which case the chain timeline grew.
+      queryClient.invalidateQueries({ queryKey: ['card-chain'] });
+      if (res?.data?.status === 'complete') {
+        Alert.alert('Trade complete', 'Ownership transferred. Chain of custody is closed.');
+      } else {
+        Alert.alert('Got it', 'Waiting for the other party to confirm receipt.');
+      }
+    },
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to confirm receipt'),
+  });
+  const cancelMeetupMutation = useMutation({
+    mutationFn: () => cstxApi.cancelMeetup(transactionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] }),
+    onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to cancel meetup'),
+  });
+
   if (isLoading || !tx) return <LoadingScreen />;
 
   // API returns the DB columns verbatim (bt.*) — buyer_user_id /
@@ -2506,8 +2536,105 @@ export const TransactionScreen = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* ── In-person meetup path ────────────────────────────
+            Either party can switch into the meetup flow instead of
+            shipping. While meetup is active, both parties confirm
+            receipt and ownership transfers when both have. */}
+        {(isBuyer || isSeller) && tx.status === 'payment_confirmed' && !tx.in_person_meet ? (
+          <View style={{
+            marginTop: Spacing.sm, padding: Spacing.md,
+            borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+            backgroundColor: Colors.surface,
+          }}>
+            <Text style={{ color: Colors.text, fontWeight: Typography.semibold, marginBottom: 4 }}>
+              Meeting up in person?
+            </Text>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm, lineHeight: 17 }}>
+              Skip shipping + tracking. Both parties confirm receipt at the meetup and ownership transfers right there.
+            </Text>
+            <Button
+              title="Switch to in-person meetup"
+              variant="secondary"
+              onPress={() => Alert.alert(
+                'Switch to in-person?',
+                'You can still cancel and go back to shipping if plans change. The other party will be notified.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Switch', onPress: () => meetInPersonMutation.mutate() },
+                ],
+              )}
+              loading={meetInPersonMutation.isPending}
+            />
+          </View>
+        ) : null}
+
+        {(isBuyer || isSeller) && tx.in_person_meet && tx.status !== 'complete' ? (
+          <View style={{
+            marginTop: Spacing.sm, padding: Spacing.md,
+            borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accent,
+            backgroundColor: Colors.accent + '15',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Ionicons name="people" size={18} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontWeight: Typography.bold }}>
+                In-person meetup
+              </Text>
+            </View>
+            <Text style={{ color: Colors.text, fontSize: Typography.sm, marginBottom: Spacing.sm, lineHeight: 18 }}>
+              {(() => {
+                const meConfirmed = isSeller ? !!tx.seller_confirmed_received_at : !!tx.buyer_confirmed_received_at;
+                const otherConfirmed = isSeller ? !!tx.buyer_confirmed_received_at : !!tx.seller_confirmed_received_at;
+                if (meConfirmed && otherConfirmed) return 'Both sides confirmed — completing the trade…';
+                if (meConfirmed) return 'You confirmed receipt. Waiting on the other party.';
+                if (otherConfirmed) return 'The other party confirmed they got their cards. Confirm you got yours to close the trade.';
+                return 'When you meet up and swap cards, each party taps the button below to confirm receipt.';
+              })()}
+            </Text>
+            {!(isSeller ? tx.seller_confirmed_received_at : tx.buyer_confirmed_received_at) ? (
+              <Button
+                title="I got my cards"
+                onPress={() => Alert.alert(
+                  'Confirm receipt?',
+                  "Only tap this once you physically have the cards in hand. Ownership transfers as soon as both parties confirm.",
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', onPress: () => confirmReceivedMutation.mutate() },
+                  ],
+                )}
+                loading={confirmReceivedMutation.isPending}
+              />
+            ) : (
+              <View style={{
+                padding: Spacing.sm, borderRadius: Radius.md,
+                backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+              }}>
+                <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
+                <Text style={{ color: Colors.text, fontSize: Typography.xs }}>
+                  You confirmed receipt at {new Date(isSeller ? tx.seller_confirmed_received_at : tx.buyer_confirmed_received_at).toLocaleString()}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                'Cancel meetup?',
+                'Reverts this trade back to standard shipping. Both receipt confirmations are cleared.',
+                [
+                  { text: 'Keep meetup', style: 'cancel' },
+                  { text: 'Cancel meetup', style: 'destructive', onPress: () => cancelMeetupMutation.mutate() },
+                ],
+              )}
+              style={{ alignSelf: 'center', marginTop: Spacing.sm, padding: Spacing.xs }}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>
+                Cancel meetup
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Seller: add tracking (gated behind pack-out video if required) */}
-        {isSeller && tx.status === 'payment_confirmed' && (videoStatus?.packout?.recorded || !videoStatus?.video_required || videoStatus?.waiver?.fully_waived) && (
+        {isSeller && tx.status === 'payment_confirmed' && !tx.in_person_meet && (videoStatus?.packout?.recorded || !videoStatus?.video_required || videoStatus?.waiver?.fully_waived) && (
           <View>
             {/* E3 — signature confirmation recommendation for high-value
                 shipments. Stops "delivered = stolen porch" disputes. */}
