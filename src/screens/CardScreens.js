@@ -3863,6 +3863,37 @@ export const CardDetailScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             );
           }
+          // Two photos: render side-by-side at half-container width
+          // each. The horizontal-scroll carousel below was cutting
+          // the second photo off on cards with square (1024x1024)
+          // sources — portrait-aspect photos happened to look fine
+          // because they fit closer to the 200x280 image box. Two
+          // photos is the common "front + back" case, so making them
+          // both fully visible matters more than a swipe affordance.
+          // Three+ still uses the scroll carousel.
+          if (ownPhotos.length === 2) {
+            return (
+              <View style={[
+                styles.cardImageArea,
+                { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.base },
+              ]}>
+                {ownPhotos.map((uri, i) => (
+                  <TouchableOpacity
+                    key={`${uri}-${i}`}
+                    activeOpacity={0.85}
+                    onPress={() => openLightbox(i)}
+                    style={{ flex: 1, height: 280, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          }
           return (
             <ScrollView
               horizontal
