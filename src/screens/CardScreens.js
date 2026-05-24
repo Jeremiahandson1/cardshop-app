@@ -3513,14 +3513,25 @@ export const CardDetailScreen = ({ navigation, route }) => {
   const [vaultPickerLocker, setVaultPickerLocker] = useState('');
   const [vaultPickerReceipt, setVaultPickerReceipt] = useState('');
 
-  // Live eBay active-ask summary for the catalog row. We
-  // deliberately don't show sold-comp medians — eBay deprecated
-  // Finding API in 2024 and the Marketplace Insights replacement
-  // is gated. Third-party SOLD data is one-click away via the
-  // research_links block below.
+  // Live eBay active-ask summary for the catalog row. Pass the
+  // OWNED card's grade + print_run so the comps come back filtered
+  // to comparable listings (a PSA 10 doesn't pool with raw, a /99
+  // doesn't pool with /150). Cache key includes these refinements
+  // so React Query doesn't serve a raw response for a graded card.
+  const askGradeCompany =
+    card?.grading_company && card.grading_company !== 'raw'
+      ? card.grading_company
+      : null;
+  const askGrade = askGradeCompany ? card?.grade || null : null;
+  const askPrintRun = card?.print_run || null;
+  const askParams = {
+    ...(askGradeCompany ? { grading_company: askGradeCompany } : {}),
+    ...(askGrade ? { grade: askGrade } : {}),
+    ...(askPrintRun ? { print_run: askPrintRun } : {}),
+  };
   const { data: asks } = useQuery({
-    queryKey: ['catalog-asks', card?.catalog_id],
-    queryFn: () => catalogApi.marketAsks(card.catalog_id).then((r) => r.data),
+    queryKey: ['catalog-asks', card?.catalog_id, askGradeCompany, askGrade, askPrintRun],
+    queryFn: () => catalogApi.marketAsks(card.catalog_id, askParams).then((r) => r.data),
     enabled: !!card?.catalog_id,
     staleTime: 5 * 60 * 1000,
   });

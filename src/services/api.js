@@ -142,7 +142,10 @@ export const catalogApi = {
   get: (id) => api.get(`/catalog/${id}`),
   // Live active-listing asks on eBay, plus links to research sold
   // prices on third-party tools (we don't host sold comps).
-  marketAsks: (id) => api.get(`/catalog/${id}/market-asks`),
+  // The caller passes the owned-card's grade + print_run so the
+  // comps come back filtered to comparable listings — a PSA 10
+  // query doesn't pool with raw, a /99 doesn't pool with /150.
+  marketAsks: (id, params) => api.get(`/catalog/${id}/market-asks`, { params }),
   create: (data) => api.post('/catalog', data),
   priceHistory: (id, params) => api.get(`/catalog/${id}/price-history`, { params }),
   parallels: (id) => api.get(`/catalog/${id}/parallels`),
