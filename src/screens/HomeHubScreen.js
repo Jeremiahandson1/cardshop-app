@@ -143,13 +143,16 @@ export const HomeHubScreen = ({ navigation }) => {
   const hasShowFloor = isAdmin || SHOW_FLOOR_TIERS.has(user?.subscription_tier);
 
   const onTilePress = (tile) => {
-    // Per-tile resolution. Show Floor is gated on tier — non-paying
-    // users land on the upsell explainer instead of the live hub.
     let target;
     if (tile.key === 'show-floor') {
-      target = hasShowFloor
-        ? { tab: 'Profile', screen: 'ShowFloorHub' }
-        : { tab: 'Profile', screen: 'ShowFloorUpsell' };
+      // ShowFloorHub is the buyer-friendly chooser ("I'm selling" vs
+      // "Shop a show"). Always send everyone there — the per-side
+      // gate lives inside the hub now, so buyers can scan a show
+      // without having to go through the seller upsell page first.
+      // Previously, non-paying users got dumped on the upsell
+      // explainer with no way to even browse — making "shop the
+      // show floor" effectively hidden inside Profile.
+      target = { tab: 'Profile', screen: 'ShowFloorHub' };
     } else if (tile.key === 'collection') {
       target = { tab: 'Binders' };
     } else if (tile.key === 'local-lcs') {
@@ -288,19 +291,9 @@ export const HomeHubScreen = ({ navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.tileTitle}>{tile.title}</Text>
-                <Text style={styles.tileSubtitle}>
-                  {tile.key === 'show-floor' && !hasShowFloor
-                    ? 'Tap to learn more'
-                    : subtitleFor(tile)}
-                </Text>
+                <Text style={styles.tileSubtitle}>{subtitleFor(tile)}</Text>
               </View>
-              {tile.key === 'show-floor' && !hasShowFloor ? (
-                <View style={styles.upgradeChip}>
-                  <Text style={styles.upgradeChipText}>UPGRADE</Text>
-                </View>
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-              )}
+              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           ))}
         </View>

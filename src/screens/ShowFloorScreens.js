@@ -50,13 +50,20 @@ const US_STATE_LOOKUP = (() => {
 // HUB
 // ============================================================
 
+// Tiers that include Show Floor seller access. Collector Pro does
+// NOT — Show Floor is a $24.99 standalone upgrade. Stores get it
+// bundled. Buyers (Shop a show) are not gated at all.
+const SHOW_FLOOR_SELLER_TIERS = new Set(['show_floor', 'store_starter', 'store_pro']);
+
 export const ShowFloorHubScreen = ({ navigation }) => {
   // Two-mode hub: "I'm selling at a show" vs "I'm shopping a show".
-  // Picking either lands the user in a focused flow. No tabs, no
-  // state filter, no nationwide collector feed — those live one
-  // tap away on the "Browse" link if needed.
+  // Selling is tier-gated (lands non-paying users on the seller
+  // upsell); shopping is free. Hub itself is reachable from the
+  // home screen for everyone so buyers don't have to dig.
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin' || user?.is_admin === true;
+  const canSell = isAdmin || SHOW_FLOOR_SELLER_TIERS.has(user?.subscription_tier);
 
   const { data: meData, refetch: refetchMe } = useQuery({
     queryKey: ['show-floor-me'],
@@ -148,12 +155,18 @@ export const ShowFloorHubScreen = ({ navigation }) => {
 
       {/* Two big tiles: sell vs shop. Selling tile changes wording
           when the user is already checked in (manage booth). Shop
-          tile always opens to the event picker. */}
+          tile always opens to the event picker. Selling is gated
+          on tier — non-paying users routes to the seller upsell
+          instead of the check-in flow; shopping has no gate. */}
       <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
         <TouchableOpacity
           activeOpacity={0.85}
           style={[styles.actionTile, { backgroundColor: 'rgba(232,197,71,0.10)', borderColor: 'rgba(232,197,71,0.45)' }]}
           onPress={() => {
+            if (!canSell) {
+              navigation.navigate('ShowFloorUpsell');
+              return;
+            }
             if (me) navigation.navigate('ManageBooth');
             else navigation.navigate('ShowFloorCheckIn');
           }}
@@ -166,10 +179,20 @@ export const ShowFloorHubScreen = ({ navigation }) => {
               {me ? 'Manage my booth' : "I'm selling at a show"}
             </Text>
             <Text style={styles.actionSubtitle}>
-              {me ? 'Edit prices, swap cards on/off the floor' : 'Pick binders, set table number, go live'}
+              {me
+                ? 'Edit prices, swap cards on/off the floor'
+                : canSell
+                  ? 'Pick binders, set table number, go live'
+                  : 'Add Show Floor to your plan to start selling'}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+          {canSell ? (
+            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+          ) : (
+            <View style={styles.upgradeChip}>
+              <Text style={styles.upgradeChipText}>UPGRADE</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -827,6 +850,12 @@ const styles = StyleSheet.create({
     color: Colors.text, marginBottom: 2,
   },
   actionSubtitle: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
+  upgradeChip: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999,
+    backgroundColor: 'rgba(232,197,71,0.20)',
+    borderWidth: 1, borderColor: 'rgba(232,197,71,0.50)',
+  },
+  upgradeChipText: { color: '#e8c547', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   container: { flex: 1, backgroundColor: Colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
