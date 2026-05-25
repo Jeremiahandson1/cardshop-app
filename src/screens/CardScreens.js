@@ -25,6 +25,100 @@ import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardInt
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
+import Svg, { Polyline, Line as SvgLine, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
+
+// Minimal SVG line chart for the card detail price history. Pure
+// inline component — keeps the dependency footprint to just
+// react-native-svg (transitively present via expo). Renders one
+// point per day after client-side aggregation (median per day +
+// CSTX flag) so a same-day burst doesn't stack ticks.
+function PriceHistoryChart({ points, summary, height = 160 }) {
+  if (!points || points.length === 0) return null;
+
+  // Aggregate to one point per day — same algorithm as the web
+  // version. CSTX flag bubbles up so the dot can render larger.
+  const byDate = new Map();
+  for (const p of points) {
+    if (!byDate.has(p.date)) byDate.set(p.date, []);
+    byDate.get(p.date).push(p);
+  }
+  const daily = Array.from(byDate.entries()).map(([date, list]) => {
+    const prices = list.map((x) => x.price_usd).sort((a, b) => a - b);
+    const median = prices.length % 2
+      ? prices[(prices.length - 1) / 2]
+      : (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2;
+    const hasCstx = list.some((x) => x.source === 'cardshop_cstx');
+    return { date, median, count: list.length, hasCstx };
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+  if (daily.length < 2) {
+    return (
+      <View style={{ paddingVertical: 12 }}>
+        <Text style={{ color: Colors.textMuted, fontSize: 13, textAlign: 'center' }}>
+          All {points.length} comp{points.length === 1 ? '' : 's'} recorded on {daily[0]?.date} — chart spreads as more days accumulate.
+        </Text>
+      </View>
+    );
+  }
+
+  // Plot dimensions. Padding for axis labels.
+  const PAD_LEFT = 42, PAD_RIGHT = 8, PAD_TOP = 8, PAD_BOTTOM = 24;
+  const W = 320;
+  const H = height;
+  const plotW = W - PAD_LEFT - PAD_RIGHT;
+  const plotH = H - PAD_TOP - PAD_BOTTOM;
+
+  const prices = daily.map((d) => d.median);
+  let yMin = Math.min(...prices);
+  let yMax = Math.max(...prices);
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const yRange = yMax - yMin;
+  const xToCanvas = (i) => PAD_LEFT + (daily.length === 1 ? plotW / 2 : (i / (daily.length - 1)) * plotW);
+  const yToCanvas = (v) => PAD_TOP + plotH - ((v - yMin) / yRange) * plotH;
+
+  const linePoints = daily.map((d, i) => `${xToCanvas(i)},${yToCanvas(d.median)}`).join(' ');
+  const medianY = summary && summary.median ? yToCanvas(summary.median) : null;
+
+  return (
+    <View style={{ alignItems: 'center', marginTop: 4 }}>
+      <Svg width={W} height={H}>
+        {/* Y axis grid: 4 horizontal lines + price labels */}
+        {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+          const y = PAD_TOP + (1 - f) * plotH;
+          const v = yMin + f * yRange;
+          return (
+            <React.Fragment key={`grid-${idx}`}>
+              <SvgLine x1={PAD_LEFT} y1={y} x2={W - PAD_RIGHT} y2={y} stroke={Colors.border} strokeDasharray="2,3" strokeWidth="0.5" />
+              <SvgText x={PAD_LEFT - 4} y={y + 3} fontSize="9" fill={Colors.textMuted} textAnchor="end">
+                ${Math.round(v)}
+              </SvgText>
+            </React.Fragment>
+          );
+        })}
+        {/* Median reference line */}
+        {medianY != null && medianY >= PAD_TOP && medianY <= PAD_TOP + plotH ? (
+          <SvgLine x1={PAD_LEFT} y1={medianY} x2={W - PAD_RIGHT} y2={medianY} stroke={Colors.accent} strokeDasharray="4,3" strokeWidth="1" />
+        ) : null}
+        {/* The line itself */}
+        <Polyline points={linePoints} fill="none" stroke={Colors.accent} strokeWidth="2" />
+        {/* Dots — bigger + filled for CSTX-verified comps */}
+        {daily.map((d, i) => (
+          <SvgCircle
+            key={`dot-${i}`}
+            cx={xToCanvas(i)} cy={yToCanvas(d.median)}
+            r={d.hasCstx ? 4.5 : 2.5}
+            fill={d.hasCstx ? Colors.accent : Colors.surface}
+            stroke={Colors.accent}
+            strokeWidth={d.hasCstx ? 1.5 : 1}
+          />
+        ))}
+        {/* X axis: first + last date */}
+        <SvgText x={PAD_LEFT} y={H - 6} fontSize="9" fill={Colors.textMuted} textAnchor="start">{daily[0].date}</SvgText>
+        <SvgText x={W - PAD_RIGHT} y={H - 6} fontSize="9" fill={Colors.textMuted} textAnchor="end">{daily[daily.length - 1].date}</SvgText>
+      </Svg>
+    </View>
+  );
+}
 
 // Shared hook for eBay feature-flag + connection state. Cached in
 // react-query so IntegrationsScreen and CardDetail share a single fetch.
@@ -3536,6 +3630,17 @@ export const CardDetailScreen = ({ navigation, route }) => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Price history — same snapshot store the dashboard reads from.
+  // Context-aware filter so PSA 10 history doesn't pool with raw.
+  const { data: history180 } = useQuery({
+    queryKey: ['catalog-price-history', card?.catalog_id, askGradeCompany, askGrade, askPrintRun],
+    queryFn: () => catalogApi.priceSnapshots(card.catalog_id, {
+      ...askParams, days: 180, min_score: 85,
+    }).then((r) => r.data),
+    enabled: !!card?.catalog_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data) => cardsApi.update(cardId, data),
     onSuccess: () => {
@@ -4196,7 +4301,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
               {asks.asks?.summary ? (
                 <View style={{ marginTop: (asks.sold?.verified || asks.sold?.asking_only) ? 12 : 0 }}>
                   <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-                    Current asks
+                    Live listings
                   </Text>
                   <Text style={{ color: Colors.text, fontSize: 14 }}>
                     <Text style={{ fontWeight: Typography.semibold }}>${Number(asks.asks.summary.median).toFixed(0)}</Text>
