@@ -219,11 +219,14 @@ export const CheckoutScreen = ({ navigation, route }) => {
   });
 
   const placeMut = useMutation({
-    mutationFn: () => checkoutApi.place({
+    // acceptUnverified rides in as a mutate variable (not state) so the
+    // E6 ≤$20 "buy anyway" retry sends it without a stale-state race.
+    mutationFn: (acceptUnverified = false) => checkoutApi.place({
       listing_id, cart_id,
       shipping_tier: shippingTier,
       payment_method: paymentMethod,
       ship_to: shipTo,
+      accept_unverified: !!acceptUnverified,
     }),
     onSuccess: async (out) => {
       if (paymentMethod === 'wallet') {
@@ -253,7 +256,23 @@ export const CheckoutScreen = ({ navigation, route }) => {
       // until checkout.session.completed lands.
       navigation.replace('OrderDetail', { id: out.order_id });
     },
-    onError: (err) => Alert.alert('Checkout failed', err.response?.data?.error || err.message),
+    onError: (err) => {
+      // E6: a ≤$20 lot with YELLOW (uploaded-scan) cards needs the buyer
+      // to acknowledge they aren't in-hand-verified. One tap covers the
+      // whole lot; followed (trusted) sellers never hit this.
+      if (err.response?.data?.code === 'live_photo_ack_required') {
+        Alert.alert(
+          'Not live-photo verified',
+          `${err.response.data.message || 'Some of these cards aren’t live-photo verified.'}\n\nThese are uploaded scans, not in-hand photos. Buy anyway?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'I understand, buy', onPress: () => placeMut.mutate(true) },
+          ],
+        );
+        return;
+      }
+      Alert.alert('Checkout failed', err.response?.data?.error || err.message);
+    },
   });
 
   // Pull listing/cart to know which shipping tiers are offered.
