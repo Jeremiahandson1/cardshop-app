@@ -83,6 +83,19 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
             <Ionicons name="cart-outline" size={13} color={Colors.text} />
             <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Cart</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('BrowseDollarBins')}
+            accessibilityLabel="Browse dollar bins"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: Colors.surface2,
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="pricetags-outline" size={13} color={Colors.text} />
+            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Bins</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

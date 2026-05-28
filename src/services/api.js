@@ -903,6 +903,12 @@ export const marketplaceApi = {
     api.patch(`/marketplace/saved-searches/${id}`, body).then((r) => r.data),
   deleteSavedSearch: (id) =>
     api.delete(`/marketplace/saved-searches/${id}`).then((r) => r.data),
+  // Theme M-L — browse dollar bins. params: { q, max_price, following, limit, offset }
+  dollarBins: (params = {}) =>
+    api.get('/marketplace/dollar-bins', { params }).then((r) => r.data),
+  // A bin's active listings. params: { min_price, max_price, limit, offset }
+  dollarBinCards: (binderId, params = {}) =>
+    api.get(`/marketplace/dollar-bins/${binderId}/cards`, { params }).then((r) => r.data),
 };
 
 // Best Offer + offers-on-cart (Phase 2B / M-J).

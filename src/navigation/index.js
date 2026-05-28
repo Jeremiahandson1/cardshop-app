@@ -90,6 +90,7 @@ import {
   MarketplaceHomeScreen, MarketplaceSearchScreen, ListingDetailScreen, SavedSearchesScreen,
 } from '../screens/MarketplaceScreens';
 import { CartListScreen, CartDetailScreen, CheckoutScreen } from '../screens/CartScreens';
+import { BrowseDollarBinsScreen, DollarBinDetailScreen } from '../screens/DollarBinScreens';
 import {
   MyListingsScreen, CreateListingScreen, MyOrdersScreen,
   OrderDetailScreen, FileOrderDisputeScreen,
@@ -458,6 +459,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="MyOffers" component={MyOffersScreen} />
     <ProfileStackNav.Screen name="ListingOfferDetail" component={ListingOfferDetailScreen} />
     <ProfileStackNav.Screen name="BulkListInventory" component={BulkListInventoryScreen} />
+    <ProfileStackNav.Screen name="BrowseDollarBins" component={BrowseDollarBinsScreen} />
+    <ProfileStackNav.Screen name="DollarBinDetail" component={DollarBinDetailScreen} />
     <ProfileStackNav.Screen name="EbayCsvImport" component={EbayCsvImportScreen} />
     <ProfileStackNav.Screen name="DraftsReview" component={DraftsReviewScreen} />
     <ProfileStackNav.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
