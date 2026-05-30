@@ -46,11 +46,14 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
       </View>
       {/* Action pills in a horizontal scroller — five pills won't fit
           on a narrow phone, so let them scroll instead of clipping the
-          last label ("Bins" was rendering as "Bin…"). */}
+          last label ("Bins" was rendering as "Bin…"). flexGrow:0 keeps
+          the ScrollView from expanding vertically and clipping the
+          pills' bottom half. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillRow}
+        style={styles.pillRowOuter}
+        contentContainerStyle={styles.pillRowInner}
       >
         <HeaderPill
           icon="search"
@@ -596,10 +599,17 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
 
-  pillRow: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+  // ScrollView outer frame — flexGrow:0 prevents the horizontal
+  // scroller from stretching vertically (which clipped pill bottoms
+  // on first roll-out). Border lives here so it spans the full row
+  // even when the inner content is narrower than the screen.
+  pillRowOuter: {
+    flexGrow: 0,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pillRowInner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
   },
 
   tabs: {
