@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView,
   Alert, TextInput, Linking, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -922,7 +923,15 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.safe}>
       <ScreenHeader title="Order" />
-      <ScrollView contentContainerStyle={{ padding: Spacing.md }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      >
+      <ScrollView
+        contentContainerStyle={{ padding: Spacing.md, paddingBottom: 200 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.statusBox}>
           <Text style={styles.statusBig}>{orderStatusLabel(order.status)}</Text>
           {order.delivered_at && order.released_at && (
@@ -1028,6 +1037,7 @@ export const OrderDetailScreen = ({ navigation, route }) => {
           />
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
