@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { marketplaceApi, listingsApi, cartApi } from '../services/api';
+import { marketplaceApi, listingsApi, cartApi, homeApi } from '../services/api';
 import { Button, ScreenHeader, EmptyState, LoadingScreen, VerificationBadge } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -36,6 +36,16 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
     queryKey: ['marketplace-feed', tab],
     queryFn: fetchers[tab],
   });
+
+  // Pending-sales banner: same source the home hub uses, so the
+  // ship-queue stays one tap away even though we no longer reroute
+  // the Marketplace tile straight to MyOrders.
+  const { data: pending } = useQuery({
+    queryKey: ['home-pending'],
+    queryFn: () => homeApi.pending(),
+    staleTime: 30000,
+  });
+  const salesToShip = pending?.counts?.marketplace_sales || 0;
 
   const listings = data?.listings || [];
 
@@ -81,6 +91,25 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('BrowseDollarBins')}
         />
       </ScrollView>
+
+      {salesToShip > 0 ? (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('MyOrders')}
+          style={{
+            marginHorizontal: Spacing.md, marginTop: Spacing.sm,
+            paddingVertical: 10, paddingHorizontal: 12,
+            borderRadius: 10, backgroundColor: 'rgba(250,204,21,0.12)',
+            borderWidth: 1, borderColor: 'rgba(250,204,21,0.55)',
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+          }}
+        >
+          <Ionicons name="cube" size={18} color="#facc15" />
+          <Text style={{ color: Colors.text, flex: 1, fontSize: 13, fontWeight: '600' }}>
+            {salesToShip === 1 ? '1 sale to ship' : `${salesToShip} sales to ship`}
+          </Text>
+          <Text style={{ color: '#facc15', fontSize: 13, fontWeight: '700' }}>Go →</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={styles.tabs}>
         <TabButton title="For You" active={tab === 'feed'} onPress={() => setTab('feed')} />

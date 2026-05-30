@@ -158,12 +158,11 @@ export const HomeHubScreen = ({ navigation }) => {
     } else if (tile.key === 'local-lcs') {
       target = { tab: 'LCS' };
     } else if (tile.key === 'marketplace') {
-      // Marketplace tile is dual-mode: with pending sales the user's
-      // intent is "I need to ship a card", route to MyOrders. With
-      // none, intent is "shop", route to the public browse.
-      target = marketplaceCount > 0
-        ? { tab: 'Profile', screen: 'MyOrders' }
-        : tile.target;
+      // Always route to MarketplaceHome — consistency across accounts
+      // beats the power-shortcut to MyOrders, especially now that
+      // MarketplaceHome surfaces a "X to ship" banner up top for
+      // sellers with pending sales (and has a permanent Orders pill).
+      target = tile.target;
     } else if (tile.target) {
       // trade-offers and other tiles ship with explicit targets
       // in the static metadata — no per-key branching needed.
