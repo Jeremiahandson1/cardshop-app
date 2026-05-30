@@ -724,11 +724,7 @@ const ShipLabelPanel = ({ onBuy, pending }) => {
   const valid = form.line1.trim() && form.city.trim()
                 && form.state.trim() && form.zip.trim();
 
-  const handleBuy = async () => {
-    if (!valid) {
-      Alert.alert('Return address required', 'Fill in your return address first.');
-      return;
-    }
+  const doBuy = async () => {
     try {
       setSaving(true);
       await authApi.updateProfile({
@@ -753,6 +749,23 @@ const ShipLabelPanel = ({ onBuy, pending }) => {
       zip: form.zip.trim(),
       country: 'US',
     });
+  };
+
+  // Defensive confirm — labels are real money. Server self-heals
+  // orphans, but the confirm makes a stray double-tap explicit.
+  const handleBuy = () => {
+    if (!valid) {
+      Alert.alert('Return address required', 'Fill in your return address first.');
+      return;
+    }
+    Alert.alert(
+      'Buy a shipping label?',
+      'This charges your EasyPost balance. If a label already exists for this order it will be returned instead — you will not be double-charged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Buy label', style: 'default', onPress: doBuy },
+      ],
+    );
   };
 
   const inputStyle = {
