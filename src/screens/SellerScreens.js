@@ -893,6 +893,15 @@ export const OrderDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Cancel failed', err.response?.data?.error || err.message),
   });
 
+  const markReceivedMut = useMutation({
+    mutationFn: () => ordersApi.markReceived(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      Alert.alert('Card is yours', 'Marked received and added to your collection.');
+    },
+    onError: (err) => Alert.alert('Mark received failed', err.response?.data?.error || err.message),
+  });
+
   if (isLoading) return <LoadingScreen />;
   if (!data?.order) return <EmptyState icon="❌" title="Order not found" />;
 
@@ -1045,6 +1054,21 @@ export const OrderDetailScreen = ({ navigation, route }) => {
         )}
 
         {/* Buyer actions */}
+        {isBuyer && ['shipped', 'in_transit', 'delivered'].includes(order.status) && (
+          <Button
+            title={markReceivedMut.isPending ? 'Confirming…' : 'Mark received'}
+            onPress={() => Alert.alert(
+              'Confirm receipt?',
+              'This transfers the card into your collection on the chain and releases the seller’s funds early.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Confirm', onPress: () => markReceivedMut.mutate() },
+              ],
+            )}
+            disabled={markReceivedMut.isPending}
+            style={{ marginTop: Spacing.md }}
+          />
+        )}
         {order.status === 'delivered' && (
           <Button
             title="File a dispute"
