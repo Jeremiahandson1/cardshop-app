@@ -596,8 +596,8 @@ const PhotoPicker = ({ photos, onChange }) => {
 const ShipOptionsPicker = ({ value, onChange, highValue }) => {
   const tiers = [
     { tier: 'pwe', name: 'Plain envelope', defaultPrice: 105, note: 'No tracking. <$20 cards.' },
-    { tier: 'bmwt', name: 'Bubble mailer + tracking', defaultPrice: 450, note: 'For $20-200 cards.' },
-    { tier: 'signature', name: 'Signature required', defaultPrice: 950, note: 'Required for $200+.' },
+    { tier: 'bmwt', name: 'Bubble mailer + tracking', defaultPrice: 600, note: 'For $20-200 cards.' },
+    { tier: 'signature', name: 'Signature required', defaultPrice: 1200, note: 'Required for $200+.' },
   ];
   const toggle = (tier) => {
     const exists = value.find((v) => v.tier === tier.tier);

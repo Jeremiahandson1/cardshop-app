@@ -36,8 +36,8 @@ export const BulkListInventoryScreen = ({ navigation }) => {
 
   const SHIPPING = {
     pwe: { tier: 'pwe', price_cents: 105 },
-    bmwt: { tier: 'bmwt', price_cents: 450 },
-    signature: { tier: 'signature', price_cents: 950 },
+    bmwt: { tier: 'bmwt', price_cents: 600 },
+    signature: { tier: 'signature', price_cents: 1200 },
   };
 
   const runMut = useMutation({
@@ -160,8 +160,8 @@ export const EbayCsvImportScreen = ({ navigation }) => {
 
   const SHIPPING = {
     pwe: { tier: 'pwe', price_cents: 105 },
-    bmwt: { tier: 'bmwt', price_cents: 450 },
-    signature: { tier: 'signature', price_cents: 950 },
+    bmwt: { tier: 'bmwt', price_cents: 600 },
+    signature: { tier: 'signature', price_cents: 1200 },
   };
 
   const importMut = useMutation({

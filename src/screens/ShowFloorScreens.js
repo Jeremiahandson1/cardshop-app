@@ -298,8 +298,8 @@ export const ShowFloorCheckInScreen = ({ navigation }) => {
 
   const SHIPPING_DEFAULTS = {
     pwe: { tier: 'pwe', price_cents: 105 },
-    bmwt: { tier: 'bmwt', price_cents: 450 },
-    signature: { tier: 'signature', price_cents: 950 },
+    bmwt: { tier: 'bmwt', price_cents: 600 },
+    signature: { tier: 'signature', price_cents: 1200 },
   };
 
   const checkInMut = useMutation({
