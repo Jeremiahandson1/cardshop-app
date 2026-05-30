@@ -896,7 +896,7 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   if (isLoading) return <LoadingScreen />;
   if (!data?.order) return <EmptyState icon="❌" title="Order not found" />;
 
-  const { order, items } = data;
+  const { order, items, label } = data;
   // Trust the server's viewer_role rather than testing `!!order.seller_id`,
   // which is always truthy and used to surface the seller's "Generate
   // shipping label" button to buyers.
@@ -970,14 +970,41 @@ export const OrderDetailScreen = ({ navigation, route }) => {
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>BREAKDOWN</Text>
+        <Text style={styles.sectionLabel}>{isSeller ? 'YOUR EARNINGS' : 'BREAKDOWN'}</Text>
         <View style={styles.box}>
-          <Row label="Card subtotal" value={usd(order.card_subtotal_cents)} />
-          <Row label="Shipping" value={usd(order.shipping_cents)} />
-          {order.sales_tax_cents > 0 && <Row label="Tax" value={usd(order.sales_tax_cents)} />}
-          <Row label="Card Shop fee" value={usd(order.total_seller_fee_cents)} />
-          <View style={styles.divider} />
-          <Row label="Total" value={usd(order.buyer_total_cents)} bold />
+          {isSeller ? (
+            <>
+              <Row label="Buyer paid" value={usd(order.buyer_total_cents)} />
+              {order.sales_tax_cents > 0 && (
+                <Row label="Tax (remitted)" value={`−${usd(order.sales_tax_cents)}`} />
+              )}
+              <Row label="Card Shop fee" value={`−${usd(order.total_seller_fee_cents)}`} />
+              {label?.cost_cents ? (
+                <Row label="Shipping label" value={`−${usd(label.cost_cents)}`} />
+              ) : (
+                <Row label="Shipping label" value="—" />
+              )}
+              <View style={styles.divider} />
+              <Row
+                label={label?.cost_cents ? 'You net' : 'You will net'}
+                value={usd(
+                  (order.buyer_total_cents || 0)
+                  - (order.sales_tax_cents || 0)
+                  - (order.total_seller_fee_cents || 0)
+                  - (label?.cost_cents || 0)
+                )}
+                bold
+              />
+            </>
+          ) : (
+            <>
+              <Row label="Card subtotal" value={usd(order.card_subtotal_cents)} />
+              <Row label="Shipping" value={usd(order.shipping_cents)} />
+              {order.sales_tax_cents > 0 && <Row label="Tax" value={usd(order.sales_tax_cents)} />}
+              <View style={styles.divider} />
+              <Row label="Total" value={usd(order.buyer_total_cents)} bold />
+            </>
+          )}
         </View>
 
         {/* Seller ship action — labeled, address-aware. */}
