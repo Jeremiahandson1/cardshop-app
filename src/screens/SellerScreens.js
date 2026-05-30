@@ -15,8 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listingsApi, ordersApi, shippingApi, cardsApi, bindersApi,
-  walletApi, listingDefaultsApi,
+  walletApi, listingDefaultsApi, authApi,
 } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as SecureStore from 'expo-secure-store';
@@ -697,6 +698,149 @@ function orderStatusLabel(s) {
 }
 
 // ============================================================
+// Seller return-address + label-buy panel.
+//
+// Pre-fills from the saved user.shipping_* fields (loaded by /auth/me
+// after the API patch). If nothing saved yet, shows an inline form;
+// submit persists to /auth/me so the next ship is one tap, then
+// fires the label buy with from_address in the body.
+// ============================================================
+const ShipLabelPanel = ({ onBuy, pending }) => {
+  const user = useAuthStore((s) => s.user);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const hasSaved = !!(user?.shipping_line1 && user?.shipping_city
+                      && user?.shipping_state && user?.shipping_zip);
+  const [editing, setEditing] = useState(!hasSaved);
+  const [form, setForm] = useState({
+    line1: user?.shipping_line1 || '',
+    line2: user?.shipping_line2 || '',
+    city:  user?.shipping_city  || '',
+    state: user?.shipping_state || '',
+    zip:   user?.shipping_zip   || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const valid = form.line1.trim() && form.city.trim()
+                && form.state.trim() && form.zip.trim();
+
+  const handleBuy = async () => {
+    if (!valid) {
+      Alert.alert('Return address required', 'Fill in your return address first.');
+      return;
+    }
+    try {
+      setSaving(true);
+      await authApi.updateProfile({
+        shipping_line1: form.line1.trim(),
+        shipping_line2: form.line2.trim() || null,
+        shipping_city:  form.city.trim(),
+        shipping_state: form.state.trim(),
+        shipping_zip:   form.zip.trim(),
+      });
+      await refreshUser?.();
+    } catch {
+      // non-fatal — we still pass the address to the label call below.
+    } finally {
+      setSaving(false);
+    }
+    onBuy({
+      name: user?.display_name || user?.username || 'Seller',
+      line1: form.line1.trim(),
+      line2: form.line2.trim() || null,
+      city: form.city.trim(),
+      state: form.state.trim(),
+      zip: form.zip.trim(),
+      country: 'US',
+    });
+  };
+
+  const inputStyle = {
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bg,
+    borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 8,
+    color: Colors.text, fontSize: 14,
+  };
+
+  return (
+    <View style={{
+      marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md,
+      backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.accent,
+    }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <Ionicons name="cube-outline" size={18} color={Colors.accent} />
+        <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 15 }}>
+          Ship this order
+        </Text>
+      </View>
+      <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 12 }}>
+        Generate a shipping label to mark this as shipped. Label cost is
+        covered by the buyer's shipping payment.
+      </Text>
+
+      {hasSaved && !editing ? (
+        <View style={{
+          backgroundColor: Colors.surface2, borderRadius: Radius.sm, padding: 10,
+          flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12,
+        }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 13, marginBottom: 2 }}>
+              Return address
+            </Text>
+            <Text style={{ color: Colors.text, fontSize: 13 }}>
+              {user.shipping_line1}{user.shipping_line2 ? `, ${user.shipping_line2}` : ''}
+            </Text>
+            <Text style={{ color: Colors.text, fontSize: 13 }}>
+              {user.shipping_city}, {user.shipping_state} {user.shipping_zip}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setEditing(true)}>
+            <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={{ gap: 8, marginBottom: 12 }}>
+          <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 13 }}>
+            Your return address
+          </Text>
+          <TextInput
+            style={inputStyle} placeholder="Street address" placeholderTextColor={Colors.textMuted}
+            value={form.line1} onChangeText={(v) => setForm((f) => ({ ...f, line1: v }))}
+          />
+          <TextInput
+            style={inputStyle} placeholder="Apt, suite, etc. (optional)" placeholderTextColor={Colors.textMuted}
+            value={form.line2} onChangeText={(v) => setForm((f) => ({ ...f, line2: v }))}
+          />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={[inputStyle, { flex: 2 }]} placeholder="City" placeholderTextColor={Colors.textMuted}
+              value={form.city} onChangeText={(v) => setForm((f) => ({ ...f, city: v }))}
+            />
+            <TextInput
+              style={[inputStyle, { flex: 1 }]} placeholder="State" placeholderTextColor={Colors.textMuted}
+              value={form.state} maxLength={2} autoCapitalize="characters"
+              onChangeText={(v) => setForm((f) => ({ ...f, state: v }))}
+            />
+            <TextInput
+              style={[inputStyle, { flex: 1 }]} placeholder="ZIP" placeholderTextColor={Colors.textMuted}
+              value={form.zip} keyboardType="number-pad"
+              onChangeText={(v) => setForm((f) => ({ ...f, zip: v }))}
+            />
+          </View>
+          <Text style={{ color: Colors.textMuted, fontSize: 11 }}>
+            Saved to your profile — you'll only fill this in once.
+          </Text>
+        </View>
+      )}
+
+      <Button
+        title={pending ? 'Generating…' : saving ? 'Saving address…' : 'Generate shipping label'}
+        onPress={handleBuy}
+        disabled={pending || saving || !valid}
+      />
+    </View>
+  );
+};
+
+// ============================================================
 // ORDER DETAIL
 // ============================================================
 export const OrderDetailScreen = ({ navigation, route }) => {
@@ -717,7 +861,7 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   });
 
   const buyLabelMut = useMutation({
-    mutationFn: () => shippingApi.buyLabel(id),
+    mutationFn: (fromAddress) => shippingApi.buyLabel(id, fromAddress),
     onSuccess: (out) => {
       Alert.alert('Label generated', `Tracking: ${out.tracking_number}`);
       if (out.label_url) Linking.openURL(out.label_url);
@@ -739,7 +883,11 @@ export const OrderDetailScreen = ({ navigation, route }) => {
   if (!data?.order) return <EmptyState icon="❌" title="Order not found" />;
 
   const { order, items } = data;
-  const isSeller = !!order.seller_id;     // page is shown for both — UI branches below
+  // Trust the server's viewer_role rather than testing `!!order.seller_id`,
+  // which is always truthy and used to surface the seller's "Generate
+  // shipping label" button to buyers.
+  const isSeller = order.viewer_role === 'seller';
+  const isBuyer  = order.viewer_role === 'buyer';
 
   // Download + share the PDF receipt. Auth required, so we fetch
   // with the Bearer token, write to a temp file, then open the
@@ -810,26 +958,41 @@ export const OrderDetailScreen = ({ navigation, route }) => {
           <Row label="Total" value={usd(order.buyer_total_cents)} bold />
         </View>
 
-        {/* Seller actions */}
-        {['authorized', 'captured'].includes(order.status) && (
-          <Button
-            title={buyLabelMut.isPending ? 'Generating…' : 'Generate shipping label'}
-            onPress={() => buyLabelMut.mutate()}
-            disabled={buyLabelMut.isPending}
-            style={{ marginTop: Spacing.md }}
+        {/* Seller ship action — labeled, address-aware. */}
+        {isSeller && ['authorized', 'captured'].includes(order.status) && (
+          <ShipLabelPanel
+            onBuy={(addr) => buyLabelMut.mutate(addr)}
+            pending={buyLabelMut.isPending}
           />
         )}
         {['shipped', 'in_transit', 'delivered'].includes(order.status) && (
           <Button
-            title="View shipping label"
+            title={isSeller ? 'View shipping label' : 'Track shipment'}
             variant="ghost"
             onPress={async () => {
               const lbl = await shippingApi.getLabel(id).catch(() => null);
-              if (lbl?.label_url) Linking.openURL(lbl.label_url);
-              else Alert.alert('No label available');
+              if (lbl?.tracking_url) Linking.openURL(lbl.tracking_url);
+              else if (lbl?.label_url && isSeller) Linking.openURL(lbl.label_url);
+              else Alert.alert('No tracking info yet');
             }}
             style={{ marginTop: Spacing.md }}
           />
+        )}
+
+        {/* Buyer-side reassurance — without an action button, buyers
+            were leaving the order detail unsure what state they were in. */}
+        {isBuyer && ['authorized', 'captured'].includes(order.status) && (
+          <View style={{
+            marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.md,
+            backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border,
+          }}>
+            <Text style={{ color: Colors.text, fontWeight: '700', marginBottom: 4 }}>
+              Waiting on the seller to ship
+            </Text>
+            <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+              The seller has 3–5 days to mail this card. You'll get a push notification when it ships.
+            </Text>
+          </View>
         )}
 
         {/* Buyer actions */}

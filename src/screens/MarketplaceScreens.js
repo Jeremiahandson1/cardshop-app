@@ -43,61 +43,41 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safe}>
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Marketplace</Text>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('MarketplaceSearch')}
-            accessibilityLabel="Search the marketplace"
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-              backgroundColor: Colors.surface2,
-              borderWidth: 1, borderColor: Colors.border,
-            }}
-          >
-            <Ionicons name="search" size={13} color={Colors.text} />
-            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('SavedSearches')}
-            accessibilityLabel="Saved searches and alerts"
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-              backgroundColor: Colors.surface2,
-              borderWidth: 1, borderColor: Colors.border,
-            }}
-          >
-            <Ionicons name="notifications-outline" size={13} color={Colors.text} />
-            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Alerts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('CartList')}
-            accessibilityLabel="View your cart"
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-              backgroundColor: Colors.surface2,
-              borderWidth: 1, borderColor: Colors.border,
-            }}
-          >
-            <Ionicons name="cart-outline" size={13} color={Colors.text} />
-            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Cart</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('BrowseDollarBins')}
-            accessibilityLabel="Browse dollar bins"
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-              backgroundColor: Colors.surface2,
-              borderWidth: 1, borderColor: Colors.border,
-            }}
-          >
-            <Ionicons name="pricetags-outline" size={13} color={Colors.text} />
-            <Text style={{ color: Colors.text, fontSize: 12, fontWeight: '700' }}>Bins</Text>
-          </TouchableOpacity>
-        </View>
       </View>
+      {/* Action pills in a horizontal scroller — five pills won't fit
+          on a narrow phone, so let them scroll instead of clipping the
+          last label ("Bins" was rendering as "Bin…"). */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pillRow}
+      >
+        <HeaderPill
+          icon="search"
+          label="Search"
+          onPress={() => navigation.navigate('MarketplaceSearch')}
+        />
+        <HeaderPill
+          icon="receipt-outline"
+          label="Orders"
+          onPress={() => navigation.navigate('MyOrders')}
+        />
+        <HeaderPill
+          icon="notifications-outline"
+          label="Alerts"
+          onPress={() => navigation.navigate('SavedSearches')}
+        />
+        <HeaderPill
+          icon="cart-outline"
+          label="Cart"
+          onPress={() => navigation.navigate('CartList')}
+        />
+        <HeaderPill
+          icon="pricetags-outline"
+          label="Dollar bins"
+          onPress={() => navigation.navigate('BrowseDollarBins')}
+        />
+      </ScrollView>
 
       <View style={styles.tabs}>
         <TabButton title="For You" active={tab === 'feed'} onPress={() => setTab('feed')} />
@@ -144,6 +124,25 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
 const TabButton = ({ title, active, onPress }) => (
   <TouchableOpacity onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
     <Text style={[styles.tabText, active && styles.tabTextActive]}>{title}</Text>
+  </TouchableOpacity>
+);
+
+// Shared header pill — keeps the five marketplace shortcuts (search,
+// orders, alerts, cart, bins) visually consistent. Always labeled per
+// the no-bare-icons rule.
+const HeaderPill = ({ icon, label, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    accessibilityLabel={label}
+    style={{
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+      backgroundColor: Colors.surface2,
+      borderWidth: 1, borderColor: Colors.border,
+    }}
+  >
+    <Ionicons name={icon} size={14} color={Colors.text} />
+    <Text style={{ color: Colors.text, fontSize: 13, fontWeight: '700' }}>{label}</Text>
   </TouchableOpacity>
 );
 
@@ -593,10 +592,15 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.xs,
+  },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
+
+  pillRow: {
+    flexDirection: 'row', gap: 8,
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
 
   tabs: {
     flexDirection: 'row', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
