@@ -212,17 +212,11 @@ export const CheckoutScreen = ({ navigation, route }) => {
     queryFn: () => walletApi.summary(),
   });
 
-  // Auto-flip the default once the wallet summary lands. The initial
-  // useState picks 'wallet' (CollX intent — pay Stripe at top-up,
-  // not per sale). If the wallet can't cover the order, fall back
-  // to card so the buyer isn't stuck on a disabled option.
-  React.useEffect(() => {
-    const bal = wallet?.balance?.available_cents || 0;
-    const needed = subtotalCents || 0;
-    if (paymentMethod === 'wallet' && bal > 0 && bal < needed) {
-      setPaymentMethod('card');
-    }
-  }, [wallet?.balance?.available_cents, subtotalCents]);
+  // Wallet now handles full / partial / zero coverage through one
+  // place call: the API auto-detects partial balance and returns a
+  // top-up Stripe checkout for the shortfall. No client fallback
+  // needed — keep paymentMethod='wallet' unless the buyer explicitly
+  // switches to 'card'.
 
   // Quote whenever picker state is complete enough to compute it.
   const { data: quote, refetch: refetchQuote, isFetching: quoting } = useQuery({
@@ -246,19 +240,16 @@ export const CheckoutScreen = ({ navigation, route }) => {
       accept_unverified: !!acceptUnverified,
     }),
     onSuccess: async (out) => {
-      if (paymentMethod === 'wallet') {
+      // Full wallet coverage completes synchronously. Hybrid (partial
+      // balance auto-topped-up) and pure card both return a Stripe
+      // Checkout URL that we open in the in-app browser; the webhook
+      // finishes the order once the top-up lands.
+      if (!out.checkout_url) {
         Alert.alert(
           'Order placed!',
           'Funds transferred from your wallet. The seller has 5 days to ship.',
           [{ text: 'OK', onPress: () => navigation.replace('OrderDetail', { id: out.order_id }) }],
         );
-        return;
-      }
-      // Card flow: open Stripe Checkout in an in-app browser. Stripe
-      // returns to cardshop://orders/success?order_id=X (deep link)
-      // and the webhook handles status flipping server-side.
-      if (!out.checkout_url) {
-        Alert.alert('Checkout error', 'No payment URL returned.');
         return;
       }
       try {
@@ -425,17 +416,18 @@ export const CheckoutScreen = ({ navigation, route }) => {
           <Text style={[styles.payText, paymentMethod === 'card' && { color: Colors.bg }]}>Credit / debit card</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.payOption,
-            paymentMethod === 'wallet' && styles.payOptionActive,
-            (wallet?.balance?.available_cents || 0) < (quote?.gross_cents || 0) && { opacity: 0.5 },
-          ]}
+          style={[styles.payOption, paymentMethod === 'wallet' && styles.payOptionActive]}
           onPress={() => setPaymentMethod('wallet')}
-          disabled={(wallet?.balance?.available_cents || 0) < (quote?.gross_cents || subtotalCents)}
         >
           <Ionicons name="wallet-outline" size={20} color={paymentMethod === 'wallet' ? Colors.bg : Colors.text} />
           <Text style={[styles.payText, paymentMethod === 'wallet' && { color: Colors.bg }]}>
-            Wallet · {usd(wallet?.balance?.available_cents || 0)} available
+            {(() => {
+              const bal = wallet?.balance?.available_cents || 0;
+              const needed = quote?.gross_cents || subtotalCents || 0;
+              if (bal >= needed && needed > 0) return `Wallet · ${usd(bal)} available`;
+              if (bal > 0 && bal < needed) return `Wallet ${usd(bal)} + ${usd(needed - bal)} top-up`;
+              return `Top up & buy · ${usd(needed)} via card`;
+            })()}
           </Text>
         </TouchableOpacity>
 
