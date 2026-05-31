@@ -190,14 +190,11 @@ const BalanceCard = ({ ledger, available, pending, onWithdraw, onTopup, onDashbo
   <View style={styles.balanceCard}>
     <Text style={styles.balanceLabel}>Wallet balance</Text>
     <Text style={styles.balanceAmount}>{usd(ledger ?? available)}</Text>
-    {pending > 0 && (
-      <Text style={styles.balancePending}>
-        + {usd(pending)} settling in Stripe
+    {available < (ledger ?? 0) ? (
+      <Text style={styles.balanceSubtle}>
+        {usd(available)} ready to cash out
       </Text>
-    )}
-    <Text style={styles.balanceSubtle}>
-      {usd(available)} available to cash out · {usd(pending)} held until Stripe clears
-    </Text>
+    ) : null}
     <View style={styles.balanceActions}>
       <Button
         title="Withdraw"
