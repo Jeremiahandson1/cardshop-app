@@ -169,7 +169,12 @@ export const CartDetailScreen = ({ navigation, route }) => {
 export const CheckoutScreen = ({ navigation, route }) => {
   const { listing_id, cart_id } = route.params;
   const [shippingTier, setShippingTier] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('card');   // card | wallet
+  // Default to 'wallet' so buyers with a balance get the free-of-Stripe
+  // path. Once the wallet balance loads we auto-flip back to 'card'
+  // only if the wallet can't cover the order (handled in the effect
+  // below). CollX-style: pay Stripe once when funding the wallet, not
+  // on every sale.
+  const [paymentMethod, setPaymentMethod] = useState('wallet');   // card | wallet
   const [shipTo, setShipTo] = useState({
     name: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'US',
   });
@@ -206,6 +211,18 @@ export const CheckoutScreen = ({ navigation, route }) => {
     queryKey: ['wallet-summary'],
     queryFn: () => walletApi.summary(),
   });
+
+  // Auto-flip the default once the wallet summary lands. The initial
+  // useState picks 'wallet' (CollX intent — pay Stripe at top-up,
+  // not per sale). If the wallet can't cover the order, fall back
+  // to card so the buyer isn't stuck on a disabled option.
+  React.useEffect(() => {
+    const bal = wallet?.balance?.available_cents || 0;
+    const needed = subtotalCents || 0;
+    if (paymentMethod === 'wallet' && bal > 0 && bal < needed) {
+      setPaymentMethod('card');
+    }
+  }, [wallet?.balance?.available_cents, subtotalCents]);
 
   // Quote whenever picker state is complete enough to compute it.
   const { data: quote, refetch: refetchQuote, isFetching: quoting } = useQuery({
