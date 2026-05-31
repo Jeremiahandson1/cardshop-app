@@ -186,15 +186,22 @@ const OnboardingCard = ({ status, requirements, onStart, loading }) => {
   );
 };
 
-const BalanceCard = ({ ledger, available, pending, onWithdraw, onTopup, onDashboard, dashboardLoading }) => (
-  <View style={styles.balanceCard}>
-    <Text style={styles.balanceLabel}>Wallet balance</Text>
-    <Text style={styles.balanceAmount}>{usd(ledger ?? available)}</Text>
-    {available < (ledger ?? 0) ? (
-      <Text style={styles.balanceSubtle}>
-        {usd(available)} ready to cash out
-      </Text>
-    ) : null}
+const BalanceCard = ({ ledger, available, pending, onWithdraw, onTopup, onDashboard, dashboardLoading }) => {
+  const ledgerCents = ledger ?? available ?? 0;
+  // Rolling-hold breakdown: what's withdrawable now vs sitting in
+  // Stripe's hold. We don't trust pending blindly — if Stripe and
+  // ledger have drifted (label cost reversal in flight, etc.) the
+  // remainder line uses the ledger as the source of truth.
+  const inHold = Math.max(0, ledgerCents - (available || 0));
+  return (
+    <View style={styles.balanceCard}>
+      <Text style={styles.balanceLabel}>Wallet balance</Text>
+      <Text style={styles.balanceAmount}>{usd(ledgerCents)}</Text>
+      {inHold > 0 ? (
+        <Text style={styles.balanceSubtle}>
+          {usd(available || 0)} to cash out · {usd(inHold)} pending Stripe hold
+        </Text>
+      ) : null}
     <View style={styles.balanceActions}>
       <Button
         title="Withdraw"
@@ -211,7 +218,8 @@ const BalanceCard = ({ ledger, available, pending, onWithdraw, onTopup, onDashbo
         : <Text style={styles.dashboardText}>Tax forms & bank details ↗</Text>}
     </TouchableOpacity>
   </View>
-);
+  );
+};
 
 const LedgerRow = ({ entry }) => {
   const isCredit = entry.direction === 'credit';
