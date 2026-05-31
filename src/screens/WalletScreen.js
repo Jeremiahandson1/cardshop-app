@@ -93,6 +93,7 @@ export const WalletScreen = ({ navigation }) => {
         ) : (
           <>
             <BalanceCard
+              ledger={summary.ledger_balance_cents}
               available={summary.balance.available_cents}
               pending={summary.balance.pending_cents}
               onWithdraw={() => navigation.navigate('Payout')}
@@ -185,13 +186,18 @@ const OnboardingCard = ({ status, requirements, onStart, loading }) => {
   );
 };
 
-const BalanceCard = ({ available, pending, onWithdraw, onTopup, onDashboard, dashboardLoading }) => (
+const BalanceCard = ({ ledger, available, pending, onWithdraw, onTopup, onDashboard, dashboardLoading }) => (
   <View style={styles.balanceCard}>
-    <Text style={styles.balanceLabel}>Available balance</Text>
-    <Text style={styles.balanceAmount}>{usd(available)}</Text>
+    <Text style={styles.balanceLabel}>Wallet balance</Text>
+    <Text style={styles.balanceAmount}>{usd(ledger ?? available)}</Text>
     {pending > 0 && (
-      <Text style={styles.balancePending}>+ {usd(pending)} pending</Text>
+      <Text style={styles.balancePending}>
+        + {usd(pending)} settling in Stripe
+      </Text>
     )}
+    <Text style={styles.balanceSubtle}>
+      {usd(available)} available to cash out · {usd(pending)} held until Stripe clears
+    </Text>
     <View style={styles.balanceActions}>
       <Button
         title="Withdraw"
@@ -429,6 +435,7 @@ const styles = StyleSheet.create({
   balanceLabel: { color: Colors.textMuted, fontSize: 12, letterSpacing: 1 },
   balanceAmount: { fontSize: 42, fontWeight: '700', color: Colors.text },
   balancePending: { color: Colors.textMuted, fontSize: 13 },
+  balanceSubtle: { color: Colors.textMuted, fontSize: 11, marginTop: 4, textAlign: 'center' },
   balanceActions: { flexDirection: 'row', gap: Spacing.sm, width: '100%', marginTop: Spacing.md },
   dashboardLink: { marginTop: Spacing.sm },
   dashboardText: { color: Colors.accent2, fontSize: 13 },
