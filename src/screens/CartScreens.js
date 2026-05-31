@@ -169,12 +169,11 @@ export const CartDetailScreen = ({ navigation, route }) => {
 export const CheckoutScreen = ({ navigation, route }) => {
   const { listing_id, cart_id } = route.params;
   const [shippingTier, setShippingTier] = useState(null);
-  // Default to 'wallet' so buyers with a balance get the free-of-Stripe
-  // path. Once the wallet balance loads we auto-flip back to 'card'
-  // only if the wallet can't cover the order (handled in the effect
-  // below). CollX-style: pay Stripe once when funding the wallet, not
-  // on every sale.
-  const [paymentMethod, setPaymentMethod] = useState('wallet');   // card | wallet
+  // Initial 'card' — auto-promotes to 'wallet' below if the buyer
+  // is onboarded AND has a usable balance. Buyers pay no platform
+  // fee, so we don't pitch onboarding to them; wallet is purely
+  // for buyers who already opted in (usually because they sell too).
+  const [paymentMethod, setPaymentMethod] = useState('card');   // card | wallet
   const [shipTo, setShipTo] = useState({
     name: '', line1: '', line2: '', city: '', state: '', zip: '', country: 'US',
   });
@@ -212,11 +211,18 @@ export const CheckoutScreen = ({ navigation, route }) => {
     queryFn: () => walletApi.summary(),
   });
 
-  // Wallet now handles full / partial / zero coverage through one
-  // place call: the API auto-detects partial balance and returns a
-  // top-up Stripe checkout for the shortfall. No client fallback
-  // needed — keep paymentMethod='wallet' unless the buyer explicitly
-  // switches to 'card'.
+  // Auto-promote to 'wallet' once the summary lands IF the buyer is
+  // onboarded AND has a balance to lean on (full or partial). When
+  // there's no Connect or the balance is $0, wallet is identical to
+  // card in cost — so we just leave 'card' selected.
+  React.useEffect(() => {
+    const onboarded = !!wallet?.onboarded;
+    const bal = wallet?.balance?.available_cents || 0;
+    const needed = quote?.gross_cents || subtotalCents || 0;
+    if (onboarded && bal > 0 && needed > 0 && paymentMethod === 'card') {
+      setPaymentMethod('wallet');
+    }
+  }, [wallet?.onboarded, wallet?.balance?.available_cents, quote?.gross_cents]);
 
   // Quote whenever picker state is complete enough to compute it.
   const { data: quote, refetch: refetchQuote, isFetching: quoting } = useQuery({
@@ -415,21 +421,22 @@ export const CheckoutScreen = ({ navigation, route }) => {
           <Ionicons name="card-outline" size={20} color={paymentMethod === 'card' ? Colors.bg : Colors.text} />
           <Text style={[styles.payText, paymentMethod === 'card' && { color: Colors.bg }]}>Credit / debit card</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.payOption, paymentMethod === 'wallet' && styles.payOptionActive]}
-          onPress={() => setPaymentMethod('wallet')}
-        >
-          <Ionicons name="wallet-outline" size={20} color={paymentMethod === 'wallet' ? Colors.bg : Colors.text} />
-          <Text style={[styles.payText, paymentMethod === 'wallet' && { color: Colors.bg }]}>
-            {(() => {
-              const bal = wallet?.balance?.available_cents || 0;
-              const needed = quote?.gross_cents || subtotalCents || 0;
-              if (bal >= needed && needed > 0) return `Wallet · ${usd(bal)} available`;
-              if (bal > 0 && bal < needed) return `Wallet ${usd(bal)} + ${usd(needed - bal)} top-up`;
-              return `Top up & buy · ${usd(needed)} via card`;
-            })()}
-          </Text>
-        </TouchableOpacity>
+        {wallet?.onboarded && (wallet?.balance?.available_cents || 0) > 0 ? (
+          <TouchableOpacity
+            style={[styles.payOption, paymentMethod === 'wallet' && styles.payOptionActive]}
+            onPress={() => setPaymentMethod('wallet')}
+          >
+            <Ionicons name="wallet-outline" size={20} color={paymentMethod === 'wallet' ? Colors.bg : Colors.text} />
+            <Text style={[styles.payText, paymentMethod === 'wallet' && { color: Colors.bg }]}>
+              {(() => {
+                const bal = wallet?.balance?.available_cents || 0;
+                const needed = quote?.gross_cents || subtotalCents || 0;
+                if (bal >= needed && needed > 0) return `Wallet · ${usd(bal)} available`;
+                return `Wallet ${usd(bal)} + ${usd(needed - bal)} top-up`;
+              })()}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Quote breakdown */}
         {quote && (
