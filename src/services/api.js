@@ -419,7 +419,10 @@ export const feedbackApi = {
 // BINDERS
 // ============================================================
 export const bindersApi = {
-  list: () => api.get('/binders'),
+  // Default limit was 20 server-side; bump to 500 so the binder
+  // picker in CardDetail gets every binder the user owns. Callers
+  // can still pass their own params.
+  list: (params = { limit: 500 }) => api.get('/binders', { params }),
   create: (data) => api.post('/binders', data),
   get: (id) => api.get(`/binders/${id}`),
   update: (id, data) => api.patch(`/binders/${id}`, data),

@@ -2379,7 +2379,12 @@ const styles = StyleSheet.create({
   },
   scopeTabs: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.base,
+    // Explicit left + right padding (instead of paddingHorizontal)
+    // so the trailing pill in the horizontal ScrollView always has
+    // breathing room and the user can see there's a scroll affordance
+    // beyond the last visible tab.
+    paddingLeft: Spacing.base,
+    paddingRight: Spacing.lg,
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
   },
@@ -2646,6 +2651,9 @@ const styles = StyleSheet.create({
   listingOwnerName: {
     color: Colors.textMuted,
     fontSize: Typography.xs,
+    // flex:1 lets a long display name truncate (numberOfLines={1})
+    // instead of pushing the Super Trader badge off the right edge.
+    flex: 1,
   },
 
   // Detail
