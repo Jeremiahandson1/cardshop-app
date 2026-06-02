@@ -4232,7 +4232,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
                       <TouchableOpacity
                         key={b.id}
                         onPress={() => {
-                          setBinderPickerVisible(false);
+                          // Keep the modal open so the user can toggle
+                          // several binders in one pass. The row's
+                          // checkmark updates after the mutation's
+                          // card-refetch lands.
                           if (inThis) removeFromBinderMut.mutate(b.id);
                           else moveBinder.mutate(b.id);
                         }}
@@ -4283,7 +4286,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: Colors.textMuted, fontWeight: Typography.semibold }}>Cancel</Text>
+                <Text style={{ color: Colors.accent, fontWeight: Typography.semibold, fontSize: Typography.base }}>Done</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
