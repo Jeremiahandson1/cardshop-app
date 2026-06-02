@@ -3777,18 +3777,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
       Alert.alert('No binders', 'Create a binder first from the Collection tab.');
       return;
     }
-    Alert.alert(
-      'Add to which binder?',
-      'Pick a binder to add this card to. Cards can live in multiple binders — adding here keeps it in any others it\u2019s already in.',
-      [
-        ...myBinders.map((b) => ({
-          text: b.name,
-          onPress: () => moveBinder.mutate(b.id),
-        })),
-        { text: 'Cancel', style: 'cancel' },
-      ],
-      { cancelable: true },
-    );
+    setBinderPickerVisible(true);
   };
 
   const deleteMutation = useMutation({
@@ -3857,6 +3846,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
   const [zoomOpen, setZoomOpen] = React.useState(false);
   const [zoomIndex, setZoomIndex] = React.useState(0);
   const [videoOpen, setVideoOpen] = React.useState(false);
+  // Binder picker — Alert.alert hard-caps at 3 buttons on Android, so
+  // users with 4+ binders never saw their full list. Modal with a
+  // scrollable list handles N binders cleanly on both platforms.
+  const [binderPickerVisible, setBinderPickerVisible] = React.useState(false);
 
   if (isLoading || !card) return <LoadingScreen />;
 
@@ -4167,6 +4160,108 @@ export const CardDetailScreen = ({ navigation, route }) => {
           initialIndex={zoomIndex}
           onClose={() => setZoomOpen(false)}
         />
+
+        {/* Binder picker — scrollable modal so N binders all fit
+            (Alert.alert caps at 3 buttons on Android). */}
+        <Modal
+          visible={binderPickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBinderPickerVisible(false)}
+          statusBarTranslucent
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setBinderPickerVisible(false)}
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {}}
+              style={{
+                backgroundColor: Colors.bg,
+                borderTopLeftRadius: Radius.lg,
+                borderTopRightRadius: Radius.lg,
+                paddingTop: Spacing.md,
+                paddingBottom: Spacing.lg,
+                maxHeight: '75%',
+              }}
+            >
+              <View style={{
+                alignSelf: 'center', width: 36, height: 4, borderRadius: 2,
+                backgroundColor: Colors.border, marginBottom: Spacing.sm,
+              }} />
+              <Text style={{
+                paddingHorizontal: Spacing.base,
+                fontSize: Typography.lg,
+                fontWeight: Typography.semibold,
+                color: Colors.text,
+              }}>
+                Add to which binder?
+              </Text>
+              <Text style={{
+                paddingHorizontal: Spacing.base,
+                fontSize: Typography.xs,
+                color: Colors.textMuted,
+                marginTop: 4,
+                marginBottom: Spacing.sm,
+              }}>
+                The card stays in any binder it's already in — this is additive.
+              </Text>
+
+              <ScrollView style={{ maxHeight: 460 }}>
+                {myBinders.map((b) => (
+                  <TouchableOpacity
+                    key={b.id}
+                    onPress={() => {
+                      setBinderPickerVisible(false);
+                      moveBinder.mutate(b.id);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: Spacing.md,
+                      paddingHorizontal: Spacing.base,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: Colors.border,
+                      gap: Spacing.sm,
+                    }}
+                  >
+                    <Ionicons name="folder-outline" size={20} color={Colors.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        color: Colors.text,
+                        fontSize: Typography.base,
+                        fontWeight: Typography.semibold,
+                      }}>
+                        {b.name}
+                      </Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                        {Number(b.card_count || 0)} card{Number(b.card_count || 0) === 1 ? '' : 's'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setBinderPickerVisible(false)}
+                style={{
+                  paddingVertical: Spacing.md,
+                  paddingHorizontal: Spacing.base,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: Colors.textMuted, fontWeight: Typography.semibold }}>Cancel</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <View style={{ padding: Spacing.base }}>
           {/* Title block */}
