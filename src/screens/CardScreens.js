@@ -3689,12 +3689,22 @@ export const CardDetailScreen = ({ navigation, route }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
-      // Server semantics are additive — card stays in any binders
-      // it was already in and is now ALSO in this one. Wording
-      // matches that so users don't think it's an exclusive move.
-      Alert.alert('Added', 'This card is now in the selected binder. It also stays in any binders you already had it in.');
+      // No success alert — the picker UI shows the new "in" state
+      // via the checkmark and re-fetches the card on success, so a
+      // popup on every tap would be noisy when toggling.
     },
     onError: (err) => Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.'),
+  });
+
+  // Remove this card from a specific binder (binder_cards row deletes).
+  // Additive model means the card stays in every other binder it's in.
+  const removeFromBinderMut = useMutation({
+    mutationFn: (binderId) => bindersApi.removeCard(binderId, cardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-binders'] });
+    },
+    onError: (err) => Alert.alert('Could not remove from binder', err?.response?.data?.error || 'Try again.'),
   });
 
   // Setting the binder-level intent IS the feed switch — server
@@ -3891,7 +3901,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
               }}
             >
               <Ionicons name="folder-open-outline" size={13} color={Colors.accent} />
-              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Move</Text>
+              <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Binders</Text>
             </TouchableOpacity>
           ) : null}
           {isOwner && !actionsLocked ? (
@@ -4201,7 +4211,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 fontWeight: Typography.semibold,
                 color: Colors.text,
               }}>
-                Add to which binder?
+                Manage binders
               </Text>
               <Text style={{
                 paddingHorizontal: Spacing.base,
@@ -4210,43 +4220,59 @@ export const CardDetailScreen = ({ navigation, route }) => {
                 marginTop: 4,
                 marginBottom: Spacing.sm,
               }}>
-                The card stays in any binder it's already in — this is additive.
+                Tap a binder to add or remove this card. Checkmarks show where the card is now.
               </Text>
 
               <ScrollView style={{ maxHeight: 460 }}>
-                {myBinders.map((b) => (
-                  <TouchableOpacity
-                    key={b.id}
-                    onPress={() => {
-                      setBinderPickerVisible(false);
-                      moveBinder.mutate(b.id);
-                    }}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingVertical: Spacing.md,
-                      paddingHorizontal: Spacing.base,
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: Colors.border,
-                      gap: Spacing.sm,
-                    }}
-                  >
-                    <Ionicons name="folder-outline" size={20} color={Colors.accent} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        color: Colors.text,
-                        fontSize: Typography.base,
-                        fontWeight: Typography.semibold,
-                      }}>
-                        {b.name}
-                      </Text>
-                      <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
-                        {Number(b.card_count || 0)} card{Number(b.card_count || 0) === 1 ? '' : 's'}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                ))}
+                {(() => {
+                  const inSet = new Set(Array.isArray(card.in_binder_ids) ? card.in_binder_ids : []);
+                  return myBinders.map((b) => {
+                    const inThis = inSet.has(b.id);
+                    return (
+                      <TouchableOpacity
+                        key={b.id}
+                        onPress={() => {
+                          setBinderPickerVisible(false);
+                          if (inThis) removeFromBinderMut.mutate(b.id);
+                          else moveBinder.mutate(b.id);
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: Spacing.md,
+                          paddingHorizontal: Spacing.base,
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                          borderBottomColor: Colors.border,
+                          gap: Spacing.sm,
+                          backgroundColor: inThis ? Colors.accent + '11' : 'transparent',
+                        }}
+                      >
+                        <Ionicons
+                          name={inThis ? 'checkmark-circle' : 'folder-outline'}
+                          size={20}
+                          color={inThis ? Colors.accent2 || Colors.accent : Colors.accent}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{
+                            color: Colors.text,
+                            fontSize: Typography.base,
+                            fontWeight: Typography.semibold,
+                          }}>
+                            {b.name}
+                          </Text>
+                          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                            {inThis ? 'In this binder · tap to remove' : `${Number(b.card_count || 0)} card${Number(b.card_count || 0) === 1 ? '' : 's'} · tap to add`}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name={inThis ? 'remove-circle-outline' : 'add-circle-outline'}
+                          size={18}
+                          color={inThis ? '#c0392b' : Colors.accent}
+                        />
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
               </ScrollView>
 
               <TouchableOpacity
