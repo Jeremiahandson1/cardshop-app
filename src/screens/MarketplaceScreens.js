@@ -471,6 +471,12 @@ export const ListingDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
+          {/* Card details + chain. Every buyer-relevant signal lives
+              here so the decision happens on this screen instead of
+              bouncing to the catalog page. Tap the chain row to open
+              the full ownership timeline (CardChainScreen). */}
+          <CardDetailsAndChainBlock listing={listing} navigation={navigation} />
+
           <Text style={styles.shipLabel}>Ships via</Text>
           <View style={{ gap: 4 }}>
             {(listing.shipping_options || []).map((opt) => (
@@ -551,6 +557,127 @@ const Badge = ({ icon, color, text }) => (
     <Text style={[styles.badgeText, { color }]}>{text}</Text>
   </View>
 );
+
+// ------------------------------------------------------------
+// Card details + chain block. Used inside ListingDetailScreen.
+// Shown beneath the seller row so all of the buyer-relevant
+// signals (numbering, RC/Auto/Relic, cert, pop, transfer count,
+// stolen status) sit together at the point of decision.
+// ------------------------------------------------------------
+const CardDetailsAndChainBlock = ({ listing, navigation }) => {
+  const fmtDate = (d) => {
+    if (!d) return '';
+    try {
+      return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return ''; }
+  };
+  const daysOwned = listing.owner_acquired_at
+    ? Math.max(0, Math.floor((Date.now() - new Date(listing.owner_acquired_at).getTime()) / 86400000))
+    : null;
+
+  const numberedLabel = listing.serial_number != null && listing.print_run
+    ? `#${listing.serial_number}/${listing.print_run}`
+    : listing.print_run
+      ? `/${listing.print_run}`
+      : null;
+
+  const gradingCompany = listing.oc_grading_company || listing.grading_company;
+  const grade          = listing.oc_grade           || listing.grade;
+  const certNumber     = listing.cert_number;
+  const popLine = (listing.pop_total != null)
+    ? `Pop ${listing.pop_total}${listing.pop_higher != null ? ` · ${listing.pop_higher} higher` : ''}`
+    : null;
+
+  const transferCount = Number(listing.transfer_count || 0);
+
+  return (
+    <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
+      <Text style={styles.shipLabel}>Card details</Text>
+
+      <View style={{ gap: 4 }}>
+        {numberedLabel ? (
+          <Text style={styles.detailDescription}>
+            <Text style={{ fontWeight: '700' }}>{numberedLabel}</Text>
+            {listing.parallel ? ` · ${listing.parallel}` : ''}
+            {listing.is_one_of_one ? ' · 1 of 1' : ''}
+          </Text>
+        ) : null}
+        {listing.subset_name ? (
+          <Text style={styles.detailDescription}>Insert / subset: {listing.subset_name}</Text>
+        ) : null}
+        {(listing.manufacturer || listing.year || listing.set_name) ? (
+          <Text style={styles.detailDescription}>
+            {[listing.year, listing.manufacturer, listing.set_name].filter(Boolean).join(' · ')}
+          </Text>
+        ) : null}
+        {(listing.is_rookie || listing.is_autograph || listing.is_relic) ? (
+          <View style={[styles.badgeRow, { marginTop: 4 }]}>
+            {listing.is_rookie    ? <Badge icon="star" color={Colors.accent} text="Rookie" /> : null}
+            {listing.is_autograph ? <Badge icon="create" color={Colors.accent2} text="Autograph" /> : null}
+            {listing.is_relic     ? <Badge icon="cube" color={Colors.accent3} text="Relic" /> : null}
+          </View>
+        ) : null}
+      </View>
+
+      {(gradingCompany || certNumber || popLine) ? (
+        <View style={{ marginTop: Spacing.sm, gap: 3 }}>
+          <Text style={styles.shipLabel}>Grading</Text>
+          {(gradingCompany || grade) ? (
+            <Text style={styles.detailDescription}>
+              {gradingCompany ? String(gradingCompany).toUpperCase() : ''}
+              {grade ? ` ${grade}` : ''}
+              {certNumber ? `  ·  cert ${certNumber}` : ''}
+            </Text>
+          ) : null}
+          {popLine ? <Text style={styles.detailDescription}>{popLine}</Text> : null}
+        </View>
+      ) : null}
+
+      <View style={{ marginTop: Spacing.sm, gap: 3 }}>
+        <Text style={styles.shipLabel}>Chain of custody</Text>
+        <TouchableOpacity
+          onPress={() => listing.owned_card_id
+            ? navigation.navigate('CardChain', { cardId: listing.owned_card_id })
+            : null}
+          disabled={!listing.owned_card_id}
+          accessibilityLabel="View the full chain of custody for this card"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+            padding: Spacing.sm,
+            borderRadius: Radius.md, borderWidth: 1,
+            borderColor: listing.reported_stolen ? '#c0392b' : Colors.border,
+            backgroundColor: listing.reported_stolen ? '#c0392b15' : Colors.surface,
+          }}
+        >
+          <Ionicons
+            name={listing.reported_stolen ? 'alert-circle' : 'link'}
+            size={20}
+            color={listing.reported_stolen ? '#c0392b' : Colors.accent}
+          />
+          <View style={{ flex: 1 }}>
+            {listing.reported_stolen ? (
+              <Text style={{ color: '#c0392b', fontWeight: '700' }}>Reported stolen</Text>
+            ) : (
+              <Text style={{ color: Colors.text, fontWeight: '700' }}>
+                {transferCount === 0
+                  ? 'Original owner · no prior transfers'
+                  : `${transferCount} transfer${transferCount === 1 ? '' : 's'} on the chain`}
+              </Text>
+            )}
+            <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              {listing.owner_acquired_at
+                ? `Seller has held this card since ${fmtDate(listing.owner_acquired_at)}${daysOwned != null ? ` · ${daysOwned} day${daysOwned === 1 ? '' : 's'}` : ''}`
+                : 'View ownership history'}
+            </Text>
+          </View>
+          {listing.owned_card_id ? (
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          ) : null}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 // ============================================================
 // SAVED SEARCHES

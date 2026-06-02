@@ -48,6 +48,139 @@ const shippingIcon = (pref) => ({
   either: { icon: 'swap-horizontal-outline', label: 'In person or ship' },
 }[pref] || { icon: 'help-outline', label: 'Unknown' });
 
+// Buyer-decision block: numbering, RC/Auto/Relic, grading, pop,
+// chain summary + tap-through to CardChainScreen for the full
+// ownership history. Mirrors the marketplace version (see
+// MarketplaceScreens.CardDetailsAndChainBlock) so a trader on
+// either surface sees the same chain context at the same moment.
+const TradeCardDetailsAndChainBlock = ({ listing, navigation }) => {
+  const fmtDate = (d) => {
+    if (!d) return '';
+    try {
+      return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return ''; }
+  };
+  const daysOwned = listing.owner_acquired_at
+    ? Math.max(0, Math.floor((Date.now() - new Date(listing.owner_acquired_at).getTime()) / 86400000))
+    : null;
+
+  const numberedLabel = listing.serial_number != null && listing.print_run
+    ? `#${listing.serial_number}/${listing.print_run}`
+    : listing.print_run
+      ? `/${listing.print_run}`
+      : null;
+
+  const popLine = (listing.pop_total != null)
+    ? `Pop ${listing.pop_total}${listing.pop_higher != null ? ` · ${listing.pop_higher} higher` : ''}`
+    : null;
+
+  const transferCount = Number(listing.transfer_count || 0);
+  const hasBadges = listing.is_rookie || listing.is_autograph || listing.is_relic || listing.is_one_of_one;
+  const hasGrading = listing.grading_company || listing.cert_number || popLine;
+  const ownedCardId = listing.owned_card_id;
+
+  return (
+    <View style={[styles.detailSection, { gap: Spacing.sm }]}>
+      <Text style={styles.detailSectionLabel}>Card details</Text>
+
+      <View style={{ gap: 4 }}>
+        {numberedLabel ? (
+          <Text style={styles.detailBody}>
+            <Text style={{ fontWeight: '700' }}>{numberedLabel}</Text>
+            {listing.parallel && !listing.detailParallelAlreadyShown ? ` · ${listing.parallel}` : ''}
+            {listing.is_one_of_one ? ' · 1 of 1' : ''}
+          </Text>
+        ) : null}
+        {listing.subset_name ? (
+          <Text style={styles.detailBody}>Insert / subset: {listing.subset_name}</Text>
+        ) : null}
+        {listing.manufacturer ? (
+          <Text style={styles.detailBody}>
+            Manufacturer: {listing.manufacturer}
+          </Text>
+        ) : null}
+        {hasBadges ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+            {listing.is_rookie ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: Colors.accent }}>
+                <Ionicons name="star" size={12} color={Colors.accent} />
+                <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: '700' }}>Rookie</Text>
+              </View>
+            ) : null}
+            {listing.is_autograph ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: Colors.accent2 }}>
+                <Ionicons name="create" size={12} color={Colors.accent2} />
+                <Text style={{ color: Colors.accent2, fontSize: 11, fontWeight: '700' }}>Autograph</Text>
+              </View>
+            ) : null}
+            {listing.is_relic ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: Colors.accent3 }}>
+                <Ionicons name="cube" size={12} color={Colors.accent3} />
+                <Text style={{ color: Colors.accent3, fontSize: 11, fontWeight: '700' }}>Relic</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      {hasGrading ? (
+        <View style={{ gap: 3 }}>
+          <Text style={styles.detailSectionLabel}>Grading</Text>
+          {(listing.grading_company || listing.grade) ? (
+            <Text style={styles.detailBody}>
+              {listing.grading_company ? String(listing.grading_company).toUpperCase() : ''}
+              {listing.grade ? ` ${listing.grade}` : ''}
+              {listing.cert_number ? `  ·  cert ${listing.cert_number}` : ''}
+            </Text>
+          ) : null}
+          {popLine ? <Text style={styles.detailBody}>{popLine}</Text> : null}
+        </View>
+      ) : null}
+
+      <View style={{ gap: 3 }}>
+        <Text style={styles.detailSectionLabel}>Chain of custody</Text>
+        <TouchableOpacity
+          onPress={() => ownedCardId ? navigation.navigate('CardChain', { cardId: ownedCardId }) : null}
+          disabled={!ownedCardId}
+          accessibilityLabel="View the full chain of custody for this card"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+            padding: Spacing.sm,
+            borderRadius: Radius.md, borderWidth: 1,
+            borderColor: listing.reported_stolen ? '#c0392b' : Colors.border,
+            backgroundColor: listing.reported_stolen ? '#c0392b15' : Colors.surface,
+          }}
+        >
+          <Ionicons
+            name={listing.reported_stolen ? 'alert-circle' : 'link'}
+            size={20}
+            color={listing.reported_stolen ? '#c0392b' : Colors.accent}
+          />
+          <View style={{ flex: 1 }}>
+            {listing.reported_stolen ? (
+              <Text style={{ color: '#c0392b', fontWeight: '700' }}>Reported stolen</Text>
+            ) : (
+              <Text style={{ color: Colors.text, fontWeight: '700' }}>
+                {transferCount === 0
+                  ? 'Original owner · no prior transfers'
+                  : `${transferCount} transfer${transferCount === 1 ? '' : 's'} on the chain`}
+              </Text>
+            )}
+            <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              {listing.owner_acquired_at
+                ? `Owner has held this card since ${fmtDate(listing.owner_acquired_at)}${daysOwned != null ? ` · ${daysOwned} day${daysOwned === 1 ? '' : 's'}` : ''}`
+                : 'View ownership history'}
+            </Text>
+          </View>
+          {ownedCardId ? (
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          ) : null}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 // Advisory verification badge. Shown on listing cards + detail.
 // `verified` = AI confirmed, `unverified` = could not confirm (default),
 // `failed` = AI flagged mismatch, `pending` = waiting on AI check.
@@ -690,6 +823,12 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
             </View>
           ) : null}
         </View>
+
+        {/* Card details + chain. Every buyer-relevant signal in one
+            place so the trader decides on this screen instead of
+            bouncing. Tap the chain row to open CardChainScreen for
+            the full ownership history. */}
+        <TradeCardDetailsAndChainBlock listing={listing} navigation={navigation} />
 
         {/* Looking for */}
         {listing.looking_for_text ? (
