@@ -161,6 +161,36 @@ export const CreateListingScreen = ({ navigation, route }) => {
   });
   const needsOnboarding = walletSummary && walletSummary.configured && !walletSummary.onboarded;
 
+  // Pull the owned card so we can pre-fill the listing photos with
+  // what the seller already registered. Without this, the photo picker
+  // looks empty even when the card has front+back+extras attached
+  // from registration — the seller gets prompted to "take a photo" as
+  // if proving ownership again. The API's uploadIfBase64 helper
+  // accepts https URLs unchanged, so passing existing Cloudinary URLs
+  // straight through the listing payload is safe.
+  const { data: ownedCardData } = useQuery({
+    queryKey: ['owned-card-for-listing', ownedCardId],
+    queryFn: () => cardsApi.get(ownedCardId).then((r) => r.data),
+    enabled: !!ownedCardId,
+  });
+  const photosPrefilledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (photosPrefilledRef.current) return;
+    if (!ownedCardData) return;
+    const existing = [
+      ownedCardData.own_image_front,
+      ownedCardData.own_image_back,
+      ...(Array.isArray(ownedCardData.photo_urls) ? ownedCardData.photo_urls : []),
+    ].filter(Boolean);
+    // De-dup in case photo_urls[0] is the same as own_image_front.
+    const seen = new Set();
+    const deduped = existing.filter((u) => (seen.has(u) ? false : seen.add(u)));
+    if (deduped.length) {
+      setPhotos(deduped);
+      photosPrefilledRef.current = true;
+    }
+  }, [ownedCardData]);
+
   // Saved listing defaults — pre-fill the shipping picker so a repeat
   // seller doesn't re-pick the same tiers every time. First-timers see
   // an empty picker; the standard SHIP-OPTIONS template kicks in for
@@ -320,7 +350,7 @@ export const CreateListingScreen = ({ navigation, route }) => {
           <>
             <Text style={styles.help}>Pick the card you want to list. Listings backed by your chain
             get a "Verified ownership" badge buyers can see.</Text>
-            {!cards.length && <EmptyState icon="🃏" title="No cards yet" message="Add a card to your collection first." />}
+            {!cards.length && <EmptyState title="No cards yet" message="Add a card to your collection first." />}
             {cards.map((c) => (
               <TouchableOpacity
                 key={c.id}
@@ -594,11 +624,18 @@ const PhotoPicker = ({ photos, onChange }) => {
 };
 
 const ShipOptionsPicker = ({ value, onChange, highValue }) => {
+  // Canonical 5-tier set — matches cardshop-api/src/routes/listing-defaults.js
+  // SHIPPING_TIERS_KNOWN and the auto-list defaults in cards.js. Default
+  // prices line up with auto-list so a manually-built listing prices the
+  // same as one the system generated for the seller.
   const tiers = [
-    { tier: 'pwe', name: 'Plain envelope', defaultPrice: 105, note: 'No tracking. <$20 cards.' },
-    { tier: 'bmwt', name: 'Bubble mailer + tracking', defaultPrice: 600, note: 'For $20-200 cards.' },
-    { tier: 'signature', name: 'Signature required', defaultPrice: 1200, note: 'Required for $200+.' },
+    { tier: 'pwe',                name: 'Plain envelope',           defaultPrice: 130,  note: 'No tracking. Under $20 cards. Covers stamp + envelope.' },
+    { tier: 'gmg',                name: 'BMWT',                     defaultPrice: 600,  note: 'Bubble mailer + tracking, 3-5 days. Covers all zones. $20-200 cards.' },
+    { tier: 'gmg_signature',      name: 'BMWT + Signature',         defaultPrice: 1000, note: 'Bubble mailer + tracking + signed for. Required for $200+.' },
+    { tier: 'priority',           name: 'Priority Mail',            defaultPrice: 1100, note: 'Faster 2-3 days. Optional upgrade.' },
+    { tier: 'priority_signature', name: 'Priority Mail + Signature', defaultPrice: 1500, note: 'Fastest + signed for. Acceptable for $200+.' },
   ];
+  const SIGNATURE_TIERS = new Set(['gmg_signature', 'priority_signature']);
   const toggle = (tier) => {
     const exists = value.find((v) => v.tier === tier.tier);
     if (exists) onChange(value.filter((v) => v.tier !== tier.tier));
@@ -608,7 +645,10 @@ const ShipOptionsPicker = ({ value, onChange, highValue }) => {
     <View style={{ gap: Spacing.xs }}>
       {tiers.map((t) => {
         const sel = value.find((v) => v.tier === t.tier);
-        const disabled = highValue && t.tier !== 'signature' && !sel;   // can still toggle off
+        // At $200+ only the two signature-bearing tiers can be added.
+        // Already-selected non-signature options can still be toggled
+        // off — so the seller can fix a mis-listed card cleanly.
+        const disabled = highValue && !SIGNATURE_TIERS.has(t.tier) && !sel;
         return (
           <TouchableOpacity
             key={t.tier}
@@ -983,15 +1023,34 @@ export const OrderDetailScreen = ({ navigation, route }) => {
         <View style={styles.box}>
           {isSeller ? (
             <>
-              <Row label="Buyer paid" value={usd(order.buyer_total_cents)} />
+              {/* Top of the breakdown: what the buyer paid, split into
+                  its parts. Sale + shipping are what the seller is
+                  "due"; tax is collected from the buyer and remitted
+                  to the state — it never touches the seller's net. */}
+              <Row label="Sale amount" value={usd(order.card_subtotal_cents)} />
+              <Row label="Shipping paid" value={usd(order.shipping_cents)} />
               {order.sales_tax_cents > 0 && (
                 <Row label="Tax (remitted)" value={`−${usd(order.sales_tax_cents)}`} />
               )}
-              <Row label="Card Shop fee" value={`−${usd(order.total_seller_fee_cents)}`} />
+              {/* Split the seller fee into our cut and Stripe's
+                  pass-through so a $1 card doesn't read like Card
+                  Shop is charging 46¢. Falls back to the legacy
+                  total_seller_fee_cents on older orders that don't
+                  carry the broken-out columns. */}
+              <Row
+                label="Card Shop fee"
+                value={`−${usd(
+                  order.platform_fee_cents
+                  ?? Math.max(0, (order.total_seller_fee_cents || 0) - (order.stripe_fee_cents || 0))
+                )}`}
+              />
+              {(order.stripe_fee_cents || 0) > 0 && (
+                <Row label="Payment processing" value={`−${usd(order.stripe_fee_cents)}`} />
+              )}
               {label?.cost_cents ? (
                 <Row label="Shipping label" value={`−${usd(label.cost_cents)}`} />
               ) : (
-                <Row label="Shipping label" value="—" />
+                <Row label="Shipping label" value={buyLabelMut.isPending ? 'Buying…' : '—'} />
               )}
               <View style={styles.divider} />
               <Row

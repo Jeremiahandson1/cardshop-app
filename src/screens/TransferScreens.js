@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { transfersApi, cardsApi, safetyApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { Button, Input, LoadingScreen } from '../components/ui';
+import { Button, Input, LoadingScreen, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 export const InitiateTransferScreen = ({ navigation, route }) => {
@@ -18,6 +18,11 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
 
   const [recipientUsername, setRecipientUsername] = useState('');
   const [price, setPrice] = useState('');
+  // Only one transfer method is wired up today (username), but the
+  // JSX still has the picker scaffold + `method === 'standard'`
+  // checks. Without this state the screen throws "Property 'method'
+  // does not exist" the moment it renders.
+  const [method, setMethod] = useState('standard');
 
   const { data: card } = useQuery({
     queryKey: ['card', cardId],
@@ -97,15 +102,28 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.lg, paddingBottom: 100 }}>
-        {/* Card preview */}
-        <View style={styles.cardPreview}>
-          <Text style={{ fontSize: 28 }}>🃏</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardName}>{card.player_name}</Text>
-            <Text style={styles.cardSub}>{card.year} {card.set_name}</Text>
-          </View>
-          <Ionicons name="swap-horizontal" size={20} color={Colors.accent} />
-        </View>
+        {/* Card preview — prefer the owner's uploaded photo, then
+            the catalog stock image, fall back to the logo only when
+            neither exists. Same priority as CardDetailScreen so the
+            transfer screen feels like a continuation of the card view. */}
+        {(() => {
+          const ownPhotos = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
+          const thumb = ownPhotos[0] || card.own_image_front || card.front_image_url || null;
+          return (
+            <View style={styles.cardPreview}>
+              {thumb ? (
+                <Image source={{ uri: thumb }} style={styles.cardThumb} resizeMode="cover" />
+              ) : (
+                <LogoMark size={40} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardName}>{card.player_name}</Text>
+                <Text style={styles.cardSub}>{card.year} {card.set_name}</Text>
+              </View>
+              <Ionicons name="swap-horizontal" size={20} color={Colors.accent} />
+            </View>
+          );
+        })()}
 
         {/* Method selector */}
         <View>
@@ -312,6 +330,12 @@ const styles = StyleSheet.create({
   },
   cardName: { color: Colors.text, fontSize: Typography.base, fontWeight: Typography.semibold },
   cardSub: { color: Colors.textMuted, fontSize: Typography.sm },
+  cardThumb: {
+    width: 38, height: 54,
+    borderRadius: 4,
+    backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.border,
+  },
   sectionLabel: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.sm },
   methodRow: { flexDirection: 'row', gap: Spacing.sm },
   methodBtn: {

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { searchApi } from '../services/api';
-import { EmptyState, LoadingScreen } from '../components/ui';
+import { EmptyState, LoadingScreen, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -74,7 +74,7 @@ export const SearchScreen = ({ navigation }) => {
       <View style={styles.resultImg}>
         {item.front_image_url
           ? <Image source={{ uri: item.front_image_url }} style={{ width: 50, height: 70 }} resizeMode="contain" />
-          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 24 }}>🃏</Text></View>
+          : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><LogoMark size={32} /></View>
         }
       </View>
       <View style={{ flex: 1 }}>

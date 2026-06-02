@@ -23,7 +23,7 @@ import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, EmptyState, LoadingScreen,
   ScreenHeader, SectionHeader, Divider, CardTile,
-  VerificationBadge,
+  VerificationBadge, LogoMark,
 } from '../components/ui';
 import { FairnessPanel } from '../components/FairnessPanel';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
@@ -1567,7 +1567,7 @@ export const MakeTradeOfferScreen = ({ navigation, route }) => {
 // ============================================================
 
 // Single-line card row used on both sides of the trade. Tap opens
-// CardDetail. Falls back to a 🃏 placeholder when the image_url is
+// CardDetail. Falls back to the CardShop logo when the image_url is
 // missing so the row height stays consistent.
 const TradeCardRow = ({ card, onPress }) => (
   <TouchableOpacity
@@ -1590,7 +1590,7 @@ const TradeCardRow = ({ card, onPress }) => (
       />
     ) : (
       <View style={{ width: 36, height: 50, borderRadius: 4, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>🃏</Text>
+        <LogoMark size={24} />
       </View>
     )}
     <View style={{ flex: 1 }}>

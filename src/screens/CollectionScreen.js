@@ -181,7 +181,6 @@ export const CollectionScreen = ({ navigation }) => {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="🃏"
             title={search ? 'No matches found' : 'No cards yet'}
             message={search ? 'Try a different search term' : 'Tap + to register your first card'}
             action={!search ? { label: 'Register a Card', onPress: () => navigation.navigate('RegisterCard') } : null}

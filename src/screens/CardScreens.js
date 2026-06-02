@@ -21,9 +21,9 @@ import { showMessage } from 'react-native-flash-message';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi } from '../services/api';
+import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi, transfersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge } from '../components/ui';
+import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 import Svg, { Polyline, Line as SvgLine, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
@@ -997,7 +997,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
     grading_company: 'raw',
-    condition: 'near_mint',
+    condition: 'mint',
     cert_number: '',
     grade: '',
     for_sale: false,
@@ -1300,11 +1300,30 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // are saved when both exist; if only one exists, that one gets
   // added. The user can reorder later via the photo grid (move-up /
   // make-cover buttons in the rendered photos block below).
+  //
+  // Idempotency: this function fires from BOTH the sibling-row pick
+  // (line 1976 area) and the candidate-row pick (line 2009 area). A
+  // user who taps one path and then switches to the other was getting
+  // their front+back appended twice — observed in prod as a 4-photo
+  // owned_card (Wolvesman 2026-06-02 Slowpoke & Psyduck-GX). Guard
+  // with a ref so any subsequent call is a no-op for this scan session.
+  // Reset on every new scan via the camera trigger.
+  const scanCommittedRef = React.useRef(false);
+  // Reset the idempotency latch whenever a fresh scanReview lands
+  // (a new front/back capture pair). Without this, after the user
+  // registers one card and starts scanning the next, the latch from
+  // the previous commit would silently block the new photos from
+  // being added.
+  React.useEffect(() => {
+    if (!scanReview) scanCommittedRef.current = false;
+  }, [scanReview]);
   const commitScanPhotos = () => {
+    if (scanCommittedRef.current) return;
     const additions = [];
     if (scanReview?.frontUri) additions.push(scanReview.frontUri);
     if (scanReview?.backUri)  additions.push(scanReview.backUri);
     if (!additions.length) return;
+    scanCommittedRef.current = true;
     setPhotos((p) => [...p, ...additions]);
     setPhotoSources((src) => [...src, ...additions.map(() => 'camera')]);
   };
@@ -1606,6 +1625,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         for_trade: form.for_trade,
         asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
         serial_number: form.serial_number ? parseInt(form.serial_number) : undefined,
+        // Backfill the catalog row's print_run when the user fills
+        // the inline "/N" input we show on catalog rows that didn't
+        // have it. API backfills card_catalog so the next collector
+        // who registers from the same row inherits the fix.
+        print_run: form.print_run ? parseInt(form.print_run, 10) : undefined,
         purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
         notes: form.notes || undefined,
@@ -1714,21 +1738,21 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // condition chip opens the long-form description below.
   const CONDITIONS = [
     { key: 'gem_mint',  label: 'Gem Mint',   ebay: 'Graded — Gem Mint',
-      desc: 'PSA/BGS/SGC 10 equivalent. Perfect centering, sharp corners, no printing defects visible under magnification. Raw Gem Mint is rare and should normally be graded.' },
+      desc: 'Perfect centering, sharp corners, no printing defects visible under magnification. Raw Gem Mint is rare and should normally be graded.' },
     { key: 'mint',      label: 'Mint',       ebay: 'Mint or Mint 9',
-      desc: 'PSA 9 equivalent. Near-perfect centering (55/45 or better), sharp corners, clean surface. One very minor flaw acceptable (e.g. a pinpoint print speck).' },
+      desc: 'Near-perfect centering (55/45 or better), sharp corners, clean surface. One very minor flaw acceptable (e.g. a pinpoint print speck).' },
     { key: 'near_mint', label: 'Near Mint',  ebay: 'Near Mint–Mint or NM 8',
-      desc: 'PSA 7-8 equivalent. Slight off-centering (60/40), minor corner wear, light surface scratches visible at an angle. No creases.' },
+      desc: 'Slight off-centering (60/40), minor corner wear, light surface scratches visible at an angle. No creases.' },
     { key: 'excellent', label: 'Excellent',  ebay: 'Excellent',
-      desc: 'PSA 5-6. Mild rounding on one or two corners, minor edge wear, fuzz visible. Image still sharp, no creases or major surface flaws.' },
+      desc: 'Mild rounding on one or two corners, minor edge wear, fuzz visible. Image still sharp, no creases or major surface flaws.' },
     { key: 'very_good', label: 'Very Good',  ebay: 'Very Good',
-      desc: 'PSA 3-4. Noticeable corner wear and edge fuzz, small surface scratches or light gloss loss. May have a single very light crease.' },
+      desc: 'Noticeable corner wear and edge fuzz, small surface scratches or light gloss loss. May have a single very light crease.' },
     { key: 'good',      label: 'Good',       ebay: 'Good',
-      desc: 'PSA 2. Rounded corners, frayed edges, visible creases, surface scratches or minor stains. Image intact and clearly identifiable.' },
+      desc: 'Rounded corners, frayed edges, visible creases, surface scratches or minor stains. Image intact and clearly identifiable.' },
     { key: 'fair',      label: 'Fair',       ebay: 'Fair',
-      desc: 'PSA 1.5. Heavy wear on all edges/corners, multiple creases, possible minor tears at the edge. Image recognizable.' },
+      desc: 'Heavy wear on all edges/corners, multiple creases, possible minor tears at the edge. Image recognizable.' },
     { key: 'poor',      label: 'Poor',       ebay: 'Poor',
-      desc: 'PSA 1. Major damage — tears, water damage, heavy staining, missing paper, writing, or pin-holes. Still the correct card but barely presentable.' },
+      desc: 'Major damage — tears, water damage, heavy staining, missing paper, writing, or pin-holes. Still the correct card but barely presentable.' },
   ];
   const [conditionDescFor, setConditionDescFor] = useState(null);
 
@@ -1796,7 +1820,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               <View style={styles.catalogResultImg}>
                 {item.front_image_url
                   ? <Image source={{ uri: item.front_image_url }} style={{ width: 40, height: 56 }} resizeMode="contain" />
-                  : <Text style={{ fontSize: 24 }}>🃏</Text>
+                  : <LogoMark size={32} />
                 }
               </View>
               <View style={{ flex: 1 }}>
@@ -2163,7 +2187,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
     return (
       <>
       {/* Full-screen overlay during AI analysis. Without it, the
-          user just sees the cascade screen for 3-5 seconds with no
+          user just sees the cascade screen for 15-20 seconds with no
           indication anything is happening. */}
       <Modal visible={scanAnalyzing} transparent animationType="fade">
         <View style={{
@@ -2175,7 +2199,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
             Analyzing both photos…
           </Text>
           <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-            Cross-referencing front + back to identify the card. Usually 3-5 seconds.
+            Cross-referencing front + back to identify the card. Usually 15-20 seconds.
           </Text>
         </View>
       </Modal>
@@ -2856,7 +2880,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         {!selectedCatalog ? <LoadingScreen /> : <View style={styles.selectedCard}>
           {selectedCatalog.front_image_url
             ? <Image source={{ uri: selectedCatalog.front_image_url }} style={{ width: 50, height: 70 }} resizeMode="contain" />
-            : <Text style={{ fontSize: 28 }}>🃏</Text>
+            : <LogoMark size={40} />
           }
           <View style={{ flex: 1 }}>
             <Text style={styles.catalogPlayer}>{selectedCatalog.player_name}</Text>
@@ -3794,6 +3818,39 @@ export const CardDetailScreen = ({ navigation, route }) => {
     );
   };
 
+  // Cancel an in-flight peer-to-peer transfer. The card row's
+  // pending_transfer_* fields drive the banner UI; cancel flips the
+  // transfer to 'cancelled' on the API and unlocks the card.
+  const cancelTransferMutation = useMutation({
+    mutationFn: (transferId) => transfersApi.cancel(transferId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+    },
+    onError: (err) => Alert.alert(
+      'Could not cancel',
+      err.response?.data?.error || 'Please try again.'
+    ),
+  });
+
+  const confirmCancelTransfer = () => {
+    if (!card?.pending_transfer_id) return;
+    const to = card.pending_transfer_to_name || card.pending_transfer_to_username || 'the recipient';
+    Alert.alert(
+      'Cancel this transfer?',
+      `The pending transfer to ${to} will be cancelled and the card returned to your collection.`,
+      [
+        { text: 'Keep it pending', style: 'cancel' },
+        {
+          text: 'Cancel transfer',
+          style: 'destructive',
+          onPress: () => cancelTransferMutation.mutate(card.pending_transfer_id),
+        },
+      ]
+    );
+  };
+
   // Lightbox state — open with the tapped photo, swipe between
   // all of the owner's uploaded photos (catalog stock images are
   // intentionally excluded; they're lower-resolution thumbnails).
@@ -3811,6 +3868,13 @@ export const CardDetailScreen = ({ navigation, route }) => {
   // visible because it's always informational.
   const tradeLocked = !!card?.pending_cstx_id;
   const goToTransaction = () => navigation.navigate('Transaction', { transactionId: card.pending_cstx_id });
+  // Plain peer-to-peer transfer in flight (not a marketplace CSTX). The
+  // banner below offers Cancel; the action chips up top suppress so the
+  // owner doesn't see a Transfer/Edit/Delete row that the API would 409.
+  const transferLocked = !!card?.pending_transfer_id;
+  // Either kind of in-flight ownership change locks the same downstream
+  // controls (vault, listing toggles, eBay state, list-for-sale flow).
+  const actionsLocked = tradeLocked || transferLocked;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -3837,7 +3901,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
               <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Move</Text>
             </TouchableOpacity>
           ) : null}
-          {isOwner ? (
+          {isOwner && !actionsLocked ? (
           <>
           <TouchableOpacity
             onPress={() => navigation.navigate('EditCard', { cardId })}
@@ -3927,6 +3991,47 @@ export const CardDetailScreen = ({ navigation, route }) => {
             <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
           </TouchableOpacity>
         ) : null}
+        {/* Peer-to-peer transfer in flight. Banner replaces the regular
+            action chips so the owner can't double-transfer or delete a
+            locked card. Tap = confirm dialog → cancel via API. */}
+        {transferLocked ? (
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              marginHorizontal: Spacing.base, marginTop: Spacing.base,
+              padding: Spacing.base,
+              borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.warning || '#b8830f',
+              backgroundColor: (Colors.warning || '#b8830f') + '15',
+            }}
+          >
+            <Ionicons name="swap-horizontal" size={20} color={Colors.warning || '#b8830f'} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.text, fontWeight: Typography.semibold }}>
+                Transfer in progress
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 2 }}>
+                Waiting for {card.pending_transfer_to_name || card.pending_transfer_to_username || 'the recipient'} to {card.pending_transfer_status === 'pending_delivery' ? 'confirm delivery' : 'accept'}.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={confirmCancelTransfer}
+              disabled={cancelTransferMutation.isPending}
+              accessibilityLabel="Cancel pending transfer"
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999,
+                backgroundColor: '#fff',
+                borderWidth: 1, borderColor: Colors.warning || '#b8830f',
+                opacity: cancelTransferMutation.isPending ? 0.5 : 1,
+              }}
+            >
+              <Ionicons name="close-circle-outline" size={14} color={Colors.warning || '#b8830f'} />
+              <Text style={{ color: Colors.warning || '#b8830f', fontSize: 12, fontWeight: '700' }}>
+                {cancelTransferMutation.isPending ? 'Cancelling…' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {/* Card image — prefer the owner's uploaded photos (photo_urls
             first, then the dedicated image_front/back fields) because
             most Panini/Topps catalog rows ship with no stock image.
@@ -3942,7 +4047,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
             return (
               <View style={styles.cardImageArea}>
                 <View style={styles.cardImagePlaceholder}>
-                  <Text style={{ fontSize: 60 }}>🃏</Text>
+                  <LogoMark size={80} />
                 </View>
               </View>
             );
@@ -4220,7 +4325,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
               user thinks "is this card tradeable?" and the data
               model follows. Hidden while a trade is in progress —
               intent can't change while the card is mid-CSTX. */}
-          {card?.owner_id === currentUserId && !tradeLocked ? (
+          {card?.owner_id === currentUserId && !actionsLocked ? (
             <View style={{ marginTop: Spacing.lg }}>
               <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontWeight: Typography.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.sm }}>
                 Trade status
@@ -4694,7 +4799,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
               drop verification to vault_verified; when shipped out,
               user is prompted to pair-scan to re-establish gold.
               Hidden during a pending CSTX (can't vault a card mid-deal). */}
-          {tradeLocked ? null : card.vault_provider ? (
+          {actionsLocked ? null : card.vault_provider ? (
             <View style={{
               marginTop: Spacing.md,
               padding: Spacing.md,
@@ -4840,12 +4945,12 @@ export const CardDetailScreen = ({ navigation, route }) => {
             </SafeAreaView>
           </Modal>
 
-          {/* Manual transfer button. Hidden during a pending CSTX —
-              ownership transfers automatically when the trade
-              completes, so a manual InitiateTransfer would either
-              double-send or lock the card out of the in-progress
-              deal. Surface the Transaction CTA instead. */}
-          {tradeLocked ? null : (
+          {/* Manual transfer button. Hidden during any in-flight
+              ownership change — a pending CSTX (the marketplace flow
+              completes ownership automatically) OR a peer-to-peer
+              transfer already waiting on the recipient. The banner up
+              top surfaces the cancel CTA in either case. */}
+          {actionsLocked ? null : (
             <Button
               title="Transfer Ownership"
               onPress={() => navigation.navigate('InitiateTransfer', { cardId })}
@@ -4854,9 +4959,9 @@ export const CardDetailScreen = ({ navigation, route }) => {
           )}
 
           {/* List on eBay — gated until the feature flag flips on,
-              and suppressed entirely when the card is locked in a
-              pending CSTX (can't list a card you're already moving). */}
-          {tradeLocked ? null : (
+              and suppressed entirely whenever the card is locked in
+              a pending CSTX or peer transfer. */}
+          {actionsLocked ? null : (
             <View style={{ marginTop: Spacing.md }}>
               {!ebayEnabled ? (
                 <View style={styles.ebayDisabled}>
@@ -4921,7 +5026,7 @@ export const EditCardScreen = ({ navigation, route }) => {
     setForm({
       for_sale: !!card.for_sale,
       for_trade: !!card.for_trade,
-      condition: card.condition || 'near_mint',
+      condition: card.condition || 'mint',
       condition_notes: card.condition_notes || '',
       asking_price: card.asking_price != null ? String(card.asking_price) : '',
       // Show price: empty string = "use my regular price". Sellers set
@@ -4941,21 +5046,21 @@ export const EditCardScreen = ({ navigation, route }) => {
   // copy shows up this should move to a module-level constant.
   const CONDITIONS = [
     { key: 'gem_mint',  label: 'Gem Mint',   ebay: 'Graded — Gem Mint',
-      desc: 'PSA/BGS/SGC 10 equivalent. Perfect centering, sharp corners, no printing defects visible under magnification.' },
+      desc: 'Perfect centering, sharp corners, no printing defects visible under magnification.' },
     { key: 'mint',      label: 'Mint',       ebay: 'Mint or Mint 9',
-      desc: 'PSA 9. Near-perfect centering (55/45+), sharp corners, clean surface. One very minor flaw acceptable.' },
+      desc: 'Near-perfect centering (55/45+), sharp corners, clean surface. One very minor flaw acceptable.' },
     { key: 'near_mint', label: 'Near Mint',  ebay: 'Near Mint–Mint or NM 8',
-      desc: 'PSA 7-8. Slight off-centering, minor corner wear, light surface scratches at an angle. No creases.' },
+      desc: 'Slight off-centering, minor corner wear, light surface scratches at an angle. No creases.' },
     { key: 'excellent', label: 'Excellent',  ebay: 'Excellent',
-      desc: 'PSA 5-6. Mild corner rounding, minor edge wear. Image still sharp, no creases.' },
+      desc: 'Mild corner rounding, minor edge wear. Image still sharp, no creases.' },
     { key: 'very_good', label: 'Very Good',  ebay: 'Very Good',
-      desc: 'PSA 3-4. Noticeable corner wear and edge fuzz. May have a single very light crease.' },
+      desc: 'Noticeable corner wear and edge fuzz. May have a single very light crease.' },
     { key: 'good',      label: 'Good',       ebay: 'Good',
-      desc: 'PSA 2. Rounded corners, visible creases, surface scratches. Image intact.' },
+      desc: 'Rounded corners, visible creases, surface scratches. Image intact.' },
     { key: 'fair',      label: 'Fair',       ebay: 'Fair',
-      desc: 'PSA 1.5. Heavy wear, multiple creases, possible minor tears. Image recognizable.' },
+      desc: 'Heavy wear, multiple creases, possible minor tears. Image recognizable.' },
     { key: 'poor',      label: 'Poor',       ebay: 'Poor',
-      desc: 'PSA 1. Major damage — tears, water damage, stains, writing, pin-holes.' },
+      desc: 'Major damage — tears, water damage, stains, writing, pin-holes.' },
   ];
 
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));

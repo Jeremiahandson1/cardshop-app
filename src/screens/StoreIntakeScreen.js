@@ -72,7 +72,7 @@ export const StoreIntakeScreen = ({ navigation }) => {
   const [showManualSearch, setShowManualSearch] = useState(false);
 
   // Details form
-  const [condition, setCondition] = useState('near_mint');
+  const [condition, setCondition] = useState('mint');
   const [askingPrice, setAskingPrice] = useState('');
   const [publicNotes, setPublicNotes] = useState('');
   const [frontPhoto, setFrontPhoto] = useState(null); // base64 data URL
@@ -301,7 +301,7 @@ export const StoreIntakeScreen = ({ navigation }) => {
     setStage(STAGE.VISION);
     setScannedQr(null);
     setSelectedCatalog(null);
-    setCondition('near_mint');
+    setCondition('mint');
     setAskingPrice('');
     setPublicNotes('');
     setFrontPhoto(null);

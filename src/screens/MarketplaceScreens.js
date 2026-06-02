@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { marketplaceApi, listingsApi, cartApi, homeApi } from '../services/api';
-import { Button, ScreenHeader, EmptyState, LoadingScreen, VerificationBadge } from '../components/ui';
+import { Button, ScreenHeader, EmptyState, LoadingScreen, VerificationBadge, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 const usd = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
@@ -194,7 +194,7 @@ const MarketplaceFirstListingState = ({ onListCard }) => (
       backgroundColor: Colors.surface,
       alignItems: 'center',
     }}>
-      <Text style={{ fontSize: 44, marginBottom: 8 }}>🃏</Text>
+      <LogoMark size={60} style={{ marginBottom: 8 }} />
       <Text style={{ color: Colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 6 }}>
         This marketplace starts with you.
       </Text>
@@ -530,7 +530,19 @@ export const ListingDetailScreen = ({ navigation, route }) => {
 };
 
 function shipTierLabel(t) {
-  return ({ pwe: 'Plain envelope (no tracking)', bmwt: 'Bubble mailer + tracking', signature: 'Signature required' })[t] || t;
+  // Canonical tier set lives in cardshop-api/src/routes/listing-defaults.js
+  // (SHIPPING_TIERS_KNOWN). bmwt + signature are legacy aliases for
+  // backward compat with listings created before migration 114.
+  return ({
+    pwe:                 'Plain envelope (no tracking)',
+    gmg:                 'BMWT',
+    gmg_signature:       'BMWT + Signature',
+    priority:            'Priority Mail',
+    priority_signature:  'Priority Mail + Signature',
+    // Legacy
+    bmwt:                'BMWT',
+    signature:           'Priority Mail + Signature',
+  })[t] || t;
 }
 
 const Badge = ({ icon, color, text }) => (
@@ -628,12 +640,19 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
 
-  // ScrollView outer frame — flexGrow:0 prevents the horizontal
-  // scroller from stretching vertically (which clipped pill bottoms
-  // on first roll-out). Border lives here so it spans the full row
-  // even when the inner content is narrower than the screen.
+  // ScrollView outer frame. flexGrow:0 prevents the horizontal
+  // scroller from stretching vertically, flexShrink:0 prevents the
+  // FlatList of listings below from squeezing it back down (which is
+  // what was clipping the pills' bottom halves whenever the list had
+  // more than 2 cards — the column-wrapper made the FlatList ask for
+  // a measurable vertical share). minHeight pins it as a final
+  // belt-and-suspenders against any future descendant style tweaks.
+  // Border lives here so it spans the full row even when the inner
+  // content is narrower than the screen.
   pillRowOuter: {
     flexGrow: 0,
+    flexShrink: 0,
+    minHeight: 48,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   pillRowInner: {

@@ -9,6 +9,16 @@ import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../services/api';
 
+const LOGO_SRC = require('../../assets/icon.png');
+
+export const LogoMark = ({ size = 28, style, rounded = true }) => (
+  <Image
+    source={LOGO_SRC}
+    style={[{ width: size, height: size, borderRadius: rounded ? size * 0.18 : 0 }, style]}
+    resizeMode="contain"
+  />
+);
+
 // ============================================================
 // BUTTON
 // ============================================================
@@ -258,8 +268,8 @@ export const CardTile = ({ card, onPress, style }) => {
   // Prefer the owner's uploaded photo over the catalog stock image
   // because most Panini/Topps rows ship with no image at all. Order:
   // photo_urls[0] → owner's dedicated front image → catalog front
-  // image → 🃏 placeholder. Field-name hedge covers both /cards/mine
-  // (aliased own_image_front) and /cards/:id (raw image_front_url).
+  // image → CardShop logo placeholder. Field-name hedge covers both
+  // /cards/mine (aliased own_image_front) and /cards/:id (raw image_front_url).
   const ownPhoto = Array.isArray(card.photo_urls) && card.photo_urls.length
     ? card.photo_urls[0] : null;
   const displayUri = ownPhoto
@@ -276,7 +286,7 @@ export const CardTile = ({ card, onPress, style }) => {
         <Image source={{ uri: displayUri }} style={cardTileStyles.image} resizeMode="contain" />
       ) : (
         <View style={cardTileStyles.imagePlaceholder}>
-          <Text style={{ fontSize: 28 }}>🃏</Text>
+          <LogoMark size={42} />
         </View>
       )}
       {card.is_rookie && (
@@ -407,9 +417,13 @@ const headerStyles = StyleSheet.create({
 // ============================================================
 // EMPTY STATE
 // ============================================================
-export const EmptyState = ({ icon = '🃏', title, message, action }) => (
+export const EmptyState = ({ icon, title, message, action }) => (
   <View style={emptyStyles.container}>
-    <Text style={emptyStyles.icon}>{icon}</Text>
+    {icon == null || icon === '🃏'
+      ? <LogoMark size={64} style={{ marginBottom: Spacing.base }} />
+      : typeof icon === 'string'
+        ? <Text style={emptyStyles.icon}>{icon}</Text>
+        : icon}
     <Text style={emptyStyles.title}>{title}</Text>
     {message && <Text style={emptyStyles.message}>{message}</Text>}
     {action && (

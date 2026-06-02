@@ -29,7 +29,7 @@ const CARDS = [
     key: 'scan',
     icon: 'qr-code',
     title: 'Tag your cards',
-    body: 'Stick a Card Shop QR on a card and every transfer, scan, and ownership change is logged forever. Pro includes 25 stickers a month.',
+    body: 'Stick a Card Shop QR on a card and every transfer, scan, and ownership change is logged forever. Show Floor includes a sheet of 117 stickers a month.',
   },
   {
     key: 'trade',

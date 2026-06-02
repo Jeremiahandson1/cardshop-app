@@ -366,10 +366,18 @@ const Choice = ({ active, title, sub, onPress }) => (
 );
 
 function shipTierLabel(t) {
+  // Canonical tier set lives in cardshop-api/src/routes/listing-defaults.js
+  // (SHIPPING_TIERS_KNOWN). bmwt + signature are legacy aliases for
+  // backward compat with listings created before migration 114.
   return ({
-    pwe: 'Plain envelope',
-    bmwt: 'Bubble mailer + tracking',
-    signature: 'Signature required',
+    pwe:                 'Plain envelope',
+    gmg:                 'BMWT',
+    gmg_signature:       'BMWT + Signature',
+    priority:            'Priority Mail',
+    priority_signature:  'Priority Mail + Signature',
+    // Legacy
+    bmwt:                'BMWT',
+    signature:           'Priority Mail + Signature',
   })[t] || t;
 }
 

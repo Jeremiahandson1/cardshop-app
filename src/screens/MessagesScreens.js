@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesApi } from '../services/api';
-import { LoadingScreen } from '../components/ui';
+import { LoadingScreen, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 function formatRelative(iso) {
@@ -89,7 +89,7 @@ export const ConversationListScreen = ({ navigation }) => {
               <Image source={{ uri: item.front_image_url }} style={styles.convThumb} />
             ) : (
               <View style={[styles.convThumb, styles.convThumbFallback]}>
-                <Text style={{ fontSize: 18 }}>🃏</Text>
+                <LogoMark size={26} />
               </View>
             )}
             <View style={{ flex: 1, marginLeft: Spacing.md }}>

@@ -99,7 +99,7 @@ export const DiscoverScreen = ({ navigation }) => {
               }}
             >
               <Text style={styles.sportEmoji}>
-                {({ Baseball: '⚾', Basketball: '🏀', Football: '🏈', Hockey: '🏒', Pokemon: '⚡', MTG: '🧙' })[item] || '🃏'}
+                {({ Baseball: '⚾', Basketball: '🏀', Football: '🏈', Hockey: '🏒', Pokemon: '⚡', MTG: '🧙' })[item] || '🎯'}
               </Text>
               <Text style={styles.sportLabel}>{item}</Text>
             </TouchableOpacity>

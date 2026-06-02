@@ -13,7 +13,7 @@ import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalle
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
-  ScreenHeader, SectionHeader, Divider, CardTile
+  ScreenHeader, SectionHeader, Divider, CardTile, LogoMark
 } from '../components/ui';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 
@@ -853,7 +853,7 @@ export const BinderCardPickerScreen = ({ navigation, route }) => {
                 <View style={styles.pickerCardImg}>
                   {item.front_image_url
                     ? <Image source={{ uri: item.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                    : <Text style={{ fontSize: 20 }}>🃏</Text>
+                    : <LogoMark size={28} />
                   }
                 </View>
                 <View style={{ flex: 1 }}>
@@ -925,7 +925,6 @@ export const BinderCardPickerScreen = ({ navigation, route }) => {
         }}
         ListEmptyComponent={
           <EmptyState
-            icon="🃏"
             title={search ? 'No matches found' : 'No cards available'}
             message={search ? 'Try a different search' : 'All your cards are already in this binder.'}
           />
@@ -1023,7 +1022,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
             || item.front_image_url;
           return uri
             ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
-            : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28 }}>🃏</Text></View>;
+            : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><LogoMark size={48} /></View>;
         })()}
         <View style={styles.publicCardIntentOverlay}>
           <IntentBadge signal={item.intent_signal} />
@@ -1351,7 +1350,6 @@ export const PublicBinderScreen = ({ navigation, route }) => {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="🃏"
             title="No cards in this binder yet"
             message={isOwner
               ? 'Scan the back of a card, scan a slab cert, or enter one manually. Card Shop handles the rest.'
@@ -1453,7 +1451,7 @@ export const BinderCardDetailScreen = ({ navigation, route }) => {
         <View style={styles.cardImageArea}>
           {card.front_image_url
             ? <Image source={{ uri: card.front_image_url }} style={styles.cardImage} resizeMode="contain" />
-            : <View style={styles.cardImagePlaceholder}><Text style={{ fontSize: 60 }}>🃏</Text></View>
+            : <View style={styles.cardImagePlaceholder}><LogoMark size={80} /></View>
           }
         </View>
 
@@ -1673,7 +1671,7 @@ export const MakeOfferScreen = ({ navigation, route }) => {
               <View style={styles.pickerCardImg}>
                 {card.front_image_url
                   ? <Image source={{ uri: card.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                  : <Text style={{ fontSize: 20 }}>🃏</Text>
+                  : <LogoMark size={28} />
                 }
               </View>
               <View style={{ flex: 1 }}>
@@ -1739,7 +1737,7 @@ export const MakeOfferScreen = ({ navigation, route }) => {
                   <View style={styles.pickerCardImg}>
                     {card.front_image_url
                       ? <Image source={{ uri: card.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                      : <Text style={{ fontSize: 20 }}>🃏</Text>
+                      : <LogoMark size={28} />
                     }
                   </View>
                   <View style={{ flex: 1 }}>
@@ -1788,7 +1786,7 @@ export const MakeOfferScreen = ({ navigation, route }) => {
                     <View style={styles.pickerCardImg}>
                       {item.front_image_url
                         ? <Image source={{ uri: item.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                        : <Text style={{ fontSize: 20 }}>🃏</Text>
+                        : <LogoMark size={28} />
                       }
                     </View>
                     <View style={{ flex: 1 }}>
@@ -1884,7 +1882,7 @@ export const OffersListScreen = ({ navigation }) => {
             <View style={styles.offerItemImg}>
               {item.card_image_url
                 ? <Image source={{ uri: item.card_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                : <Text style={{ fontSize: 20 }}>🃏</Text>
+                : <LogoMark size={28} />
               }
             </View>
             <View style={{ flex: 1 }}>
@@ -2004,7 +2002,7 @@ export const OfferDetailScreen = ({ navigation, route }) => {
               <View style={styles.pickerCardImg}>
                 {card.front_image_url
                   ? <Image source={{ uri: card.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                  : <Text style={{ fontSize: 20 }}>🃏</Text>
+                  : <LogoMark size={28} />
                 }
               </View>
               <View style={{ flex: 1 }}>
@@ -2050,7 +2048,7 @@ export const OfferDetailScreen = ({ navigation, route }) => {
                 <View style={styles.pickerCardImg}>
                   {card.front_image_url
                     ? <Image source={{ uri: card.front_image_url }} style={{ width: 36, height: 50 }} resizeMode="contain" />
-                    : <Text style={{ fontSize: 20 }}>🃏</Text>
+                    : <LogoMark size={28} />
                   }
                 </View>
                 <View style={{ flex: 1 }}>

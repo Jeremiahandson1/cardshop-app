@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { showMessage } from 'react-native-flash-message';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../services/api';
-import { Button, Input } from '../components/ui';
+import { Button, Input, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
@@ -100,7 +100,7 @@ export const LoginScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.logoArea}>
             <View style={styles.logoMark}>
-              <Text style={styles.logoIcon}>🃏</Text>
+              <LogoMark size={64} />
             </View>
             <Text style={styles.logoTitle}>Card Shop</Text>
             <Text style={styles.logoSub}>by Twomiah</Text>
@@ -289,7 +289,7 @@ export const RegisterScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.logoArea}>
             <View style={styles.logoMark}>
-              <Text style={styles.logoIcon}>🃏</Text>
+              <LogoMark size={64} />
             </View>
             <Text style={styles.logoTitle}>Card Shop</Text>
             <Text style={styles.logoSub}>by Twomiah</Text>

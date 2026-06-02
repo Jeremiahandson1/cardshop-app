@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { showMessage } from 'react-native-flash-message';
 
 import { dealRadarApi } from '../services/api';
-import { Button, EmptyState, LoadingScreen } from '../components/ui';
+import { Button, EmptyState, LoadingScreen, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 // ============================================================
@@ -224,7 +224,7 @@ const DealRow = ({ row, onPress, onLongPress }) => {
           <Image source={{ uri: row.listing_image_url }} style={rowStyles.thumb} resizeMode="cover" />
         ) : (
           <View style={[rowStyles.thumb, rowStyles.thumbPlaceholder]}>
-            <Text style={{ fontSize: 22 }}>🃏</Text>
+            <LogoMark size={30} />
           </View>
         )}
         {row.status === 'new' && <View style={rowStyles.newDot} />}
