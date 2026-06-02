@@ -3712,9 +3712,13 @@ export const CardDetailScreen = ({ navigation, route }) => {
       if (ctx?.prev) queryClient.setQueryData(['card', cardId], ctx.prev);
       Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.');
     },
-    onSettled: () => {
+    onSettled: (_data, _err, binderId) => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
+      // The affected binder's detail view caches its card list under
+      // ['binder', binderId] (BinderScreens.js:187). Without this it
+      // takes 5min (default staleTime) to reflect the change.
+      if (binderId) queryClient.invalidateQueries({ queryKey: ['binder', binderId] });
     },
   });
 
@@ -3730,9 +3734,10 @@ export const CardDetailScreen = ({ navigation, route }) => {
       if (ctx?.prev) queryClient.setQueryData(['card', cardId], ctx.prev);
       Alert.alert('Could not remove from binder', err?.response?.data?.error || 'Try again.');
     },
-    onSettled: () => {
+    onSettled: (_data, _err, binderId) => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
+      if (binderId) queryClient.invalidateQueries({ queryKey: ['binder', binderId] });
     },
   });
 
