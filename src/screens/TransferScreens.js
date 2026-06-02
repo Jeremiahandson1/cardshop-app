@@ -45,12 +45,13 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
       queryClient.invalidateQueries({ queryKey: ['my-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      // Skip the modal-tap intermission — the card-detail screen we
+      // bounce back to renders a "Transfer in progress · waiting for
+      // X" banner the moment the refetch lands, which is the same
+      // confirmation the alert used to provide. One less tap, no
+      // perceived lag.
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        'Transfer Initiated',
-        'The recipient will be notified and needs to accept the transfer.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      navigation.goBack();
     },
     onError: (err) => {
       Alert.alert('Error', err.response?.data?.error || 'Transfer failed');

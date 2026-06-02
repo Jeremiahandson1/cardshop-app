@@ -5179,6 +5179,51 @@ export const EditCardScreen = ({ navigation, route }) => {
   const [newPhotos, setNewPhotos] = useState([]); // newly-added file:// URIs
   const [conditionDescFor, setConditionDescFor] = useState(null);
 
+  // Re-link picker — for cards the AI matcher landed on the wrong
+  // catalog row (e.g. base instead of a /25 parallel). Search the
+  // catalog, tap a result, confirm, swap. Server blocks the swap if
+  // the card already has chain-of-custody history.
+  const [relinkVisible, setRelinkVisible] = useState(false);
+  const [relinkQ, setRelinkQ] = useState('');
+  const [relinkQDebounced, setRelinkQDebounced] = useState('');
+  React.useEffect(() => {
+    const t = setTimeout(() => setRelinkQDebounced(relinkQ.trim()), 300);
+    return () => clearTimeout(t);
+  }, [relinkQ]);
+  const { data: relinkResults, isFetching: relinkSearching } = useQuery({
+    queryKey: ['catalog-search-relink', relinkQDebounced],
+    queryFn: () => catalogApi.search({ q: relinkQDebounced, limit: 30 }).then((r) => r.data),
+    enabled: relinkVisible && relinkQDebounced.length >= 3,
+    keepPreviousData: true,
+  });
+  const relinkMut = useMutation({
+    mutationFn: (newCatalogId) => cardsApi.relink(cardId, newCatalogId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      setRelinkVisible(false);
+      setRelinkQ('');
+      Alert.alert('Card re-linked', 'The card is now matched to the catalog entry you picked.');
+    },
+    onError: (err) => {
+      Alert.alert(
+        err.response?.data?.code === 'chain_locked' ? 'Chain locked' : 'Could not re-link',
+        err.response?.data?.error || 'Try again.',
+      );
+    },
+  });
+  const confirmRelink = (target) => {
+    Alert.alert(
+      'Re-link to this card?',
+      `${[target.year, target.manufacturer, target.set_name].filter(Boolean).join(' · ')}\n${target.player_name}${target.parallel ? ` · ${target.parallel}` : ''}${target.print_run ? ` /${target.print_run}` : ''}${target.card_number ? ` · #${target.card_number}` : ''}\n\nThis replaces what the card is matched to. Photos, notes, and condition stay.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Re-link', onPress: () => relinkMut.mutate(target.id) },
+      ],
+    );
+  };
+
   React.useEffect(() => {
     if (!card || form) return;
     setForm({
@@ -5388,6 +5433,28 @@ export const EditCardScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* Wrong-card re-link. Hidden once the card has any chain
+            history (server rejects the swap anyway; hiding the CTA
+            keeps the UI honest). */}
+        {(card.transfer_count || 0) === 0 && !card.acquired_via_cstx ? (
+          <TouchableOpacity
+            onPress={() => setRelinkVisible(true)}
+            accessibilityLabel="Re-link this card to a different catalog entry"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingVertical: Spacing.sm, paddingHorizontal: Spacing.base,
+              borderRadius: Radius.md, borderWidth: 1,
+              borderColor: Colors.border, backgroundColor: Colors.surface,
+              alignSelf: 'flex-start',
+            }}
+          >
+            <Ionicons name="swap-horizontal" size={16} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>
+              Wrong card? Pick the right one
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* Condition */}
         {card.grading_company === 'raw' || !card.grading_company ? (
           <View>
@@ -5572,6 +5639,98 @@ export const EditCardScreen = ({ navigation, route }) => {
           style={{ flex: 1 }}
         />
       </View>
+
+      {/* Re-link picker. Modal with a debounced search against
+          /catalog/search, tap a result to confirm + swap. Server
+          rejects with chain_locked when the card already has
+          transfer history (route at POST /cards/:id/relink). */}
+      <Modal
+        visible={relinkVisible}
+        animationType="slide"
+        onRequestClose={() => setRelinkVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setRelinkVisible(false)}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Pick the right card</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+            margin: Spacing.base,
+            padding: Spacing.sm,
+            borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+            backgroundColor: Colors.surface,
+          }}>
+            <Ionicons name="search" size={16} color={Colors.textMuted} />
+            <TextInput
+              value={relinkQ}
+              onChangeText={setRelinkQ}
+              placeholder="Player, set, year, card number…"
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+              autoCorrect={false}
+              autoCapitalize="words"
+              style={{ flex: 1, color: Colors.text, fontSize: Typography.base }}
+              returnKeyType="search"
+            />
+            {relinkQ ? (
+              <TouchableOpacity onPress={() => setRelinkQ('')}>
+                <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {relinkQDebounced.length < 3 ? (
+            <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg, paddingHorizontal: Spacing.base }}>
+              Type at least 3 characters to search the catalog.
+            </Text>
+          ) : relinkSearching && !relinkResults ? (
+            <View style={{ marginTop: Spacing.lg, alignItems: 'center' }}>
+              <ActivityIndicator color={Colors.accent} />
+            </View>
+          ) : !Array.isArray(relinkResults?.results) || relinkResults.results.length === 0 ? (
+            <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg, paddingHorizontal: Spacing.base }}>
+              No catalog matches for "{relinkQDebounced}". Try a different player name, year, or set.
+            </Text>
+          ) : (
+            <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
+              {relinkResults.results.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => confirmRelink(c)}
+                  style={{
+                    paddingVertical: Spacing.md,
+                    paddingHorizontal: Spacing.base,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: Colors.border,
+                    gap: 2,
+                  }}
+                >
+                  <Text style={{ color: Colors.text, fontSize: Typography.base, fontWeight: '700' }}>
+                    {c.player_name}
+                    {c.card_number ? <Text style={{ color: Colors.textMuted, fontWeight: '400' }}>  #{c.card_number}</Text> : null}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+                    {[c.year, c.manufacturer, c.set_name].filter(Boolean).join(' · ')}
+                  </Text>
+                  {(c.parallel || c.print_run || c.is_one_of_one || c.subset_name) ? (
+                    <Text style={{ color: Colors.accent, fontSize: Typography.xs, marginTop: 2 }}>
+                      {c.parallel ? c.parallel : ''}
+                      {c.print_run ? `${c.parallel ? ' · ' : ''}/${c.print_run}` : ''}
+                      {c.is_one_of_one ? ' · 1/1' : ''}
+                      {c.subset_name ? `${(c.parallel || c.print_run || c.is_one_of_one) ? ' · ' : ''}${c.subset_name}` : ''}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };

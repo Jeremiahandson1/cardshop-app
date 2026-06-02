@@ -211,6 +211,9 @@ export const cardsApi = {
   update: (id, data) => api.patch(`/cards/${id}`, data, { timeout: 90_000 }),
   delete: (id) => api.delete(`/cards/${id}`),
   history: (id) => api.get(`/cards/${id}/history`),
+  // Change the catalog row this owned card maps to (fix wrong-match
+  // from the scanner). Server enforces owner + no-chain-history.
+  relink: (id, new_catalog_id) => api.post(`/cards/${id}/relink`, { new_catalog_id }),
   // "This is actually my card, not theirs." Files a counter-claim
   // on a graded cert. Only useful for non-owners viewing a card.
   counterClaim: (id, { reason, evidence_url } = {}) =>
