@@ -3684,27 +3684,56 @@ export const CardDetailScreen = ({ navigation, route }) => {
   });
   const myBinders = bindersData?.binders || [];
 
+  // Add / remove use optimistic updates against the ['card', cardId]
+  // cache so the picker checkmark flips the instant the user taps.
+  // Without this the user has to wait for the round-trip + refetch
+  // before the UI reflects the new state — which reads as "the tap
+  // didn't do anything" when toggling fast across many binders.
+  const optimisticPatchInBinder = (binderId, op) => {
+    queryClient.setQueryData(['card', cardId], (old) => {
+      if (!old) return old;
+      const cur = Array.isArray(old.in_binder_ids) ? old.in_binder_ids : [];
+      const next = op === 'add'
+        ? (cur.includes(binderId) ? cur : [...cur, binderId])
+        : cur.filter((id) => id !== binderId);
+      return { ...old, in_binder_ids: next };
+    });
+  };
+
   const moveBinder = useMutation({
     mutationFn: (binderId) => moveCardToBinder(cardId, binderId),
-    onSuccess: () => {
+    onMutate: async (binderId) => {
+      await queryClient.cancelQueries({ queryKey: ['card', cardId] });
+      const prev = queryClient.getQueryData(['card', cardId]);
+      optimisticPatchInBinder(binderId, 'add');
+      return { prev };
+    },
+    onError: (err, _binderId, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['card', cardId], ctx.prev);
+      Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
-      // No success alert — the picker UI shows the new "in" state
-      // via the checkmark and re-fetches the card on success, so a
-      // popup on every tap would be noisy when toggling.
     },
-    onError: (err) => Alert.alert('Could not add card to binder', err?.response?.data?.error || 'Try again.'),
   });
 
-  // Remove this card from a specific binder (binder_cards row deletes).
-  // Additive model means the card stays in every other binder it's in.
   const removeFromBinderMut = useMutation({
     mutationFn: (binderId) => bindersApi.removeCard(binderId, cardId),
-    onSuccess: () => {
+    onMutate: async (binderId) => {
+      await queryClient.cancelQueries({ queryKey: ['card', cardId] });
+      const prev = queryClient.getQueryData(['card', cardId]);
+      optimisticPatchInBinder(binderId, 'remove');
+      return { prev };
+    },
+    onError: (err, _binderId, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['card', cardId], ctx.prev);
+      Alert.alert('Could not remove from binder', err?.response?.data?.error || 'Try again.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
     },
-    onError: (err) => Alert.alert('Could not remove from binder', err?.response?.data?.error || 'Try again.'),
   });
 
   // Setting the binder-level intent IS the feed switch — server
