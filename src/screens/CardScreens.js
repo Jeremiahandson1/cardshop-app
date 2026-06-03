@@ -5179,23 +5179,35 @@ export const EditCardScreen = ({ navigation, route }) => {
   const [newPhotos, setNewPhotos] = useState([]); // newly-added file:// URIs
   const [conditionDescFor, setConditionDescFor] = useState(null);
 
-  // Re-link picker — for cards the AI matcher landed on the wrong
-  // catalog row (e.g. base instead of a /25 parallel). Search the
-  // catalog, tap a result, confirm, swap. Server blocks the swap if
-  // the card already has chain-of-custody history.
+  // Re-link picker — reuses the same cascade (sport → year →
+  // manufacturer → set → player → card # → subset/parallel) used by
+  // the register flow so the user picks a catalog row the same way
+  // they always do, not via a separate text search box.
   const [relinkVisible, setRelinkVisible] = useState(false);
-  const [relinkQ, setRelinkQ] = useState('');
-  const [relinkQDebounced, setRelinkQDebounced] = useState('');
-  React.useEffect(() => {
-    const t = setTimeout(() => setRelinkQDebounced(relinkQ.trim()), 300);
-    return () => clearTimeout(t);
-  }, [relinkQ]);
-  const { data: relinkResults, isFetching: relinkSearching } = useQuery({
-    queryKey: ['catalog-search-relink', relinkQDebounced],
-    queryFn: () => catalogApi.search({ q: relinkQDebounced, limit: 30 }).then((r) => r.data),
-    enabled: relinkVisible && relinkQDebounced.length >= 3,
-    placeholderData: keepPreviousData,
-  });
+  const RELINK_CASCADE_ORDER = [
+    'sport', 'year', 'manufacturer', 'set_name',
+    'player_name', 'card_number', 'subset_name', 'parallel',
+  ];
+  const RELINK_CASCADE_LABEL = {
+    sport:         'Sport',
+    year:          'Year',
+    manufacturer:  'Manufacturer',
+    set_name:      'Set',
+    subset_name:   'Subset / Insert',
+    player_name:   'Player',
+    card_number:   'Pick the exact card',
+    parallel:      'Parallel / variant',
+  };
+  const [relinkCascade, setRelinkCascade] = useState({});
+  const [relinkCascadeDim, setRelinkCascadeDim] = useState('sport');
+  const [relinkCascadeQuery, setRelinkCascadeQuery] = useState('');
+  const openRelink = () => {
+    setRelinkCascade({});
+    setRelinkCascadeDim('sport');
+    setRelinkCascadeQuery('');
+    setRelinkVisible(true);
+  };
+
   const relinkMut = useMutation({
     mutationFn: (newCatalogId) => cardsApi.relink(cardId, newCatalogId),
     onSuccess: () => {
@@ -5203,7 +5215,6 @@ export const EditCardScreen = ({ navigation, route }) => {
       queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
       setRelinkVisible(false);
-      setRelinkQ('');
       Alert.alert('Card re-linked', 'The card is now matched to the catalog entry you picked.');
     },
     onError: (err) => {
@@ -5222,6 +5233,35 @@ export const EditCardScreen = ({ navigation, route }) => {
         { text: 'Re-link', onPress: () => relinkMut.mutate(target.id) },
       ],
     );
+  };
+
+  // Cascade calls this when the user finishes the picker (final dim).
+  // We do the same exact-match resolution the register flow uses,
+  // then prompt for confirm and fire the relink.
+  const onRelinkCascadeComplete = async (filters) => {
+    try {
+      const res = await catalogApi.search({
+        sport: filters.sport,
+        year: filters.year,
+        manufacturer: filters.manufacturer,
+        set_name: filters.set_name,
+        subset_name: filters.subset_name,
+        card_number: filters.card_number,
+        player_name: filters.player_name,
+        parallel: filters.parallel,
+        limit: 5,
+      });
+      const hits = res.data?.cards || [];
+      const exact = hits.find((c) =>
+        (c.card_number || '') === (filters.card_number || '') &&
+        (c.subset_name || '') === (filters.subset_name || ''),
+      );
+      const picked = exact || hits[0];
+      if (picked) confirmRelink(picked);
+      else Alert.alert('No match', 'No catalog row matched. Try a different combination.');
+    } catch (err) {
+      Alert.alert('Search failed', err?.response?.data?.error || 'Try again');
+    }
   };
 
   React.useEffect(() => {
@@ -5438,7 +5478,7 @@ export const EditCardScreen = ({ navigation, route }) => {
             keeps the UI honest). */}
         {(card.transfer_count || 0) === 0 && !card.acquired_via_cstx ? (
           <TouchableOpacity
-            onPress={() => setRelinkVisible(true)}
+            onPress={openRelink}
             accessibilityLabel="Re-link this card to a different catalog entry"
             style={{
               flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -5640,10 +5680,11 @@ export const EditCardScreen = ({ navigation, route }) => {
         />
       </View>
 
-      {/* Re-link picker. Modal with a debounced search against
-          /catalog/search, tap a result to confirm + swap. Server
-          rejects with chain_locked when the card already has
-          transfer history (route at POST /cards/:id/relink). */}
+      {/* Re-link picker. Uses the same CascadePicker as the register
+          flow so the user walks Sport → Year → Manufacturer → Set →
+          Player → Card # → Subset → Parallel, same as everywhere else.
+          On the final step we resolve to an exact catalog row and
+          prompt for confirm before firing POST /cards/:id/relink. */}
       <Modal
         visible={relinkVisible}
         animationType="slide"
@@ -5658,77 +5699,18 @@ export const EditCardScreen = ({ navigation, route }) => {
             <View style={{ width: 24 }} />
           </View>
 
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-            margin: Spacing.base,
-            padding: Spacing.sm,
-            borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
-            backgroundColor: Colors.surface,
-          }}>
-            <Ionicons name="search" size={16} color={Colors.textMuted} />
-            <TextInput
-              value={relinkQ}
-              onChangeText={setRelinkQ}
-              placeholder="Player, set, year, card number…"
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
-              autoCorrect={false}
-              autoCapitalize="words"
-              style={{ flex: 1, color: Colors.text, fontSize: Typography.base }}
-              returnKeyType="search"
-            />
-            {relinkQ ? (
-              <TouchableOpacity onPress={() => setRelinkQ('')}>
-                <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {relinkQDebounced.length < 3 ? (
-            <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg, paddingHorizontal: Spacing.base }}>
-              Type at least 3 characters to search the catalog.
-            </Text>
-          ) : relinkSearching && !relinkResults ? (
-            <View style={{ marginTop: Spacing.lg, alignItems: 'center' }}>
-              <ActivityIndicator color={Colors.accent} />
-            </View>
-          ) : !Array.isArray(relinkResults?.results) || relinkResults.results.length === 0 ? (
-            <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.lg, paddingHorizontal: Spacing.base }}>
-              No catalog matches for "{relinkQDebounced}". Try a different player name, year, or set.
-            </Text>
-          ) : (
-            <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
-              {relinkResults.results.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  onPress={() => confirmRelink(c)}
-                  style={{
-                    paddingVertical: Spacing.md,
-                    paddingHorizontal: Spacing.base,
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: Colors.border,
-                    gap: 2,
-                  }}
-                >
-                  <Text style={{ color: Colors.text, fontSize: Typography.base, fontWeight: '700' }}>
-                    {c.player_name}
-                    {c.card_number ? <Text style={{ color: Colors.textMuted, fontWeight: '400' }}>  #{c.card_number}</Text> : null}
-                  </Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
-                    {[c.year, c.manufacturer, c.set_name].filter(Boolean).join(' · ')}
-                  </Text>
-                  {(c.parallel || c.print_run || c.is_one_of_one || c.subset_name) ? (
-                    <Text style={{ color: Colors.accent, fontSize: Typography.xs, marginTop: 2 }}>
-                      {c.parallel ? c.parallel : ''}
-                      {c.print_run ? `${c.parallel ? ' · ' : ''}/${c.print_run}` : ''}
-                      {c.is_one_of_one ? ' · 1/1' : ''}
-                      {c.subset_name ? `${(c.parallel || c.print_run || c.is_one_of_one) ? ' · ' : ''}${c.subset_name}` : ''}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          <CascadePicker
+            navigation={navigation}
+            cascade={relinkCascade}
+            setCascade={setRelinkCascade}
+            cascadeDim={relinkCascadeDim}
+            setCascadeDim={setRelinkCascadeDim}
+            cascadeQuery={relinkCascadeQuery}
+            setCascadeQuery={setRelinkCascadeQuery}
+            cascadeOrder={RELINK_CASCADE_ORDER}
+            cascadeLabel={RELINK_CASCADE_LABEL}
+            onComplete={onRelinkCascadeComplete}
+          />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
