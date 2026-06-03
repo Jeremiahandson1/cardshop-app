@@ -188,10 +188,15 @@ const CascadePicker = ({
     // Distinct-over-1.7M-rows can take several seconds cold. Fail
     // fast on error so the user sees a retry button instead of
     // waiting through exponential backoff thinking nothing is
-    // happening. Keep previous data visible during refetch so the
-    // UI doesn't flash empty between steps.
+    // happening.
     retry: 1,
-    placeholderData: keepPreviousData,
+    // Only keep previous data while the user is typing in the search
+    // box of the SAME step (cascadeDim unchanged). When they advance
+    // to the next step, drop the placeholder so the prior step's
+    // options don't flash on screen as the new step loads.
+    // The queryKey shape is ['catalog-filter', cascadeDim, ...].
+    placeholderData: (prevData, prevQuery) =>
+      prevQuery?.queryKey?.[1] === cascadeDim ? prevData : undefined,
   });
 
   // On the card_number step we show full catalog rows for the
