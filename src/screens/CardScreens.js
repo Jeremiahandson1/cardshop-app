@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   FlatList, Image, Alert, ActivityIndicator, Modal, Dimensions, Linking,
   BackHandler,
 } from 'react-native';
