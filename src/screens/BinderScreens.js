@@ -257,9 +257,14 @@ export const BinderEditorScreen = ({ navigation, route }) => {
 
   const createMutation = useMutation({
     mutationFn: (data) => bindersApi.create(data),
-    onSuccess: (res) => {
+    onSuccess: () => {
+      // Bounce back to wherever the user opened the create flow from
+      // (binders list / picker / etc.). The previous behavior replaced
+      // this screen with the new binder's editor — visually it looked
+      // identical to the create form, so users thought the save didn't
+      // happen and tapped Save again.
       queryClient.invalidateQueries({ queryKey: ['my-binders'] });
-      navigation.replace('BinderEditor', { binderId: res.data?.id });
+      navigation.goBack();
     },
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to create binder'),
   });
