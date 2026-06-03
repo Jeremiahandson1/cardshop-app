@@ -637,6 +637,20 @@ const CardDetailsAndChainBlock = ({ listing, navigation }) => {
         </View>
       ) : null}
 
+      {(listing.owner_condition_notes || listing.owner_public_notes) ? (
+        <View style={{ marginTop: Spacing.sm, gap: 3 }}>
+          <Text style={styles.shipLabel}>Notes from the seller</Text>
+          {listing.owner_condition_notes ? (
+            <Text style={styles.detailDescription}>
+              <Text style={{ fontWeight: '700' }}>Condition:</Text> {listing.owner_condition_notes}
+            </Text>
+          ) : null}
+          {listing.owner_public_notes ? (
+            <Text style={styles.detailDescription}>{listing.owner_public_notes}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={{ marginTop: Spacing.sm, gap: 3 }}>
         <Text style={styles.shipLabel}>Chain of custody</Text>
         <TouchableOpacity
