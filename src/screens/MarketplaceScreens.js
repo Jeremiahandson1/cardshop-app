@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { marketplaceApi, listingsApi, cartApi, homeApi } from '../services/api';
 import { Button, ScreenHeader, EmptyState, LoadingScreen, VerificationBadge, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -293,6 +293,10 @@ export const MarketplaceSearchScreen = ({ navigation }) => {
     queryKey: ['marketplace-search', q, filters],
     queryFn: () => marketplaceApi.search({ q, ...filters, limit: 25 }),
     enabled: q.length > 1 || Object.keys(filters).length > 0,
+    // Keep showing the previous result set while a new query is in
+    // flight (typing in the search box, toggling filters) so the
+    // list doesn't blank out between keystrokes.
+    placeholderData: keepPreviousData,
   });
 
   const listings = data?.listings || [];

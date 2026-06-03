@@ -20,7 +20,7 @@ import { showMessage } from 'react-native-flash-message';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi, transfersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge, LogoMark } from '../components/ui';
@@ -191,7 +191,7 @@ const CascadePicker = ({
     // happening. Keep previous data visible during refetch so the
     // UI doesn't flash empty between steps.
     retry: 1,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   // On the card_number step we show full catalog rows for the
@@ -215,7 +215,7 @@ const CascadePicker = ({
         limit: 200,
       }).then((r) => r.data?.cards || []),
     staleTime: 10_000,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const options = cascadeDim === 'year' ? yearOptions
@@ -5194,7 +5194,7 @@ export const EditCardScreen = ({ navigation, route }) => {
     queryKey: ['catalog-search-relink', relinkQDebounced],
     queryFn: () => catalogApi.search({ q: relinkQDebounced, limit: 30 }).then((r) => r.data),
     enabled: relinkVisible && relinkQDebounced.length >= 3,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
   const relinkMut = useMutation({
     mutationFn: (newCatalogId) => cardsApi.relink(cardId, newCatalogId),

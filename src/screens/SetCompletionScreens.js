@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { setsApi, wantListApi, catalogApi } from '../services/api';
 import {
   Button, EmptyState, LoadingScreen, ScreenHeader, SectionHeader, Divider,
@@ -144,7 +144,7 @@ export const BrowseSetsScreen = ({ navigation }) => {
         .then((r) => r.data?.values || []),
     staleTime: 10_000,
     retry: 1,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   // Cards already tracked (to show checkmarks and prevent dupes

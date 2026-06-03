@@ -706,13 +706,34 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
     },
   });
 
+  // Withdraw: optimistically drop the listing from every cached
+  // ['trade-listings', ...] feed so the trade board feels instant
+  // even though the server call hasn't returned yet. Snapshot every
+  // touched cache for rollback if the API rejects. The actual
+  // navigation.goBack() now fires from the confirm dialog itself
+  // (see the Remove button below) rather than waiting on success.
   const removeMutation = useMutation({
     mutationFn: () => tradeListingsApi.remove(listingId),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['trade-listings'] });
+      const matched = qc.getQueriesData({ queryKey: ['trade-listings'] });
+      const snapshots = matched.map(([key, data]) => [key, data]);
+      matched.forEach(([key, data]) => {
+        if (!data) return;
+        const dropById = (arr) => Array.isArray(arr) ? arr.filter((l) => l.id !== listingId) : arr;
+        qc.setQueryData(key, {
+          ...data,
+          listings: dropById(data.listings),
+          store_listings: dropById(data.store_listings),
+        });
+      });
+      return { snapshots };
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trade-listings'] });
-      navigation.goBack();
     },
-    onError: (err) => {
+    onError: (err, _vars, ctx) => {
+      if (ctx?.snapshots) ctx.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
       Alert.alert(
         'Could not remove listing',
         err?.response?.data?.error || err?.message || 'Try again in a moment.',
@@ -980,7 +1001,10 @@ export const TradeListingDetailScreen = ({ navigation, route }) => {
                   'This takes it off the board. You can list the card again later.',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Remove', style: 'destructive', onPress: () => removeMutation.mutate() },
+                    { text: 'Remove', style: 'destructive', onPress: () => {
+                      removeMutation.mutate();
+                      navigation.goBack();
+                    } },
                   ],
                 )}
                 style={{ flex: 1 }}
