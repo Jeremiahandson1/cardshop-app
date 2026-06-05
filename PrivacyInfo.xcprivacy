@@ -11,7 +11,6 @@
     - Camera: scanning QR codes + capturing card photos
     - Photo Library: uploading existing card photos
     - Location: trade listings and LCS lookups (when in use)
-    - NFC: ownership-transfer reads at trade shows
     - Email + name: account identity (used for auth, login,
       linked to identity)
     - Crash logs (Sentry): bug diagnosis (NOT linked to identity
