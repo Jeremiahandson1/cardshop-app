@@ -218,6 +218,52 @@ export function registerNotificationResponseHandler(navigationRef) {
         }
         return;
       }
+
+      // CSTX dispute opened on a binder_transaction. Routes to the
+      // same transaction screen — dispute card surfaces inline.
+      if (data?.type === 'binder_dispute' && data.cstx_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'Transaction', params: { transactionId: data.cstx_id },
+          });
+        }
+        return;
+      }
+
+      // 14-day-stuck transfer ping (cron). Lands on the Transfers tab
+      // so the user sees the stuck one.
+      if (data?.type === 'transfer_stuck') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'TransferList' });
+        return;
+      }
+
+      // Counter-claim resolved / cert counter-claim — open the card.
+      if ((data?.type === 'cert_counter_claim' || data?.type === 'counter_claim_resolved') && data.owned_card_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'CardDetail', params: { cardId: data.owned_card_id },
+          });
+        }
+        return;
+      }
+
+      // Reprice sweep — open the affected card so the seller can act.
+      if ((data?.type === 'reprice_applied'
+            || data?.type === 'reprice_suggest'
+            || data?.type === 'reprice_alert') && data.owned_card_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'CardDetail', params: { cardId: data.owned_card_id },
+          });
+        }
+        return;
+      }
+
+      // New follower — open trust profile so they can see who.
+      if (data?.type === 'binder_follow') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'TrustProfile' });
+        return;
+      }
     } catch (err) {
       console.warn('notification response handler error', err?.message);
     }

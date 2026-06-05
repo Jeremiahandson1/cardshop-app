@@ -113,6 +113,46 @@ const NOTIFICATION_MAP = {
   // Card-traded-away — losing offerer notification when the listing
   // owner picked someone else.
   trade_listing_traded_away:  { icon: 'close-circle', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') },
+
+  // Transfers: 14-day-stuck cron ping (stuckSweep).
+  transfer_stuck: { icon: 'time', color: '#f87171',
+    dest: (n, nav) => n.data?.transfer_id ? nav.navigate('Transfers') : nav.navigate('Notifications') },
+
+  // Social: new follower.
+  binder_follow: { icon: 'people', color: '#4ecdc4',
+    dest: (_, nav) => nav.navigate('Profile', { screen: 'TrustProfile' }) },
+
+  // Counter-claim family. counter_claim (generic) already mapped above;
+  // cert_counter_claim (new) routes to the same card; counter_claim_resolved
+  // is the admin-resolution ping to either party.
+  cert_counter_claim: { icon: 'shield', color: '#f87171',
+    dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+  counter_claim_resolved: { icon: 'shield-checkmark', color: '#4ade80',
+    dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+
+  // CSTX dispute (binder_transactions). Different from order_dispute_*
+  // (marketplace).
+  binder_dispute: { icon: 'warning', color: '#f87171',
+    dest: (n, nav) => n.data?.cstx_id ? nav.navigate('Transaction', { transactionId: n.data.cstx_id }) : nav.navigate('DisputeList') },
+
+  // Sticker reprint family.
+  sticker_reprint_admin:      { icon: 'qr-code', color: '#e8c547', dest: (_, nav) => nav.navigate('Notifications') },
+  sticker_reprint_admin_bulk: { icon: 'qr-code', color: '#e8c547', dest: (_, nav) => nav.navigate('Notifications') },
+  sticker_reprint_shipped:    { icon: 'qr-code', color: '#4ade80', dest: (_, nav) => nav.navigate('Notifications') },
+
+  // Stalled-transfer admin escalation (cron escalates 72h+ unactioned).
+  stalled_transfer_admin_escalation: { icon: 'alert-circle', color: '#f87171', dest: (_, nav) => nav.navigate('Notifications') },
+
+  // Stolen-match — admin saw the cardholder confirmed.
+  stolen_match_owner_confirmed: { icon: 'shield', color: '#e8c547', dest: (_, nav) => nav.navigate('Notifications') },
+
+  // Reprice sweep — owner-facing pricing notifications.
+  reprice_applied: { icon: 'pricetag', color: '#4ade80',
+    dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+  reprice_suggest: { icon: 'pricetag', color: '#e8c547',
+    dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+  reprice_alert: { icon: 'trending-up', color: '#e8c547',
+    dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
 };
 const defaultNotifCfg = { icon: 'notifications', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') };
 
