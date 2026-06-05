@@ -4387,7 +4387,7 @@ export const CardDetailScreen = ({ navigation, route }) => {
                     { text: 'Not now', style: 'cancel' },
                     {
                       text: 'Scan now',
-                      onPress: () => navigation.navigate('AddCard', { verifyExisting: card.id, catalogId: card.catalog_id }),
+                      onPress: () => navigation.navigate('RegisterCard', { verifyExisting: card.id, catalogId: card.catalog_id }),
                     },
                   ],
                 );

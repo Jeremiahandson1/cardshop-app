@@ -521,6 +521,21 @@ const TradeStack = () => (
     <TradeStackNav.Screen name="CardChain" component={CardChainScreen} />
     <TradeStackNav.Screen name="Transaction" component={TransactionScreen} />
     <TradeStackNav.Screen name="EditCard" component={EditCardScreen} />
+    {/* TransactionScreen ships from here on accepted-offer banners
+        and silently no-op'd on three of its buttons: record packout/
+        unpack video, file a stalled-transfer report, and open a
+        dispute. Register the destinations so those buttons work. */}
+    <TradeStackNav.Screen name="TransferVideo" component={TransferVideoScreen} />
+    <TradeStackNav.Screen name="StalledTransferReport" component={StalledTransferReportScreen} />
+    <TradeStackNav.Screen name="DisputeDetail" component={DisputeDetailScreen} />
+    {/* CardDetail also fires Make offer / Message owner / Connect
+        Integrations / Request reprint / Scan to attach from this
+        stack — same silent no-op class. */}
+    <TradeStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
+    <TradeStackNav.Screen name="Conversation" component={ConversationScreen} />
+    <TradeStackNav.Screen name="Integrations" component={IntegrationsScreen} />
+    <TradeStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
+    <TradeStackNav.Screen name="QRScanner" component={QRScannerScreen} />
   </TradeStackNav.Navigator>
 );
 
