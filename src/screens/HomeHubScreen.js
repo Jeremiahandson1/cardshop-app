@@ -17,7 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { homeApi } from '../services/api';
+import { homeApi, contestsApi } from '../services/api';
 import { getPushPermissionStatus, registerForPushNotificationsAsync } from '../services/pushRegistration';
 
 // Tiers that include Show Floor access. Collector Pro does NOT —
@@ -109,6 +109,21 @@ export const HomeHubScreen = ({ navigation }) => {
     staleTime: 30000,
   });
   useFocusEffect(React.useCallback(() => { refetchPending(); }, [refetchPending]));
+
+  // Active contest banner — null when no contest is flagged.
+  // Refetch on focus so the admin can toggle on/off and users see
+  // it next time they hit home.
+  const { data: contestBanner, refetch: refetchBanner } = useQuery({
+    queryKey: ['home-contest-banner'],
+    queryFn: () => contestsApi.banner(),
+    staleTime: 60000,
+  });
+  useFocusEffect(React.useCallback(() => { refetchBanner(); }, [refetchBanner]));
+  const openContest = () => {
+    if (!contestBanner?.slug) return;
+    const url = `https://cardshop.twomiah.com/contests/${contestBanner.slug}`;
+    Linking.openURL(url).catch(() => {});
+  };
 
   const tradeOffersCount    = pending?.counts?.active_trade_offers || 0;
   const marketplaceCount    = pending?.counts?.marketplace_sales   || 0;
@@ -234,6 +249,38 @@ export const HomeHubScreen = ({ navigation }) => {
           </View>
           <Text style={styles.subtitle}>What are you here to do?</Text>
         </View>
+
+        {/* Active contest banner — admin toggles per-contest in the
+            dashboard /admin/contests page. Taps open the public
+            contest landing on the collector site. */}
+        {contestBanner ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={openContest}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+              padding: Spacing.md,
+              borderRadius: Radius.lg,
+              borderWidth: 1,
+              backgroundColor: 'rgba(232,197,71,0.14)',
+              borderColor: 'rgba(232,197,71,0.55)',
+              marginBottom: Spacing.md,
+            }}
+          >
+            <Ionicons name="gift" size={22} color="#e8c547" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#e8c547', fontSize: 14, fontWeight: '700' }}>
+                {contestBanner.title}
+              </Text>
+              <Text style={{ color: Colors.text, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
+                {contestBanner.banner_text || contestBanner.prize_description}
+              </Text>
+            </View>
+            <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '600' }}>
+              {contestBanner.banner_cta_text || 'See contest'} →
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Push-permission warning — without notifications enabled,
             no trade-offer / sale push ever lands. Tapping fires the

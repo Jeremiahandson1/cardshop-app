@@ -390,6 +390,13 @@ export const taggingSessionsApi = {
 // orders to ship, offers awaiting payment, etc. Replaces the unread-
 // notification-based banner since notifications get marked read on
 // tap but the underlying pending state stays.
+// Active contest banner — server returns null when no contest is
+// flagged. HomeHubScreen shows it as a gold pill at the top with
+// a CTA that opens the contest landing page in a WebView.
+export const contestsApi = {
+  banner: () => api.get('/contests/banner').then((r) => r.data?.banner || null),
+};
+
 export const homeApi = {
   pending: () => api.get('/home/pending').then((r) => r.data),
 };
