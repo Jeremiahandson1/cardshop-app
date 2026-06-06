@@ -230,10 +230,12 @@ export function registerNotificationResponseHandler(navigationRef) {
         return;
       }
 
-      // 14-day-stuck transfer ping (cron). Lands on the Transfers tab
-      // so the user sees the stuck one.
+      // 14-day-stuck transfer ping (cron). Lands on the Transfers
+      // screen so the user sees the stuck one. (Earlier version used
+      // 'TransferList' which isn't registered anywhere — silent
+      // no-op.)
       if (data?.type === 'transfer_stuck') {
-        if (navReady) navigationRef.current.navigate('Profile', { screen: 'TransferList' });
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'Transfers' });
         return;
       }
 

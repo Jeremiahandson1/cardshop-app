@@ -335,6 +335,11 @@ const BinderStack = () => (
     <BinderStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
     <BinderStackNav.Screen name="ConversationList" component={ConversationListScreen} />
     <BinderStackNav.Screen name="CollectionImportExport" component={CollectionImportExportScreen} />
+    {/* CardDetail in this stack fires Transaction (accepted-offer
+        banners) + Integrations (List on eBay) — register both so
+        the buttons don't silently no-op. */}
+    <BinderStackNav.Screen name="Transaction" component={TransactionScreen} />
+    <BinderStackNav.Screen name="Integrations" component={IntegrationsScreen} />
   </BinderStackNav.Navigator>
 );
 
