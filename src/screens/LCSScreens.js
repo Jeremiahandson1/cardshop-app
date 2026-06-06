@@ -85,8 +85,10 @@ export const LCSHomeScreen = ({ navigation, route }) => {
             onPress={openArbitrage}
             hitSlop={8}
             accessibilityLabel="Deals near you"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
           >
-            <Ionicons name="flash" size={22} color={Colors.accent} />
+            <Ionicons name="flash" size={18} color={Colors.accent} />
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: '600' }}>Deals</Text>
           </TouchableOpacity>
         )}
       />

@@ -251,9 +251,10 @@ export const ConversationScreen = ({ navigation, route }) => {
           <TouchableOpacity
             onPress={send}
             disabled={sendMutation.isPending || !draft.trim()}
-            style={[styles.sendBtn, (!draft.trim() || sendMutation.isPending) && { opacity: 0.4 }]}
+            style={[styles.sendBtn, (!draft.trim() || sendMutation.isPending) && { opacity: 0.4 }, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
           >
-            <Ionicons name="send" size={18} color="#fff" />
+            <Ionicons name="send" size={16} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Send</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

@@ -117,7 +117,10 @@ export const QRScannerScreen = ({ navigation, route }) => {
         if (insert.owned_card_id) {
           actions.unshift({
             text: 'View current card',
-            onPress: () => navigation.navigate('CardDetail', { cardId: insert.owned_card_id }),
+            // Scan is mounted as a bare tab — CardDetail isn't in
+            // its navigator. Cross into Profile tab so the route
+            // resolves instead of silent no-op.
+            onPress: () => navigation.navigate('Profile', { screen: 'CardDetail', params: { cardId: insert.owned_card_id } }),
           });
         }
         Alert.alert(

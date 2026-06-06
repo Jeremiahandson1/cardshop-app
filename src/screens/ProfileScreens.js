@@ -157,6 +157,30 @@ const NOTIFICATION_MAP = {
     dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
   reprice_alert: { icon: 'trending-up', color: '#e8c547',
     dest: (n, nav) => n.data?.owned_card_id ? nav.navigate('CardDetail', { cardId: n.data.owned_card_id }) : nav.navigate('Notifications') },
+
+  // Want-list match family — separate from the bare 'want_list_match'
+  // already mapped. Land on WantList so the user can see what hit.
+  want_list_binder_match: { icon: 'heart', color: '#ff6b6b', dest: (_, nav) => nav.navigate('WantList') },
+  want_list_trade_match:  { icon: 'heart', color: '#ff6b6b', dest: (_, nav) => nav.navigate('WantList') },
+
+  // Trade-board nudges (bump reminders, traded-away, group interest).
+  trade_outside_group_interest: { icon: 'people', color: '#4ecdc4',
+    dest: (n, nav) => n.data?.trade_listing_id ? nav.navigate('TradeListingDetail', { id: n.data.trade_listing_id }) : nav.navigate('Notifications') },
+  trade_listing_bump_reminder_30: { icon: 'time', color: '#e8c547',
+    dest: (n, nav) => n.data?.trade_listing_id ? nav.navigate('TradeListingDetail', { id: n.data.trade_listing_id }) : nav.navigate('Notifications') },
+  trade_listing_bump_reminder_60: { icon: 'time', color: '#e8c547',
+    dest: (n, nav) => n.data?.trade_listing_id ? nav.navigate('TradeListingDetail', { id: n.data.trade_listing_id }) : nav.navigate('Notifications') },
+  trade_listing_auto_removed_90: { icon: 'trash', color: Colors.textMuted,
+    dest: (n, nav) => n.data?.trade_listing_id ? nav.navigate('TradeListingDetail', { id: n.data.trade_listing_id }) : nav.navigate('Notifications') },
+  trade_group_joined: { icon: 'people', color: '#4ade80',
+    dest: (n, nav) => n.data?.trade_group_id ? nav.navigate('TradeGroupDetail', { id: n.data.trade_group_id }) : nav.navigate('TradeGroupsList') },
+
+  // Transfer family (legacy) + the new transfer_cancelled type from
+  // sweepUnilateralCancels.
+  transfer_cancelled: { icon: 'close-circle', color: '#f87171', dest: (_, nav) => nav.navigate('Transfers') },
+
+  // Marketing / admin announcement.
+  announcement: { icon: 'megaphone', color: '#4ecdc4', dest: (_, nav) => nav.navigate('Notifications') },
 };
 const defaultNotifCfg = { icon: 'notifications', color: Colors.textMuted, dest: (_, nav) => nav.navigate('Notifications') };
 

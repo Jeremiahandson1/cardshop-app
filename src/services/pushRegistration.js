@@ -279,6 +279,65 @@ export function registerNotificationResponseHandler(navigationRef) {
         if (navReady) navigationRef.current.navigate('Profile', { screen: 'TrustProfile' });
         return;
       }
+
+      // Legacy transfer family (existed before sales tracking the
+      // CSTX system replaced). Pushed by transfers.js routes. Land
+      // on Transfers list so the user sees the relevant row.
+      if (data?.type === 'transfer_request'
+          || data?.type === 'transfer_complete'
+          || data?.type === 'transfer_cancelled'
+          || data?.type === 'tracking_update') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'Transfers' });
+        return;
+      }
+
+      // Direct message — open the conversation if we have an id,
+      // otherwise the list.
+      if (data?.type === 'message') {
+        if (navReady) {
+          if (data.conversation_id) {
+            navigationRef.current.navigate('Profile', {
+              screen: 'Conversation', params: { conversationId: data.conversation_id },
+            });
+          } else {
+            navigationRef.current.navigate('Profile', { screen: 'ConversationList' });
+          }
+        }
+        return;
+      }
+
+      // Generic dispute notif (social.js disputes).
+      if (data?.type === 'dispute') {
+        if (navReady) {
+          if (data.dispute_id) {
+            navigationRef.current.navigate('Profile', {
+              screen: 'DisputeDetail', params: { id: data.dispute_id },
+            });
+          } else {
+            navigationRef.current.navigate('Profile', { screen: 'DisputeList' });
+          }
+        }
+        return;
+      }
+
+      // Marketing / admin announcement — land on Notifications (the
+      // body is the message).
+      if (data?.type === 'announcement') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'Notifications' });
+        return;
+      }
+
+      // Admin-targeted types — route admins to the relevant admin
+      // dashboard surface. For now Notifications inbox where the
+      // admin will see the action prompt.
+      if (data?.type === 'stolen_match_pending'
+          || data?.type === 'stolen_match_owner_confirmed'
+          || data?.type === 'sticker_reprint_admin'
+          || data?.type === 'sticker_reprint_admin_bulk'
+          || data?.type === 'stalled_transfer_admin_escalation') {
+        if (navReady) navigationRef.current.navigate('Profile', { screen: 'Notifications' });
+        return;
+      }
     } catch (err) {
       console.warn('notification response handler error', err?.message);
     }

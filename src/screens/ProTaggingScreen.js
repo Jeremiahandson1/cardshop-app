@@ -187,7 +187,9 @@ export const ProTaggingScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.sessionRow}
-            onPress={() => navigation.navigate('TaggingSessionDetail', { sessionId: item.id })}
+            disabled
+            // No TaggingSessionDetail screen exists; session row is
+            // display-only. Re-enable when that screen ships.
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.sessionStore}>{item.store_name}</Text>
