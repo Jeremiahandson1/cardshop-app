@@ -95,6 +95,10 @@ const NOTIFICATION_MAP = {
   order_dispute_opened:       { icon: 'warning',  color: '#f87171',
     dest: (n, nav) => n.data?.order_id ? nav.navigate('OrderDetail', { id: n.data.order_id }) : nav.navigate('Notifications'),
   },
+  // Buyer's Stripe charge authorized — "you have a sale to ship".
+  order_authorized:           { icon: 'cash',     color: '#4ade80',
+    dest: (n, nav) => n.data?.order_id ? nav.navigate('OrderDetail', { id: n.data.order_id }) : nav.navigate('Notifications'),
+  },
   saved_search_match:         { icon: 'search',   color: '#4ecdc4',
     dest: (n, nav) => n.data?.listing_id ? nav.navigate('ListingDetail', { id: n.data.listing_id }) : nav.navigate('Notifications'),
   },

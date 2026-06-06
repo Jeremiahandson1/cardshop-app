@@ -204,6 +204,19 @@ export function registerNotificationResponseHandler(navigationRef) {
         return;
       }
 
+      // Marketplace order authorized — seller's "you have a sale to
+      // ship" buzz, fires when the buyer's Stripe authorization
+      // captures. Highest-value seller notification; route directly
+      // to OrderDetail so they can start shipping.
+      if (data?.type === 'order_authorized' && data.order_id) {
+        if (navReady) {
+          navigationRef.current.navigate('Profile', {
+            screen: 'OrderDetail', params: { id: data.order_id },
+          });
+        }
+        return;
+      }
+
       // Generic deal lifecycle (trade complete, meetup switched,
       // counterparty confirmed, shipped, etc.). Routes to the
       // transaction screen so review prompts + next-step UI are
