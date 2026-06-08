@@ -183,7 +183,7 @@ export const LoginScreen = ({ navigation }) => {
 export const RegisterScreen = ({ navigation }) => {
   const [form, setForm] = useState({
     email: '', username: '', password: '', display_name: '', role: 'collector',
-    date_of_birth: '',
+    date_of_birth: '', referred_by_username: '',
   });
   // DOB collected as three discrete fields so a US user can type
   // 06 / 14 / 1992 in their natural mental order. The combined
@@ -268,11 +268,14 @@ export const RegisterScreen = ({ navigation }) => {
     setError('');
     setLoading(true);
     try {
+      const referredBy = (form.referred_by_username || '').trim();
       await register({
         ...form,
         email: form.email.toLowerCase().trim(),
         username: form.username.trim(),
         age_confirmed: ageConfirmed,
+        // Only send when populated — server treats absent as no referrer.
+        referred_by_username: referredBy ? referredBy : undefined,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
@@ -308,6 +311,14 @@ export const RegisterScreen = ({ navigation }) => {
             <Input label="Username" value={form.username} onChangeText={set('username')} placeholder="cardkng99" />
             <Input label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" autoComplete="email" />
             <Input label="Password" value={form.password} onChangeText={set('password')} placeholder="8+ characters" secureTextEntry />
+            <Input
+              label="Who invited you? (optional)"
+              value={form.referred_by_username}
+              onChangeText={set('referred_by_username')}
+              placeholder="their username"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
             {/* Age confirmation — required to comply with COPPA
                 without storing a specific DOB. Apple flagged
                 required DOB as 5.1.1(v) privacy violation. */}
