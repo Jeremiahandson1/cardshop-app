@@ -267,7 +267,19 @@ export const HomeHubScreen = ({ navigation }) => {
               marginBottom: Spacing.md,
             }}
           >
-            <Ionicons name="gift" size={22} color="#e8c547" />
+            {/* Prize card thumbnail when admin picked a real card as
+                the prize. Falls back to the gift icon for contests
+                with cash/credit/other prizes. Card aspect kept at
+                the usual 0.72 trade-card ratio. */}
+            {contestBanner.prize_card?.front_image_url ? (
+              <Image
+                source={{ uri: contestBanner.prize_card.front_image_url }}
+                style={{ width: 42, height: 58, borderRadius: 4, backgroundColor: '#0f172a' }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Ionicons name="gift" size={22} color="#e8c547" />
+            )}
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#e8c547', fontSize: 14, fontWeight: '700' }}>
                 {contestBanner.title}
