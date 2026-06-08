@@ -119,7 +119,7 @@ const SingleBanner = ({ contest, onPress }) => (
         {contest.title}
       </Text>
       <Text style={{ color: Colors.text, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
-        {contest.banner_text || contest.prize_description}
+        {contest.banner_text || contest.prize_description || contest.prize_card?.title || ''}
       </Text>
     </View>
     <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '600' }}>
