@@ -6,6 +6,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
   Image, KeyboardAvoidingView, Platform, ScrollView, Alert, Linking,
+  Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -214,6 +215,17 @@ export const LCSShopDetailScreen = ({ navigation, route }) => {
     onError: (e) => Alert.alert('Could not update verification', e.response?.data?.error || e.message),
   });
 
+  // null = sheet closed; otherwise the price row being edited.
+  const [editingPrice, setEditingPrice] = React.useState(null);
+  const updateMut = useMutation({
+    mutationFn: ({ id, ...patch }) => lcsApi.updatePrice(id, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lcs', 'shop-prices', shopId] });
+      setEditingPrice(null);
+    },
+    onError: (e) => Alert.alert('Could not update price', e.response?.data?.error || e.message),
+  });
+
   const prices = pricesData?.prices || [];
 
   if (isLoading) return <LoadingScreen />;
@@ -234,6 +246,7 @@ export const LCSShopDetailScreen = ({ navigation, route }) => {
           <PriceRow
             price={item}
             onVerify={() => verifyMut.mutate({ priceId: item.id, currently: item.user_has_verified })}
+            onEdit={() => setEditingPrice(item)}
             onTrend={() => navigation.navigate('LCSPriceTrend', {
               productId: item.product_id,
               variantId: item.variant_id,
@@ -257,6 +270,12 @@ export const LCSShopDetailScreen = ({ navigation, route }) => {
             message="Be the first to post a box price at this shop."
           />
         }
+      />
+      <EditPriceSheet
+        price={editingPrice}
+        onClose={() => setEditingPrice(null)}
+        onSave={(patch) => updateMut.mutate({ id: editingPrice.id, ...patch })}
+        busy={updateMut.isPending}
       />
     </SafeAreaView>
   );
@@ -326,7 +345,7 @@ const ShopActionRow = ({ shop }) => {
 // ============================================================
 // Row renderer for a single price (used on shop + product views)
 // ============================================================
-const PriceRow = ({ price, onVerify, onTrend }) => (
+const PriceRow = ({ price, onVerify, onEdit, onTrend }) => (
   <View style={styles.priceRow}>
     {price.product_image_url ? (
       <Image source={{ uri: price.product_image_url }} style={styles.priceImg} />
@@ -352,30 +371,126 @@ const PriceRow = ({ price, onVerify, onTrend }) => (
     </View>
     <View style={{ alignItems: 'flex-end' }}>
       <Text style={styles.priceValue}>{formatPrice(price.price)}</Text>
-      <TouchableOpacity
-        onPress={onVerify}
-        disabled={price.is_own_post}
-        style={[
-          styles.verifyBtn,
-          price.user_has_verified && styles.verifyBtnOn,
-          price.is_own_post && { opacity: 0.4 },
-        ]}
-      >
-        <Ionicons
-          name={price.user_has_verified ? 'checkmark-circle' : 'checkmark-circle-outline'}
-          size={16}
-          color={price.user_has_verified ? Colors.bg : Colors.accent2}
-        />
-        <Text style={[
-          styles.verifyText,
-          price.user_has_verified && { color: Colors.bg },
-        ]}>
-          {price.verify_count}
-        </Text>
-      </TouchableOpacity>
+      {price.is_own_post && onEdit ? (
+        // Own posts can't be verified (no self-verify) — show an
+        // Edit chip instead so the original poster can update their
+        // own price as the shop's actual price changes.
+        <TouchableOpacity
+          onPress={onEdit}
+          style={[styles.verifyBtn, { flexDirection: 'row', gap: 4 }]}
+        >
+          <Ionicons name="pencil" size={14} color={Colors.accent2} />
+          <Text style={[styles.verifyText, { color: Colors.accent2 }]}>Edit</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={onVerify}
+          disabled={price.is_own_post}
+          style={[
+            styles.verifyBtn,
+            price.user_has_verified && styles.verifyBtnOn,
+            price.is_own_post && { opacity: 0.4 },
+          ]}
+        >
+          <Ionicons
+            name={price.user_has_verified ? 'checkmark-circle' : 'checkmark-circle-outline'}
+            size={16}
+            color={price.user_has_verified ? Colors.bg : Colors.accent2}
+          />
+          <Text style={[
+            styles.verifyText,
+            price.user_has_verified && { color: Colors.bg },
+          ]}>
+            {price.verify_count}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   </View>
 );
+
+// Edit sheet for an existing price post. Owner-only — the route
+// rejects edits to retired (is_current=FALSE) prices server-side.
+const EditPriceSheet = ({ price, onClose, onSave, busy }) => {
+  const [priceText, setPriceText] = React.useState(price ? String(price.price) : '');
+  const [notes, setNotes] = React.useState(price?.notes || '');
+  React.useEffect(() => {
+    if (price) {
+      setPriceText(String(price.price));
+      setNotes(price.notes || '');
+    }
+  }, [price?.id]);
+  if (!price) return null;
+  const canSave = parseFloat(priceText) > 0 && !busy;
+  return (
+    <Modal transparent animationType="slide" visible={!!price} onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: Colors.bg,
+            marginTop: 'auto',
+            padding: Spacing.lg,
+            borderTopLeftRadius: 16, borderTopRightRadius: 16,
+          }}
+        >
+          <Text style={{ color: Colors.text, fontSize: 18, fontWeight: '700', marginBottom: 4 }}>
+            Edit price
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: Spacing.md }}>
+            {price.product_name} · {price.variant_name}
+          </Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>
+            Price
+          </Text>
+          <TextInput
+            value={priceText}
+            onChangeText={setPriceText}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={Colors.textMuted}
+            style={{
+              backgroundColor: Colors.surface, color: Colors.text,
+              padding: 12, borderRadius: 8, fontSize: 16, marginBottom: Spacing.md,
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          />
+          <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>
+            Notes (optional)
+          </Text>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Sale price, member-only, etc."
+            placeholderTextColor={Colors.textMuted}
+            multiline
+            style={{
+              backgroundColor: Colors.surface, color: Colors.text,
+              padding: 12, borderRadius: 8, fontSize: 14, minHeight: 60,
+              borderWidth: 1, borderColor: Colors.border,
+              marginBottom: Spacing.lg,
+            }}
+          />
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={{ flex: 1, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' }}
+            >
+              <Text style={{ color: Colors.text, fontWeight: '600' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => onSave({ price: parseFloat(priceText), notes: notes.trim() || null })}
+              disabled={!canSave}
+              style={{ flex: 1, padding: 14, borderRadius: 10, backgroundColor: Colors.accent, alignItems: 'center', opacity: canSave ? 1 : 0.5 }}
+            >
+              <Text style={{ color: Colors.bg, fontWeight: '700' }}>{busy ? 'Saving…' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+};
 
 // ============================================================
 // 4. POST PRICE — shop chosen; pick product → variant → enter price

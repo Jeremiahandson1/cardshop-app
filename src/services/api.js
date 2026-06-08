@@ -783,6 +783,9 @@ export const lcsApi = {
   productTrend: (productId, params) =>
     api.get(`/lcs/products/${productId}/trend`, { params }),
   postPrice: (data) => api.post('/lcs/prices', data),
+  // Server accepts {price?, notes?} and refreshes posted_at. Owner-only,
+  // only while is_current=TRUE — retired prices can't be edited.
+  updatePrice: (id, data) => api.patch(`/lcs/prices/${id}`, data),
   removePrice: (id) => api.delete(`/lcs/prices/${id}`),
   verifyPrice: (id) => api.post(`/lcs/prices/${id}/verify`),
   unverifyPrice: (id) => api.delete(`/lcs/prices/${id}/verify`),
