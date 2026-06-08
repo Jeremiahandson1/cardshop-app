@@ -20,6 +20,7 @@ import { Colors, Typography } from '../theme';
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
 import { SuspendedScreen } from '../screens/SuspendedScreen';
 import { HomeHubScreen } from '../screens/HomeHubScreen';
+import { ContestScreen } from '../screens/ContestScreen';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
 import { RegisterCardScreen, CardDetailScreen, EditCardScreen } from '../screens/CardScreens';
@@ -104,6 +105,7 @@ import {
 import { SellerAnalyticsScreen } from '../screens/SellerAnalyticsScreen';
 import { AddressesScreen, AddressFormScreen } from '../screens/AddressesScreens';
 
+const HomeStackNav = createNativeStackNavigator();
 const CollectionStackNav = createNativeStackNavigator();
 const BinderStackNav = createNativeStackNavigator();
 const SearchStackNav = createNativeStackNavigator();
@@ -200,10 +202,11 @@ const TabNavigator = () => {
           with the full surface area. */}
       <Tab.Screen
         name="Home"
-        component={HomeHubScreen}
+        component={HomeStack}
         options={{
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
+        listeners={resetOnTabPress('Home', 'HomeHub')}
       />
       {/* Binders is THE home for cards. Every card auto-files into
           a Default binder (migration 033), so there's no separate
@@ -306,6 +309,15 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <CollectionStackNav.Screen name="TrustProfile" component={TrustProfileScreen} />
   </CollectionStackNav.Navigator>
+);
+
+// Home stack so tile/banner taps can push native screens (contest
+// detail, etc.) without leaving the Home tab or opening a WebView.
+const HomeStack = () => (
+  <HomeStackNav.Navigator screenOptions={screenOptions}>
+    <HomeStackNav.Screen name="HomeHub" component={HomeHubScreen} />
+    <HomeStackNav.Screen name="Contest" component={ContestScreen} />
+  </HomeStackNav.Navigator>
 );
 
 const BinderStack = () => (

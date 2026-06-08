@@ -88,6 +88,82 @@ const TILES = [
   },
 ];
 
+// Single-banner layout: full-width row with icon/card, title,
+// pitch text, and the CTA. Used when exactly one contest is
+// flagged for the home banner.
+const SingleBanner = ({ contest, onPress }) => (
+  <TouchableOpacity
+    activeOpacity={0.85}
+    onPress={() => onPress(contest.slug)}
+    style={{
+      flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+      padding: Spacing.md,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      backgroundColor: 'rgba(232,197,71,0.14)',
+      borderColor: 'rgba(232,197,71,0.55)',
+      marginBottom: Spacing.md,
+    }}
+  >
+    {contest.prize_card?.front_image_url ? (
+      <Image
+        source={{ uri: contest.prize_card.front_image_url }}
+        style={{ width: 42, height: 58, borderRadius: 4, backgroundColor: '#0f172a' }}
+        resizeMode="contain"
+      />
+    ) : (
+      <Ionicons name="gift" size={22} color="#e8c547" />
+    )}
+    <View style={{ flex: 1 }}>
+      <Text style={{ color: '#e8c547', fontSize: 14, fontWeight: '700' }}>
+        {contest.title}
+      </Text>
+      <Text style={{ color: Colors.text, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
+        {contest.banner_text || contest.prize_description}
+      </Text>
+    </View>
+    <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '600' }}>
+      {contest.banner_cta_text || 'See contest'} →
+    </Text>
+  </TouchableOpacity>
+);
+
+// Split-banner layout: card image + contest title only. flex:1 in
+// a flexWrap row puts two side-by-side; a third wraps to its own
+// row. No pitch text since the box is too narrow to read it.
+const SplitBanner = ({ contest, onPress }) => (
+  <TouchableOpacity
+    activeOpacity={0.85}
+    onPress={() => onPress(contest.slug)}
+    style={{
+      flexBasis: '48%', flexGrow: 1,
+      padding: Spacing.sm,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      backgroundColor: 'rgba(232,197,71,0.14)',
+      borderColor: 'rgba(232,197,71,0.55)',
+      flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    }}
+  >
+    {contest.prize_card?.front_image_url ? (
+      <Image
+        source={{ uri: contest.prize_card.front_image_url }}
+        style={{ width: 38, height: 52, borderRadius: 4, backgroundColor: '#0f172a' }}
+        resizeMode="contain"
+      />
+    ) : (
+      <View style={{ width: 38, height: 52, borderRadius: 4, backgroundColor: 'rgba(232,197,71,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="gift" size={20} color="#e8c547" />
+      </View>
+    )}
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
+        {contest.title}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
+
 export const HomeHubScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const greeting = (() => {
@@ -110,19 +186,29 @@ export const HomeHubScreen = ({ navigation }) => {
   });
   useFocusEffect(React.useCallback(() => { refetchPending(); }, [refetchPending]));
 
-  // Active contest banner — null when no contest is flagged.
-  // Refetch on focus so the admin can toggle on/off and users see
-  // it next time they hit home.
-  const { data: contestBanner, refetch: refetchBanner } = useQuery({
-    queryKey: ['home-contest-banner'],
-    queryFn: () => contestsApi.banner(),
+  // Active contest banners — empty array when none flagged. Admins
+  // can flip show_banner on multiple contests; the home screen
+  // renders them side-by-side (split layout) when more than one is
+  // live. Refetch on focus so toggle-on/off propagates without a
+  // pull-to-refresh.
+  const { data: contestBanners, refetch: refetchBanners } = useQuery({
+    queryKey: ['home-contest-banners'],
+    queryFn: () => contestsApi.banners(),
     staleTime: 60000,
   });
-  useFocusEffect(React.useCallback(() => { refetchBanner(); }, [refetchBanner]));
-  const openContest = () => {
-    if (!contestBanner?.slug) return;
-    const url = `https://cardshop.twomiah.com/contests/${contestBanner.slug}`;
-    Linking.openURL(url).catch(() => {});
+  useFocusEffect(React.useCallback(() => { refetchBanners(); }, [refetchBanners]));
+  const openContest = (slug) => {
+    if (!slug) return;
+    try {
+      navigation.navigate('Home', { screen: 'Contest', params: { slug } });
+    } catch (e) {
+      // Should never trip in production — HomeStack registers Contest
+      // explicitly. Fall back to the web page only if the nav stack
+      // is somehow misconfigured.
+      console.warn('[home] contest nav failed, falling back to web:', e?.message);
+      const url = `https://cardshop.twomiah.com/contests/${slug}`;
+      Linking.openURL(url).catch(() => {});
+    }
   };
 
   const tradeOffersCount    = pending?.counts?.active_trade_offers || 0;
@@ -253,45 +339,19 @@ export const HomeHubScreen = ({ navigation }) => {
         {/* Active contest banner — admin toggles per-contest in the
             dashboard /admin/contests page. Taps open the public
             contest landing on the collector site. */}
-        {contestBanner ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={openContest}
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-              padding: Spacing.md,
-              borderRadius: Radius.lg,
-              borderWidth: 1,
-              backgroundColor: 'rgba(232,197,71,0.14)',
-              borderColor: 'rgba(232,197,71,0.55)',
-              marginBottom: Spacing.md,
-            }}
-          >
-            {/* Prize card thumbnail when admin picked a real card as
-                the prize. Falls back to the gift icon for contests
-                with cash/credit/other prizes. Card aspect kept at
-                the usual 0.72 trade-card ratio. */}
-            {contestBanner.prize_card?.front_image_url ? (
-              <Image
-                source={{ uri: contestBanner.prize_card.front_image_url }}
-                style={{ width: 42, height: 58, borderRadius: 4, backgroundColor: '#0f172a' }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Ionicons name="gift" size={22} color="#e8c547" />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#e8c547', fontSize: 14, fontWeight: '700' }}>
-                {contestBanner.title}
-              </Text>
-              <Text style={{ color: Colors.text, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
-                {contestBanner.banner_text || contestBanner.prize_description}
-              </Text>
+        {Array.isArray(contestBanners) && contestBanners.length > 0 ? (
+          contestBanners.length === 1 ? (
+            // Single banner: full-width layout with title + pitch text + CTA.
+            <SingleBanner contest={contestBanners[0]} onPress={openContest} />
+          ) : (
+            // Multiple banners: split row, each compact (card image +
+            // contest title only). Falls to a new row if 3+.
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
+              {contestBanners.map((b) => (
+                <SplitBanner key={b.id} contest={b} onPress={openContest} />
+              ))}
             </View>
-            <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '600' }}>
-              {contestBanner.banner_cta_text || 'See contest'} →
-            </Text>
-          </TouchableOpacity>
+          )
         ) : null}
 
         {/* Push-permission warning — without notifications enabled,

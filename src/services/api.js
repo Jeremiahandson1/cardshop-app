@@ -394,7 +394,13 @@ export const taggingSessionsApi = {
 // flagged. HomeHubScreen shows it as a gold pill at the top with
 // a CTA that opens the contest landing page in a WebView.
 export const contestsApi = {
+  // Legacy single-banner endpoint — kept for older OTA bundles that
+  // still call it. New surfaces should use banners() so multiple
+  // flagged contests render side-by-side instead of just the most-
+  // recent one.
   banner: () => api.get('/contests/banner').then((r) => r.data?.banner || null),
+  banners: () => api.get('/contests/banners').then((r) => r.data?.banners || []),
+  get: (slug) => api.get(`/contests/${slug}`).then((r) => r.data),
 };
 
 export const homeApi = {
