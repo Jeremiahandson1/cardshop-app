@@ -5,7 +5,7 @@
 //   MyOrdersScreen        — orders where I'm seller OR buyer
 //   OrderDetailScreen     — one order's lifecycle + ship action
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView,
   Alert, TextInput, Linking, ActivityIndicator,
@@ -348,6 +348,7 @@ export const CreateListingScreen = ({ navigation, route }) => {
       <ScrollView contentContainerStyle={{ padding: Spacing.md, paddingBottom: 100 }}>
         {step === 0 && (
           <>
+            <FirstTimeSellerIntro />
             <Text style={styles.help}>Pick the card you want to list. Listings backed by your chain
             get a "Verified ownership" badge buyers can see.</Text>
             {!cards.length && <EmptyState title="No cards yet" message="Add a card to your collection first." />}
@@ -624,6 +625,111 @@ const PhotoPicker = ({ photos, onChange }) => {
   );
 };
 
+// SecureStore flag — show this only on a seller's first listing.
+const FIRST_LISTING_INTRO_KEY = 'cs_first_listing_intro_v1';
+
+// One-screen value-prop card shown at step 0 of the CreateListing
+// wizard the first time a user opens it. After they dismiss it
+// (either "Got it" or the X), suppressed forever via SecureStore.
+// Three high-signal beats, no fluff: fee math, CoC, free-to-list.
+const FirstTimeSellerIntro = () => {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    SecureStore.getItemAsync(FIRST_LISTING_INTRO_KEY)
+      .then((v) => setShow(v !== '1'))
+      .catch(() => setShow(true));
+  }, []);
+  if (!show) return null;
+  const dismiss = () => {
+    setShow(false);
+    SecureStore.setItemAsync(FIRST_LISTING_INTRO_KEY, '1').catch(() => {});
+  };
+  return (
+    <View style={introStyles.card}>
+      <View style={introStyles.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={introStyles.eyebrow}>Why sell on Card Shop</Text>
+          <Text style={introStyles.title}>The math, the moat, and the rule</Text>
+        </View>
+        <TouchableOpacity onPress={dismiss} hitSlop={12} style={introStyles.closeBtn}>
+          <Ionicons name="close" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+      <View style={introStyles.bulletRow}>
+        <View style={[introStyles.iconCircle, { backgroundColor: 'rgba(232, 197, 71, 0.18)' }]}>
+          <Ionicons name="trending-up" size={16} color="#e8c547" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={introStyles.bulletTitle}>Capped at $1 + Stripe</Text>
+          <Text style={introStyles.bulletText}>
+            On a $100 card you keep $95.80. eBay would leave you $86.45. The
+            gap stays in your pocket on every sale.
+          </Text>
+        </View>
+      </View>
+      <View style={introStyles.bulletRow}>
+        <View style={[introStyles.iconCircle, { backgroundColor: 'rgba(96, 165, 250, 0.18)' }]}>
+          <Ionicons name="shield-checkmark" size={16} color="#60a5fa" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={introStyles.bulletTitle}>Chain of custody on every sale</Text>
+          <Text style={introStyles.bulletText}>
+            The buyer sees who held the card before you. You get a permanent,
+            timestamped record useful for chargeback disputes.
+          </Text>
+        </View>
+      </View>
+      <View style={introStyles.bulletRow}>
+        <View style={[introStyles.iconCircle, { backgroundColor: 'rgba(74, 222, 128, 0.18)' }]}>
+          <Ionicons name="infinite" size={16} color="#4ade80" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={introStyles.bulletTitle}>Free to list. Free to relist.</Text>
+          <Text style={introStyles.bulletText}>
+            No insertion fees, no Promoted Listings tax. Owe nothing until the
+            card sells.
+          </Text>
+        </View>
+      </View>
+      <View style={introStyles.actions}>
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://cardshop.twomiah.com/fees')}
+          style={introStyles.linkBtn}
+        >
+          <Text style={introStyles.linkTxt}>See the full comparison →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={dismiss} style={introStyles.gotItBtn}>
+          <Text style={introStyles.gotItTxt}>Got it, list my card</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const introStyles = StyleSheet.create({
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(232, 197, 71, 0.5)',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 18,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
+  eyebrow: { color: '#e8c547', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  title: { color: Colors.text, fontSize: 18, fontWeight: '700', lineHeight: 23 },
+  closeBtn: { marginTop: -4 },
+  bulletRow: { flexDirection: 'row', gap: 12, marginBottom: 14, alignItems: 'flex-start' },
+  iconCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  bulletTitle: { color: Colors.text, fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  bulletText: { color: Colors.textMuted, fontSize: 12, lineHeight: 17 },
+  actions: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12 },
+  linkBtn: { flex: 1 },
+  linkTxt: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
+  gotItBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: '#e8c547' },
+  gotItTxt: { color: Colors.bg, fontSize: 13, fontWeight: '700' },
+});
+
 // ============================================================
 // Fee preview shown beneath the asking-price input.
 // Mirrors cardshop-api/src/lib/marketplace/feeCalc.js exactly:
@@ -679,6 +785,37 @@ const FeePreview = ({ askingPrice }) => {
   );
 };
 
+// Same eBay-fee calc as FeePreview, exposed as a helper so the
+// receipt component can compute the counterfactual take-home.
+const ebayFeeFor = (cents) => {
+  const cap = 250000;
+  const tier1 = Math.min(cents, cap);
+  const tier2 = Math.max(0, cents - cap);
+  return Math.round(tier1 * 0.1325) + Math.round(tier2 * 0.0235) + 40;
+};
+
+// Receipt-side fee saved badge. Shows up under the seller's "You
+// net" total once the sale is complete (or about to be), comparing
+// actual Card Shop net to what eBay would have left on the table.
+// Different shape from FeePreview because here we use the REAL
+// committed fees from the order, not a projection.
+const FeeSavedLine = ({ cardSubtotalCents, actualSellerFeeCents }) => {
+  if (!cardSubtotalCents || cardSubtotalCents < 100) return null;
+  const ebayFee = ebayFeeFor(cardSubtotalCents);
+  const saved = ebayFee - actualSellerFeeCents;
+  if (saved <= 0) return null;
+  const fmt = (c) => `$${(c / 100).toFixed(2)}`;
+  return (
+    <View style={feeStyles.savedBox}>
+      <Ionicons name="trending-up" size={16} color="#4ade80" />
+      <Text style={feeStyles.savedTxt}>
+        You kept <Text style={{ fontWeight: '800' }}>{fmt(saved)} more</Text> than
+        you would have on eBay (their fee would have been {fmt(ebayFee)}).
+      </Text>
+    </View>
+  );
+};
+
 const feeStyles = StyleSheet.create({
   box: {
     backgroundColor: 'rgba(232, 197, 71, 0.10)',
@@ -698,6 +835,14 @@ const feeStyles = StyleSheet.create({
   compareTxt: { color: '#4ade80', fontSize: 12, fontWeight: '600' },
   learn: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(232, 197, 71, 0.25)' },
   learnTxt: { color: Colors.accent, fontSize: 11, fontWeight: '600' },
+  savedBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    marginTop: 12, padding: 10,
+    backgroundColor: 'rgba(74, 222, 128, 0.10)',
+    borderColor: 'rgba(74, 222, 128, 0.35)', borderWidth: 1,
+    borderRadius: 8,
+  },
+  savedTxt: { flex: 1, color: '#4ade80', fontSize: 12, lineHeight: 17, fontWeight: '600' },
 });
 
 const ShipOptionsPicker = ({ value, onChange, highValue }) => {
@@ -1139,6 +1284,10 @@ export const OrderDetailScreen = ({ navigation, route }) => {
                   - (label?.cost_cents || 0)
                 )}
                 bold
+              />
+              <FeeSavedLine
+                cardSubtotalCents={order.card_subtotal_cents || 0}
+                actualSellerFeeCents={order.total_seller_fee_cents || 0}
               />
             </>
           ) : (

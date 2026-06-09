@@ -6,11 +6,12 @@
 //   ListingDetailScreen     — public detail with Buy / Add to Cart / Watch
 //   SavedSearchesScreen     — manage push alerts
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  TextInput, RefreshControl, ScrollView, Alert,
+  TextInput, RefreshControl, ScrollView, Alert, Linking,
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -19,6 +20,64 @@ import { Button, ScreenHeader, EmptyState, LoadingScreen, VerificationBadge, Log
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 const usd = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
+
+// SecureStore flag for the "Why sell here?" banner. Once a user
+// dismisses it, suppress it forever — they've seen the pitch.
+const WHY_SELL_DISMISSED_KEY = 'cs_why_sell_dismissed_v1';
+
+// Compact banner shown above the marketplace feed pitching the fee
+// gap to anyone who's only ever browsed. Dismissible — we don't
+// want to annoy power sellers who already get it. Opens the public
+// /fees page in the system browser for the full comparison.
+const WhySellHereBanner = () => {
+  const [dismissed, setDismissed] = useState(true); // optimistic-hidden until SecureStore resolves
+  useEffect(() => {
+    SecureStore.getItemAsync(WHY_SELL_DISMISSED_KEY)
+      .then((v) => setDismissed(v === '1'))
+      .catch(() => setDismissed(false));
+  }, []);
+  if (dismissed) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    SecureStore.setItemAsync(WHY_SELL_DISMISSED_KEY, '1').catch(() => {});
+  };
+  return (
+    <View style={wsStyles.box}>
+      <TouchableOpacity
+        style={wsStyles.body}
+        onPress={() => Linking.openURL('https://cardshop.twomiah.com/fees')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="trending-up" size={20} color="#e8c547" />
+        <View style={{ flex: 1 }}>
+          <Text style={wsStyles.title}>Selling here keeps more in your pocket</Text>
+          <Text style={wsStyles.sub} numberOfLines={2}>
+            Card Shop's fee is capped at $1 + Stripe processing.{' '}
+            See how that compares to eBay, Whatnot, and Fanatics →
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={dismiss} hitSlop={12} style={wsStyles.x}>
+        <Ionicons name="close" size={18} color={Colors.textMuted} />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const wsStyles = StyleSheet.create({
+  box: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginHorizontal: Spacing.md, marginTop: Spacing.sm,
+    paddingVertical: 12, paddingHorizontal: 14, paddingRight: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(232, 197, 71, 0.10)',
+    borderWidth: 1, borderColor: 'rgba(232, 197, 71, 0.45)',
+  },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  title: { color: '#e8c547', fontSize: 13, fontWeight: '700' },
+  sub: { color: Colors.text, fontSize: 12, marginTop: 2, lineHeight: 16 },
+  x: { padding: 4 },
+});
 
 // ============================================================
 // MARKETPLACE HOME
@@ -110,6 +169,9 @@ export const MarketplaceHomeScreen = ({ navigation }) => {
           <Text style={{ color: '#facc15', fontSize: 13, fontWeight: '700' }}>Go →</Text>
         </TouchableOpacity>
       ) : null}
+
+      <WhySellHereBanner />
+
 
       <View style={styles.tabs}>
         <TabButton title="For You" active={tab === 'feed'} onPress={() => setTab('feed')} />
