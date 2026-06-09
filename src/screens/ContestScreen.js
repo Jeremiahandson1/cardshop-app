@@ -170,7 +170,7 @@ export const ContestScreen = ({ route, navigation }) => {
               <Text style={S.prizeKicker}>Prize</Text>
               <Text style={S.prizeTitle}>{c.prize_card.title}</Text>
               <Text style={S.prizeMeta}>{formatPrizeNumbering(c.prize_card)}</Text>
-              {(c.prize_card.grading_company || c.prize_card.is_rookie || c.prize_card.is_autograph) ? (
+              {(c.prize_card.grading_company || c.prize_card.is_rookie || c.prize_card.is_autograph || c.prize_card.is_relic) ? (
                 <View style={S.badgeRow}>
                   {c.prize_card.grading_company ? (
                     <View style={S.badge}>
@@ -181,6 +181,7 @@ export const ContestScreen = ({ route, navigation }) => {
                   ) : null}
                   {c.prize_card.is_rookie ? <View style={S.badge}><Text style={S.badgeTxt}>RC</Text></View> : null}
                   {c.prize_card.is_autograph ? <View style={S.badge}><Text style={S.badgeTxt}>AUTO</Text></View> : null}
+                  {c.prize_card.is_relic ? <View style={S.badge}><Text style={S.badgeTxt}>RELIC</Text></View> : null}
                 </View>
               ) : null}
             </View>
