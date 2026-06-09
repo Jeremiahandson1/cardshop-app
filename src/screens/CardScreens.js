@@ -149,6 +149,18 @@ const CascadePicker = ({
 }) => {
   const currentIdx = cascadeOrder.indexOf(cascadeDim);
 
+  // Debounce the search box for the NETWORK-backed steps so typing
+  // doesn't fire a request per keystroke. Clearing (and the step
+  // advancing, which clears) applies immediately so stale text never
+  // leaks into the next step's first fetch. The local year list
+  // stays on the raw value — it's an in-memory filter.
+  const [debouncedQuery, setDebouncedQuery] = useState(cascadeQuery);
+  React.useEffect(() => {
+    if (!cascadeQuery) { setDebouncedQuery(''); return; }
+    const t = setTimeout(() => setDebouncedQuery(cascadeQuery), 250);
+    return () => clearTimeout(t);
+  }, [cascadeQuery]);
+
   // Catalog gap-report state — modal opens from the cascade footer
   // when the user can't find their set/variant. Separate from manual
   // entry: manual entry adds the card to YOUR collection, gap report
@@ -177,11 +189,11 @@ const CascadePicker = ({
   });
 
   const { data: catalogOptions, isLoading: catalogLoading, isFetching: catalogFetching, isError, refetch } = useQuery({
-    queryKey: ['catalog-filter', cascadeDim, cascade, cascadeQuery],
+    queryKey: ['catalog-filter', cascadeDim, cascade, debouncedQuery],
     enabled: cascadeDim !== 'year',
     queryFn: () =>
       catalogApi
-        .filterValues({ dimension: cascadeDim, ...cascade, q: cascadeQuery || undefined, limit: 200 })
+        .filterValues({ dimension: cascadeDim, ...cascade, q: debouncedQuery || undefined, limit: 200 })
         .then((r) => r.data?.values || []),
     // Keep typeahead snappy but not thrash-y while the user types.
     staleTime: 10_000,
@@ -207,7 +219,7 @@ const CascadePicker = ({
   // what the user expects: "show me every Aaron Donald card in
   // this set, with the insert/variation already labeled."
   const { data: variantRows, isLoading: variantLoading, isFetching: variantFetching } = useQuery({
-    queryKey: ['catalog-variants', cascade, cascadeQuery],
+    queryKey: ['catalog-variants', cascade, debouncedQuery],
     enabled: cascadeDim === 'card_number',
     queryFn: () =>
       catalogApi.search({
@@ -216,7 +228,7 @@ const CascadePicker = ({
         manufacturer: cascade.manufacturer,
         set_name: cascade.set_name,
         player_name: cascade.player_name,
-        q: cascadeQuery || undefined,
+        q: debouncedQuery || undefined,
         limit: 200,
       }).then((r) => r.data?.cards || []),
     staleTime: 10_000,
@@ -238,7 +250,7 @@ const CascadePicker = ({
   // fires when the user actually reaches the parallel step (rare
   // now that card_number step usually fills parallel directly).
   const { data: parallelRows } = useQuery({
-    queryKey: ['catalog-parallel-rows', cascade, cascadeQuery],
+    queryKey: ['catalog-parallel-rows', cascade, debouncedQuery],
     enabled: cascadeDim === 'parallel',
     queryFn: () =>
       catalogApi.search({
@@ -247,7 +259,7 @@ const CascadePicker = ({
         manufacturer: cascade.manufacturer,
         set_name: cascade.set_name,
         player_name: cascade.player_name,
-        q: cascadeQuery || undefined,
+        q: debouncedQuery || undefined,
         limit: 50,
       }).then((r) => {
         const rows = r.data?.cards || [];
