@@ -87,6 +87,22 @@ const fmtDate = (iso) => {
   } catch { return iso; }
 };
 
+// Hobby-convention numbering line. "#13 · 15/25" reads as "card 13
+// in the checklist, this is copy 15 of 25." Previously rendered
+// "#13 · /15" with no separator distinguishing the individual serial
+// from a parallel population, which collectors misread as a print
+// run of 15.
+function formatPrizeNumbering(card) {
+  if (!card) return '';
+  const parts = [];
+  if (card.card_number) parts.push(`#${card.card_number}`);
+  if (card.is_one_of_one) parts.push('1/1');
+  else if (card.serial_number && card.print_run) parts.push(`${card.serial_number}/${card.print_run}`);
+  else if (card.serial_number) parts.push(`Serial ${card.serial_number}`);
+  else if (card.print_run) parts.push(`/${card.print_run}`);
+  return parts.join('  ·  ');
+}
+
 export const ContestScreen = ({ route, navigation }) => {
   const slug = route?.params?.slug;
 
@@ -153,11 +169,7 @@ export const ContestScreen = ({ route, navigation }) => {
             <View style={{ flex: 1 }}>
               <Text style={S.prizeKicker}>Prize</Text>
               <Text style={S.prizeTitle}>{c.prize_card.title}</Text>
-              <Text style={S.prizeMeta}>
-                {c.prize_card.card_number ? `#${c.prize_card.card_number}` : ''}
-                {c.prize_card.serial_number ? ` · /${c.prize_card.serial_number}` : ''}
-                {c.prize_card.is_one_of_one ? ' · 1/1' : ''}
-              </Text>
+              <Text style={S.prizeMeta}>{formatPrizeNumbering(c.prize_card)}</Text>
               {(c.prize_card.grading_company || c.prize_card.is_rookie || c.prize_card.is_autograph) ? (
                 <View style={S.badgeRow}>
                   {c.prize_card.grading_company ? (
