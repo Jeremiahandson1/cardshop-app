@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Card Shop — Feature Graphic 1024×500</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@600;800;900&display=swap');
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #1a1a1a;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    color: #aaa;
+  }
+
+  .frame {
+    width: 1024px;
+    height: 500px;
+    background: #0a0a10;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px #333, 0 24px 60px rgba(0,0,0,0.6);
+  }
+
+  /* Subtle radial accent so the black has some depth */
+  .frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 50%, rgba(184, 147, 46, 0.08), transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(232, 93, 46, 0.05), transparent 40%);
+    pointer-events: none;
+  }
+
+  /* Left side — stacked cards */
+  .cards-wrap {
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-6deg);
+    width: 420px;
+    height: 480px;
+  }
+
+  .card {
+    position: absolute;
+    width: 300px;
+    height: 420px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #e8c14a 0%, #c89a2e 60%, #a8801a 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      inset 0 -2px 0 rgba(0,0,0,0.15),
+      0 12px 32px rgba(0,0,0,0.45);
+  }
+
+  .card.back-2 {
+    left: 70px;
+    top: 30px;
+    opacity: 0.85;
+    transform: rotate(4deg);
+  }
+
+  .card.back-1 {
+    left: 50px;
+    top: 20px;
+    opacity: 0.92;
+    transform: rotate(2deg);
+  }
+
+  .card.front {
+    left: 30px;
+    top: 10px;
+  }
+
+  /* Crown silhouette on front card */
+  .crown {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -55%);
+    width: 170px;
+    height: 130px;
+  }
+
+  /* Red accent bar at bottom of front card */
+  .accent-bar {
+    position: absolute;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 6px;
+    background: #e54848;
+    border-radius: 3px;
+  }
+
+  /* Right side — text block */
+  .text-block {
+    position: absolute;
+    left: 460px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 540px;
+  }
+
+  .pill {
+    display: inline-block;
+    background: #e85d2e;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    padding: 7px 18px 7px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+
+  .headline {
+    font-family: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif;
+    font-weight: 400;
+    font-size: 116px;
+    line-height: 0.92;
+    letter-spacing: 1px;
+    color: #d4a83a;
+    background: linear-gradient(180deg, #f0c958 0%, #d4a83a 60%, #b8932e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0 0 18px 0;
+  }
+
+  .tagline-bar {
+    width: 56px;
+    height: 4px;
+    background: #d4a83a;
+    border-radius: 2px;
+    margin: 0 0 16px 0;
+  }
+
+  .tagline {
+    font-family: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif;
+    font-weight: 400;
+    font-size: 36px;
+    letter-spacing: 2px;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1;
+  }
+
+  /* Helper UI outside the frame */
+  .label {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: #888;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  button {
+    background: #e85d2e;
+    color: #fff;
+    border: 0;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+
+  button.secondary {
+    background: #333;
+  }
+</style>
+</head>
+<body>
+
+  <div class="label">Card Shop — Feature Graphic (1024 × 500, Play Store / App Store)</div>
+
+  <div class="frame" id="frame">
+    <!-- LEFT: stacked cards -->
+    <div class="cards-wrap">
+      <div class="card back-2"></div>
+      <div class="card back-1"></div>
+      <div class="card front">
+        <svg class="crown" viewBox="0 0 170 130" xmlns="http://www.w3.org/2000/svg">
+          <!-- 3-point crown silhouette w/ pearls on tips -->
+          <path d="
+            M 10 110
+            L 10 50
+            L 40 80
+            L 60 25
+            L 85 75
+            L 110 25
+            L 130 80
+            L 160 50
+            L 160 110
+            Z"
+            fill="#0a0a0a"
+          />
+          <circle cx="10" cy="46" r="9" fill="#0a0a0a" />
+          <circle cx="60" cy="21" r="9" fill="#0a0a0a" />
+          <circle cx="110" cy="21" r="9" fill="#0a0a0a" />
+          <circle cx="160" cy="46" r="9" fill="#0a0a0a" />
+        </svg>
+        <div class="accent-bar"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: text block -->
+    <div class="text-block">
+      <div class="pill">BY TWOMIAH</div>
+      <h1 class="headline">CARD SHOP</h1>
+      <div class="tagline-bar"></div>
+      <div class="tagline">THE CHAIN FOR EVERY CARD.</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button onclick="downloadPng()">Download PNG (1024×500)</button>
+    <button class="secondary" onclick="downloadSvg()">Copy as SVG</button>
+  </div>
+
+  <div class="label" style="max-width: 1024px; line-height: 1.5; padding: 0 12px;">
+    To export: click "Download PNG" — uses html2canvas to rasterize the frame above.
+    If the PNG looks off, take a 1024×500 screenshot of the frame instead — set browser zoom to 100%
+    and use Windows + Shift + S to grab the exact rectangle.
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+  function downloadPng() {
+    const frame = document.getElementById('frame');
+    html2canvas(frame, {
+      width: 1024,
+      height: 500,
+      scale: 2,
+      backgroundColor: null,
+      useCORS: true,
+    }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'cardshop-feature-graphic-1024x500.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  }
+  function downloadSvg() {
+    alert('Use the PNG export — the design uses CSS gradients and web fonts that don\'t cleanly inline into SVG. For a vector master, take the Bebas Neue + gradient values and rebuild in Figma/Illustrator.');
+  }
+</script>
+
+</body>
+</html>
