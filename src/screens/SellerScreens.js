@@ -388,6 +388,7 @@ export const CreateListingScreen = ({ navigation, route }) => {
               placeholder="0.00"
               placeholderTextColor={Colors.textMuted}
             />
+            <FeePreview askingPrice={askingPrice} />
 
             <Text style={styles.label}>Condition</Text>
             <View style={styles.chipRow}>
@@ -622,6 +623,82 @@ const PhotoPicker = ({ photos, onChange }) => {
     </View>
   );
 };
+
+// ============================================================
+// Fee preview shown beneath the asking-price input.
+// Mirrors cardshop-api/src/lib/marketplace/feeCalc.js exactly:
+//   platform_fee = min(10% of card, $1)
+//   stripe_fee   = 2.9% + $0.30 on gross
+//   total_fee    = platform_fee + stripe_fee
+// Plus a competitor comparison — eBay's 13.25% + $0.40/order on
+// sports cards — so the seller sees the gap the moment they type.
+// Tapping "Why so low?" opens the /fees comparison page in the
+// system browser. That same number shows up on the receipt after
+// the sale, but surfacing it here is the conversion moment.
+// ============================================================
+const FeePreview = ({ askingPrice }) => {
+  const cents = Math.round((parseFloat(askingPrice) || 0) * 100);
+  if (!cents || cents < 100) return null;
+  const platformFee = Math.min(Math.round(cents * 0.10), 100);
+  const stripeFee = Math.round(cents * 0.029) + 30;
+  const csFee = platformFee + stripeFee;
+  const csNet = cents - csFee;
+  // eBay sports cards: 13.25% on first $2,500 + $0.40/order
+  const ebayCap = 250000;
+  const ebayTier1 = Math.min(cents, ebayCap);
+  const ebayTier2 = Math.max(0, cents - ebayCap);
+  const ebayFee = Math.round(ebayTier1 * 0.1325) + Math.round(ebayTier2 * 0.0235) + 40;
+  const ebayNet = cents - ebayFee;
+  const saved = csNet - ebayNet;
+  const fmt = (c) => `$${(c / 100).toFixed(2)}`;
+  return (
+    <View style={feeStyles.box}>
+      <View style={feeStyles.row}>
+        <Text style={feeStyles.label}>Card Shop fee</Text>
+        <Text style={feeStyles.value}>− {fmt(csFee)}</Text>
+      </View>
+      <View style={feeStyles.row}>
+        <Text style={feeStyles.takeHomeLabel}>You take home</Text>
+        <Text style={feeStyles.takeHomeValue}>{fmt(csNet)}</Text>
+      </View>
+      {saved > 0 ? (
+        <View style={feeStyles.compareRow}>
+          <Ionicons name="trending-up" size={14} color="#4ade80" />
+          <Text style={feeStyles.compareTxt}>
+            {fmt(saved)} more than eBay ({fmt(ebayNet)} take-home there)
+          </Text>
+        </View>
+      ) : null}
+      <TouchableOpacity
+        onPress={() => Linking.openURL('https://cardshop.twomiah.com/fees')}
+        style={feeStyles.learn}
+      >
+        <Text style={feeStyles.learnTxt}>Why so low? Compare every platform →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const feeStyles = StyleSheet.create({
+  box: {
+    backgroundColor: 'rgba(232, 197, 71, 0.10)',
+    borderColor: 'rgba(232, 197, 71, 0.45)',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 },
+  label: { color: Colors.text, fontSize: 13 },
+  value: { color: Colors.text, fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  takeHomeLabel: { color: '#e8c547', fontSize: 14, fontWeight: '700' },
+  takeHomeValue: { color: '#e8c547', fontSize: 18, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  compareRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  compareTxt: { color: '#4ade80', fontSize: 12, fontWeight: '600' },
+  learn: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(232, 197, 71, 0.25)' },
+  learnTxt: { color: Colors.accent, fontSize: 11, fontWeight: '600' },
+});
 
 const ShipOptionsPicker = ({ value, onChange, highValue }) => {
   // Canonical 5-tier set — matches cardshop-api/src/routes/listing-defaults.js
