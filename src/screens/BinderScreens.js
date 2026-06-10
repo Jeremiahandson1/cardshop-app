@@ -1354,17 +1354,25 @@ export const PublicBinderScreen = ({ navigation, route }) => {
           </View>
         }
         ListEmptyComponent={
-          <EmptyState
-            title="No cards in this binder yet"
-            message={isOwner
-              ? 'Scan the back of a card, scan a slab cert, or enter one manually. Card Shop handles the rest.'
-              : 'This binder doesn\'t have any cards yet.'
-            }
-            action={isOwner ? {
-              label: 'Add card',
-              onPress: () => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id }),
-            } : null}
-          />
+          allCards.length > 0 ? (
+            // Cards exist — the filter/section just matched nothing.
+            <EmptyState
+              title="No cards match"
+              message="Try a different player name, or clear the filter."
+            />
+          ) : (
+            <EmptyState
+              title={isOwner ? 'Your binder is ready' : 'No cards in this binder yet'}
+              message={isOwner
+                ? 'Scan the back of a card, scan a slab cert, or enter one manually. Card Shop handles the rest.'
+                : 'This binder doesn\'t have any cards yet.'
+              }
+              action={isOwner ? {
+                label: 'Add your first card',
+                onPress: () => navigation.navigate('RegisterCard', { binderId: paramBinderId || binder.id }),
+              } : null}
+            />
+          )
         }
       />
 
