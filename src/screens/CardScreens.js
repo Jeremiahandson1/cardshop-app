@@ -20,7 +20,7 @@ import { showMessage } from 'react-native-flash-message';
 // pulling in the new class-based surface.
 import * as FileSystem from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi, transfersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge, LogoMark } from '../components/ui';
@@ -188,13 +188,24 @@ const CascadePicker = ({
     },
   });
 
-  const { data: catalogOptions, isLoading: catalogLoading, isFetching: catalogFetching, isError, refetch } = useQuery({
+  // Paged: big sets have thousands of players (and 200+ parallels) —
+  // a single capped fetch silently clipped the list at the M's. The
+  // picker now loads 200 at a time and fetches more on scroll.
+  const PAGE = 200;
+  const {
+    data: catalogPages, isLoading: catalogLoading, isFetching: catalogFetching,
+    isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['catalog-filter', cascadeDim, cascade, debouncedQuery],
     enabled: cascadeDim !== 'year',
-    queryFn: () =>
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
       catalogApi
-        .filterValues({ dimension: cascadeDim, ...cascade, q: debouncedQuery || undefined, limit: 200 })
+        .filterValues({ dimension: cascadeDim, ...cascade, q: debouncedQuery || undefined, limit: PAGE, offset: pageParam })
         .then((r) => r.data?.values || []),
+    // A full page means there may be more; a short page is the end.
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE ? allPages.length * PAGE : undefined,
     // Keep typeahead snappy but not thrash-y while the user types.
     staleTime: 10_000,
     // Distinct-over-1.7M-rows can take several seconds cold. Fail
@@ -210,6 +221,10 @@ const CascadePicker = ({
     placeholderData: (prevData, prevQuery) =>
       prevQuery?.queryKey?.[1] === cascadeDim ? prevData : undefined,
   });
+  const catalogOptions = React.useMemo(
+    () => (catalogPages?.pages ? catalogPages.pages.flat() : undefined),
+    [catalogPages],
+  );
 
   // On the card_number step we show full catalog rows for the
   // player+set instead of distinct card_numbers. Each row carries
@@ -436,6 +451,15 @@ const CascadePicker = ({
         keyExtractor={(item, i) => (item && typeof item === 'object' && item.id) ? String(item.id) : String(item) + i}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: Spacing.xxxl }}
+        // Load the next page of options as the user nears the bottom.
+        // Only the catalog-backed steps page; year is local and the
+        // card_number step uses variant rows.
+        onEndReached={() => {
+          if (cascadeDim !== 'year' && cascadeDim !== 'card_number' && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           isFetching && (options?.length ?? 0) > 0 ? (
             <Text style={{ color: Colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: Spacing.xs }}>
@@ -453,7 +477,11 @@ const CascadePicker = ({
           // the manual form pre-fills with the lingering cascade
           // value (e.g. last picked McCaffrey) and the user creates
           // a duplicate of the existing card.
-          IDENTITY_DIMS.has(cascadeDim) && (options?.length ?? 0) > 0 ? (
+          isFetchingNextPage ? (
+            <View style={{ paddingVertical: Spacing.md, alignItems: 'center' }}>
+              <ActivityIndicator color={Colors.accent} />
+            </View>
+          ) : IDENTITY_DIMS.has(cascadeDim) && (options?.length ?? 0) > 0 ? (
             <TouchableOpacity
               onPress={() => onAddNewToSet?.(cascadeDim)}
               style={{
