@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'react-native-flash-message';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi, reviewsApi } from '../services/api';
+import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi, reviewsApi, catalogApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
@@ -982,6 +982,16 @@ export const PublicBinderScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Error', err.response?.data?.error || 'Failed to unfollow'),
   });
 
+  // Free-scan allowance for the first-card nudge in the empty state.
+  // Unconditional hook (see the hook-order warning below); cheap and
+  // cached, only rendered for the owner of an empty binder.
+  const { data: scanQuota } = useQuery({
+    queryKey: ['ai-scan-quota'],
+    queryFn: () => catalogApi.aiScanQuota().then((r) => r.data),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
   // IMPORTANT: every hook must run on every render in the same
   // order. The previous version put `if (isLoading) return …` on
   // top of this block, which skipped the useCallback below on the
@@ -1365,6 +1375,11 @@ export const PublicBinderScreen = ({ navigation, route }) => {
               title={isOwner ? 'Your binder is ready' : 'No cards in this binder yet'}
               message={isOwner
                 ? 'Scan the back of a card, scan a slab cert, or enter one manually. Card Shop handles the rest.'
+                  + (scanQuota?.unlimited
+                    ? '\n\nScans are unlimited on your plan — try one now!'
+                    : (scanQuota?.remaining ?? 0) > 0
+                      ? `\n\nYou have ${scanQuota.remaining} free scan${scanQuota.remaining === 1 ? '' : 's'} left today — try it now!`
+                      : '')
                 : 'This binder doesn\'t have any cards yet.'
               }
               action={isOwner ? {
