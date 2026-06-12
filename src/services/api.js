@@ -151,8 +151,10 @@ export const catalogApi = {
   parallels: (id) => api.get(`/catalog/${id}/parallels`),
   // Sibling variants — other parallels of the same exact (mfr, year,
   // set, card#). Used in the scan_review step so the user can swap
-  // when the AI picked the wrong /25 variant.
-  siblings: (id) => api.get(`/catalog/${id}/siblings`),
+  // when the AI picked the wrong /25 variant. Pass the SCANNED print
+  // run so the list anchors on the serial the camera read, not the
+  // auto-pick's run (the /399-scan-chose-/299 bug).
+  siblings: (id, printRun) => api.get(`/catalog/${id}/siblings`, printRun ? { params: { print_run: printRun } } : undefined),
   // Browse-by-set endpoints, used after the manufacturer-checklist
   // importer fills card_catalog. Distinct (mfr, year, set) + full
   // card list for a specific set.

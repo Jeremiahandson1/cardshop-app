@@ -797,11 +797,12 @@ const CascadePicker = ({
 // Matching print_run floats to the top — a /25 scan surfaces
 // other /25 parallels first.
 // ============================================================
-const SiblingRows = ({ topCandidate, onPick }) => {
+const SiblingRows = ({ topCandidate, scannedPrintRun, onPick }) => {
   const topId = topCandidate?.id;
+  const pr = parseInt(scannedPrintRun, 10) > 0 ? parseInt(scannedPrintRun, 10) : null;
   const { data, isLoading } = useQuery({
-    queryKey: ['catalog-siblings', topId],
-    queryFn: () => catalogApi.siblings(topId).then((r) => r.data),
+    queryKey: ['catalog-siblings', topId, pr],
+    queryFn: () => catalogApi.siblings(topId, pr).then((r) => r.data),
     enabled: !!topId,
     staleTime: 5 * 60_000,
   });
@@ -817,9 +818,9 @@ const SiblingRows = ({ topCandidate, onPick }) => {
   if (!siblings.length) return null;
 
   // Header copy phrases as "/25" only when every sibling shares the
-  // top pick's print run — otherwise the strip is mixed and we use
-  // the generic phrasing.
-  const tpr = topCandidate?.print_run || null;
+  // target print run (the scanned serial when available, else the
+  // top pick's) — otherwise the strip is mixed, generic phrasing.
+  const tpr = pr || topCandidate?.print_run || null;
   const allMatchPr = tpr && siblings.every((s) => s.print_run === tpr);
   const header = allMatchPr
     ? `Other /${tpr} variants of this card`
@@ -2036,6 +2037,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
               candidate; matching print_run floats to the top. */}
           <SiblingRows
             topCandidate={scanReview.candidates?.[0]}
+            scannedPrintRun={scanReview.print_run}
             onPick={(s) => {
               commitScanPhotos();
               setSelectedCatalog(s);
