@@ -37,7 +37,7 @@ import { ConversationListScreen, ConversationScreen } from '../screens/MessagesS
 import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { FeedbackScreen } from '../screens/FeedbackScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
-import { InitiateTransferScreen, TransfersScreen } from '../screens/TransferScreens';
+import { InitiateTransferScreen, TransfersScreen, ShowTransferQRScreen, ClaimTransferScreen } from '../screens/TransferScreens';
 import { DiscoverScreen, NotificationsScreen } from '../screens/DiscoverScreens';
 import {
   ProfileScreen, WantListScreen,
@@ -75,7 +75,7 @@ import { TransferVideoScreen } from '../screens/TransferVideoScreen';
 import { StalledTransferReportScreen } from '../screens/StalledTransferReportScreen';
 import { CaseModeScreen } from '../screens/CaseModeScreen';
 import { CardChainScreen } from '../screens/CardChainScreen';
-import { StolenMatchReviewScreen } from '../screens/StolenMatchReviewScreen';
+import { StolenMatchReviewScreen, RecoveryKitScreen } from '../screens/StolenMatchReviewScreen';
 import {
   ShowFloorHubScreen, ShowFloorCheckInScreen, ShowFloorEventScreen, ShowFloorUserScreen, ShowFloorShopScreen,
 } from '../screens/ShowFloorScreens';
@@ -302,6 +302,8 @@ const CollectionStack = () => (
     <CollectionStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <CollectionStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
     <CollectionStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <CollectionStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <CollectionStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
     <CollectionStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <CollectionStackNav.Screen name="PublicBinder" component={PublicBinderScreen} />
     <CollectionStackNav.Screen name="BinderCardDetail" component={BinderCardDetailScreen} />
@@ -342,6 +344,8 @@ const BinderStack = () => (
         works inside the binders stack without crossing tabs. */}
     <BinderStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <BinderStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <BinderStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <BinderStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
     <BinderStackNav.Screen name="QRScanner" component={QRScannerScreen} />
     <BinderStackNav.Screen name="StoreIntake" component={StoreIntakeScreen} />
     <BinderStackNav.Screen name="RequestReprint" component={RequestReprintScreen} />
@@ -369,6 +373,8 @@ const SearchStack = () => (
     <SearchStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <SearchStackNav.Screen name="Upgrade" component={UpgradeScreen} />
     <SearchStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <SearchStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <SearchStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
   </SearchStackNav.Navigator>
 );
 
@@ -376,7 +382,10 @@ const TransferStack = () => (
   <TransferStackNav.Navigator screenOptions={screenOptions}>
     <TransferStackNav.Screen name="TransfersMain" component={TransfersScreen} />
     <TransferStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <TransferStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <TransferStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
     <TransferStackNav.Screen name="CardDetail" component={CardDetailScreen} />
+    <TransferStackNav.Screen name="CardChain" component={CardChainScreen} />
     <TransferStackNav.Screen name="EditCard" component={EditCardScreen} />
     <TransferStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <TransferStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
@@ -397,6 +406,8 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="Conversation" component={ConversationScreen} />
     <ProfileStackNav.Screen name="RegisterCard" component={RegisterCardScreen} />
     <ProfileStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <ProfileStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <ProfileStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
     <ProfileStackNav.Screen name="MakeOffer" component={MakeOfferScreen} />
     <ProfileStackNav.Screen name="MakeTradeOffer" component={MakeTradeOfferScreen} />
     <ProfileStackNav.Screen name="OffersList" component={OffersListScreen} />
@@ -407,6 +418,7 @@ const ProfileStack = () => (
     <ProfileStackNav.Screen name="CaseMode" component={CaseModeScreen} />
     <ProfileStackNav.Screen name="CardChain" component={CardChainScreen} />
     <ProfileStackNav.Screen name="StolenMatchReview" component={StolenMatchReviewScreen} />
+    <ProfileStackNav.Screen name="RecoveryKit" component={RecoveryKitScreen} />
     <ProfileStackNav.Screen name="ShowFloorHub" component={ShowFloorHubScreen} />
     <ProfileStackNav.Screen name="ShowFloorCheckIn" component={ShowFloorCheckInScreen} />
     <ProfileStackNav.Screen name="ShowFloorEvent" component={ShowFloorEventScreen} />
@@ -535,6 +547,8 @@ const TradeStack = () => (
         registered under Profile/Collection/Binder. Also Transaction so
         accepted-offer banners can jump straight into ship/tracking. */}
     <TradeStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
+    <TradeStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
+    <TradeStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
     <TradeStackNav.Screen name="CardChain" component={CardChainScreen} />
     <TradeStackNav.Screen name="Transaction" component={TransactionScreen} />
     <TradeStackNav.Screen name="EditCard" component={EditCardScreen} />
@@ -601,6 +615,14 @@ const linkingConfig = {
         screens: {
           DealRadarFeed: 'deal-radar',
           DealRadarSettings: 'deal-radar/settings',
+          // cardshop://feedback → in-app feedback form (used by the
+          // welcome email's "tell us what you think" link).
+          Feedback: 'feedback',
+          // cardshop://t/<token> and https://cs.twomiah.com/t/<token>
+          // → QR card-transfer claim screen. In-app scans route here
+          // directly from QRScannerScreen; this covers camera/universal
+          // links opening the app cold.
+          ClaimTransfer: 't/:token',
         },
       },
       // Scan tab is a top-level Tab.Screen (not nested), so the path

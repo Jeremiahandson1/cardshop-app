@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,7 +58,27 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
     },
   });
 
+  // QR transfer: create a single-use offer, then show the QR for the
+  // buyer to scan in person. Ownership only flips when they claim it.
+  const qrMutation = useMutation({
+    mutationFn: (data) => transfersApi.createQrOffer(data).then((r) => r.data),
+    onSuccess: (offer) => {
+      navigation.navigate('ShowTransferQR', {
+        cardId,
+        offer,
+        cardName: card.player_name,
+        cardSub: `${card.year || ''} ${card.set_name || ''}`.trim(),
+      });
+    },
+    onError: (err) => {
+      Alert.alert('Error', err.response?.data?.error || 'Could not create the QR code');
+    },
+  });
 
+  const handleGenerateQr = () => {
+    const numericPrice = price ? parseFloat(price) : undefined;
+    qrMutation.mutate({ owned_card_id: cardId, sale_price: numericPrice });
+  };
 
   const handleStandardTransfer = () => {
     if (!recipientUsername.trim()) {
@@ -139,6 +159,14 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
               <Text style={styles.methodDesc}>Enter their username</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={[styles.methodBtn, method === 'qr' && styles.methodBtnActive]}
+              onPress={() => setMethod('qr')}
+            >
+              <Ionicons name="qr-code" size={20} color={method === 'qr' ? Colors.accent : Colors.textMuted} />
+              <Text style={[styles.methodLabel, method === 'qr' && { color: Colors.accent }]}>QR code</Text>
+              <Text style={styles.methodDesc}>Buyer scans in person</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -189,6 +217,20 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* QR method — generate a code the buyer scans in person */}
+        {method === 'qr' && (
+          <View style={{ gap: Spacing.sm }}>
+            <Button
+              title="Generate Transfer QR"
+              onPress={handleGenerateQr}
+              loading={qrMutation.isPending}
+            />
+            <Text style={styles.methodDesc}>
+              The buyer scans the code with their Card Shop app to receive this card in person. Set a price above first if it's a sale.
+            </Text>
+          </View>
+        )}
+
         {/* Important note */}
         <View style={styles.noteBox}>
           <Ionicons name="information-circle" size={16} color={Colors.info} />
@@ -208,6 +250,13 @@ export const TransfersScreen = ({ navigation }) => {
   const { data: transfers, isLoading, refetch } = useQuery({
     queryKey: ['my-transfers'],
     queryFn: () => transfersApi.mine({ limit: 50 }).then((r) => r.data),
+  });
+  // Off-platform sales/trades (cards exited to a non-member) — they're
+  // not transfers, so we pull them separately and show them in history.
+  const { data: disposedCards } = useQuery({
+    queryKey: ['my-disposed'],
+    // /cards/mine returns { cards, total } — pull the array.
+    queryFn: () => cardsApi.mine({ disposed: 'true', limit: 50 }).then((r) => r.data.cards || []),
   });
 
   const queryClient = useQueryClient();
@@ -242,7 +291,11 @@ export const TransfersScreen = ({ navigation }) => {
   const history = (transfers || []).filter((t) => ['completed', 'cancelled', 'disputed'].includes(t.status));
 
   const TransferItem = ({ t }) => (
-    <View style={styles.transferItem}>
+    <TouchableOpacity
+      style={styles.transferItem}
+      activeOpacity={0.7}
+      onPress={() => t.owned_card_id && navigation.navigate('CardChain', { cardId: t.owned_card_id })}
+    >
       <View style={styles.transferDir}>
         <Ionicons
           name={t.direction === 'sent' ? 'arrow-up' : 'arrow-down'}
@@ -253,7 +306,7 @@ export const TransfersScreen = ({ navigation }) => {
       <View style={{ flex: 1 }}>
         <Text style={styles.transferCard}>{t.player_name} {t.year} {t.set_name}</Text>
         <Text style={styles.transferMeta}>
-          {t.direction === 'sent' ? 'Sent' : 'Received'} · {t.method?.replace(/_/g,' ') || 'Transfer'}
+          {t.direction === 'sent' ? `Sent → @${t.to_username || 'unknown'}` : `Received ← @${t.from_username || 'unknown'}`} · {t.method?.replace(/_/g,' ') || 'Transfer'}
           {t.sale_price ? ` · $${t.sale_price}` : ''}
         </Text>
         <Text style={styles.transferDate}>{t.initiated_at ? new Date(t.initiated_at).toLocaleDateString() : ''}</Text>
@@ -282,7 +335,29 @@ export const TransfersScreen = ({ navigation }) => {
           <Text style={[styles.acceptText, { color: Colors.accent2 }]}>Confirm</Text>
         </TouchableOpacity>
       )}
-    </View>
+      <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+
+  const DisposedItem = ({ c }) => (
+    <TouchableOpacity
+      style={styles.transferItem}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('CardChain', { cardId: c.id })}
+    >
+      <View style={styles.transferDir}>
+        <Ionicons name="exit-outline" size={16} color={Colors.textMuted} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.transferCard}>{c.player_name} {c.year} {c.set_name}</Text>
+        <Text style={styles.transferMeta}>
+          {(c.disposed_method === 'traded' ? 'Traded' : 'Sold')} off-platform → {c.disposed_to_name || 'outside party'}
+          {c.disposed_price ? ` · $${c.disposed_price}` : ''}
+        </Text>
+        <Text style={styles.transferDate}>{c.disposed_at ? new Date(c.disposed_at).toLocaleDateString() : ''}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+    </TouchableOpacity>
   );
 
   return (
@@ -298,19 +373,215 @@ export const TransfersScreen = ({ navigation }) => {
             {pending.map((t) => <TransferItem key={t.id} t={t} />)}
           </View>
         )}
-        {history.length > 0 && (
+        {(history.length > 0 || (disposedCards || []).length > 0) && (
           <View>
             <Text style={[styles.sectionLabel, { marginTop: Spacing.md }]}>HISTORY</Text>
             {history.map((t) => <TransferItem key={t.id} t={t} />)}
+            {(disposedCards || []).map((c) => <DisposedItem key={`d-${c.id}`} c={c} />)}
           </View>
         )}
-        {!pending.length && !history.length && (
+        {!pending.length && !history.length && !(disposedCards || []).length && (
           <View style={{ alignItems: 'center', paddingTop: 80 }}>
             <Text style={{ fontSize: 40, marginBottom: Spacing.md }}>↔️</Text>
             <Text style={{ color: Colors.text, fontSize: Typography.lg, fontWeight: Typography.bold }}>No transfers yet</Text>
             <Text style={{ color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.sm }}>Your transfer history will appear here</Text>
           </View>
         )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// SHOW TRANSFER QR (seller) — display the code, wait for the buyer
+// ============================================================
+export const ShowTransferQRScreen = ({ navigation, route }) => {
+  const { offer, cardName, cardSub } = route.params;
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    Math.max(0, Math.round((new Date(offer.expires_at).getTime() - Date.now()) / 1000)));
+
+  // Poll the offer so the seller sees it flip to "claimed" the moment
+  // the buyer confirms. Stop polling once it's settled.
+  const { data: status } = useQuery({
+    queryKey: ['qr-offer', offer.token],
+    queryFn: () => transfersApi.getQrOffer(offer.token).then((r) => r.data),
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s && s !== 'pending' ? false : 4000;
+    },
+  });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.round((new Date(offer.expires_at).getTime() - Date.now()) / 1000)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [offer.expires_at]);
+
+  const claimed = status?.status === 'claimed';
+  const dead = status?.status === 'expired' || status?.status === 'cancelled' || secondsLeft <= 0;
+
+  useEffect(() => {
+    if (claimed) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
+  }, [claimed]);
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.popToTop()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Transfer QR</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.lg, alignItems: 'center' }}>
+        <Text style={styles.cardName}>{cardName}</Text>
+        {!!cardSub && <Text style={styles.cardSub}>{cardSub}</Text>}
+
+        {claimed ? (
+          <View style={{ alignItems: 'center', gap: Spacing.md, paddingVertical: 40 }}>
+            <Ionicons name="checkmark-circle" size={72} color={Colors.accent2} />
+            <Text style={{ color: Colors.text, fontSize: Typography.lg, fontWeight: Typography.bold }}>Transferred</Text>
+            <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>
+              This card was claimed and is no longer in your collection.
+            </Text>
+            <Button title="Done" onPress={() => navigation.popToTop()} />
+          </View>
+        ) : dead ? (
+          <View style={{ alignItems: 'center', gap: Spacing.md, paddingVertical: 40 }}>
+            <Ionicons name="time-outline" size={64} color={Colors.textMuted} />
+            <Text style={{ color: Colors.text, fontSize: Typography.lg, fontWeight: Typography.bold }}>QR expired</Text>
+            <Text style={{ color: Colors.textMuted, textAlign: 'center' }}>Go back and generate a fresh code.</Text>
+            <Button title="Back" onPress={() => navigation.goBack()} />
+          </View>
+        ) : (
+          <>
+            <View style={{ backgroundColor: '#fff', padding: Spacing.lg, borderRadius: Radius.md }}>
+              <Image source={{ uri: offer.qr_data_url }} style={{ width: 260, height: 260 }} resizeMode="contain" />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <ActivityIndicator size="small" color={Colors.accent} />
+              <Text style={{ color: Colors.textMuted }}>
+                Waiting for the buyer to scan · expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+              </Text>
+            </View>
+            <View style={styles.noteBox}>
+              <Ionicons name="information-circle" size={16} color={Colors.info} />
+              <Text style={styles.noteText}>
+                Have the buyer open Card Shop, tap Scan, and scan this code. Ownership transfers only after they confirm.
+              </Text>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// ============================================================
+// CLAIM TRANSFER (buyer) — confirm and receive the card
+// ============================================================
+export const ClaimTransferScreen = ({ navigation, route }) => {
+  const { token } = route.params;
+  const queryClient = useQueryClient();
+
+  const { data: offer, isLoading } = useQuery({
+    queryKey: ['qr-offer', token],
+    queryFn: () => transfersApi.getQrOffer(token).then((r) => r.data),
+    retry: false,
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: () => transfersApi.claimQrOffer(token).then((r) => r.data),
+    onSuccess: async (res) => {
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['my-transfers'] });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Card received', 'This card is now in your collection.', [
+        { text: 'View card', onPress: () => navigation.navigate('CardDetail', { cardId: res.owned_card_id }) },
+      ]);
+    },
+    onError: (err) => Alert.alert('Could not claim', err.response?.data?.error || 'Try again, or ask the seller for a new code.'),
+  });
+
+  if (isLoading) return <LoadingScreen />;
+
+  if (!offer) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Receive Card</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={{ alignItems: 'center', paddingTop: 80, gap: Spacing.md }}>
+          <Ionicons name="alert-circle-outline" size={64} color={Colors.textMuted} />
+          <Text style={{ color: Colors.text, fontSize: Typography.lg }}>QR not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const c = offer.card || {};
+  const blockedMsg = offer.is_own_card ? 'This is your own card.'
+    : offer.status === 'expired' ? 'This QR has expired — ask the seller for a new one.'
+    : offer.status === 'claimed' ? 'This card was already claimed.'
+    : offer.status === 'cancelled' ? 'This QR was cancelled.'
+    : !offer.claimable ? 'This card can’t be transferred right now.'
+    : null;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Receive Card</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.lg }}>
+        <View style={styles.cardPreview}>
+          {c.image ? (
+            <Image source={{ uri: c.image }} style={styles.cardThumb} resizeMode="cover" />
+          ) : (
+            <LogoMark size={40} />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardName}>{c.player_name || 'Card'}</Text>
+            <Text style={styles.cardSub}>{[c.year, c.set_name].filter(Boolean).join(' ')}</Text>
+            {!!c.serial_number && <Text style={styles.cardSub}>#{c.serial_number}</Text>}
+          </View>
+          <Ionicons name="arrow-down" size={20} color={Colors.accent2} />
+        </View>
+
+        <Text style={{ color: Colors.text, fontSize: Typography.base, textAlign: 'center' }}>
+          From <Text style={{ fontWeight: Typography.bold }}>@{offer.seller_username}</Text>
+          {offer.sale_price ? ` for $${offer.sale_price}` : ' (no charge)'}
+        </Text>
+
+        {blockedMsg ? (
+          <View style={[styles.noteBox, { borderColor: Colors.accent3 + '60', backgroundColor: Colors.accent3 + '15' }]}>
+            <Ionicons name="warning" size={16} color={Colors.accent3} />
+            <Text style={styles.noteText}>{blockedMsg}</Text>
+          </View>
+        ) : (
+          <Button
+            title={offer.sale_price ? `Accept & receive — $${offer.sale_price}` : 'Accept & receive'}
+            onPress={() => claimMutation.mutate()}
+            loading={claimMutation.isPending}
+          />
+        )}
+
+        <View style={styles.noteBox}>
+          <Ionicons name="information-circle" size={16} color={Colors.info} />
+          <Text style={styles.noteText}>
+            Accepting transfers this card into your collection and records it on the chain of custody. Money changes hands in person.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

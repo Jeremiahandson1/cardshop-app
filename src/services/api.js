@@ -212,6 +212,8 @@ export const cardsApi = {
   register: (data) => api.post('/cards', data, { timeout: 90_000 }),
   update: (id, data) => api.patch(`/cards/${id}`, data, { timeout: 90_000 }),
   delete: (id) => api.delete(`/cards/${id}`),
+  // Record a sale/trade off Card Shop to a non-member (free-text recipient).
+  exitOffPlatform: (id, body) => api.post(`/cards/${id}/exit-off-platform`, body),
   history: (id) => api.get(`/cards/${id}/history`),
   // Change the catalog row this owned card maps to (fix wrong-match
   // from the scanner). Server enforces owner + no-chain-history.
@@ -232,6 +234,11 @@ export const transfersApi = {
   confirmDelivery: (id) => api.post(`/transfers/${id}/confirm-delivery`),
   cancel: (id) => api.post(`/transfers/${id}/cancel`),
   mine: (params) => api.get('/transfers/mine', { params }),
+  // QR transfers: owner creates an offer (returns a QR image), buyer
+  // fetches details for the confirm screen, then claims it in person.
+  createQrOffer: (data) => api.post('/transfers/qr-offer', data),
+  getQrOffer: (token) => api.get(`/transfers/qr-offer/${token}`),
+  claimQrOffer: (token) => api.post(`/transfers/qr-offer/${token}/claim`),
 };
 
 // ============================================================
@@ -534,6 +541,9 @@ export const stolenMatchesApi = {
   mine: () => api.get('/stolen-matches/mine'),
   ownerConfirm: (id, notes) => api.post(`/stolen-matches/${id}/owner-confirm`, { notes }),
   ownerDismiss: (id, notes) => api.post(`/stolen-matches/${id}/owner-dismiss`, { notes }),
+  // Evidence packet + tailored "where to report" guidance for a match.
+  // We assemble it; the owner files (with a police report).
+  recoveryKit: (id) => api.get(`/stolen-matches/${id}/recovery-kit`),
 };
 
 // ============================================================

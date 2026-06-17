@@ -96,6 +96,29 @@ export const QRScannerScreen = ({ navigation, route }) => {
       scanGuardRef.current = false;
     };
 
+    // Transfer-claim QR? Payload is cardshop://t/<token> or
+    // https://cs.twomiah.com/t/<token>. Route straight to the claim
+    // confirm screen — this isn't a sticker lookup.
+    const transferMatch = /(?:cardshop:\/\/t\/|https?:\/\/[^/]+\/t\/)([A-Za-z0-9]+)/.exec(data);
+    if (transferMatch) {
+      const token = transferMatch[1];
+      setScanning(false);
+      try {
+        const state = navigation.getState?.();
+        const currentRoutes = state?.routes?.map((r) => r.name) || [];
+        const isTabRoot = currentRoutes.includes('Binders') && currentRoutes.includes('Profile');
+        if (isTabRoot) {
+          navigation.navigate('Binders', { screen: 'ClaimTransfer', params: { token } });
+        } else {
+          navigation.navigate('ClaimTransfer', { token });
+        }
+      } catch (e) {
+        Alert.alert('Navigation failed', e?.message || 'unknown');
+        resetScanner();
+      }
+      return;
+    }
+
     try {
       const res = await qrApi.lookup(code);
       const insert = res.data;
