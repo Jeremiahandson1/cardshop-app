@@ -78,7 +78,9 @@ export const CardChainScreen = ({ navigation, route }) => {
             {card.manufacturer ? `${card.manufacturer} · ` : ''}
             {card.card_number ? `#${card.card_number}` : ''}
             {card.parallel ? ` · ${card.parallel}` : ''}
-            {card.serial_number ? ` · /${card.serial_number}` : ''}
+            {card.serial_number
+              ? ` · #${card.serial_number}${card.print_run ? `/${card.print_run}` : ''}`
+              : (card.print_run ? ` · /${card.print_run}` : '')}
           </Text>
           {card.grading_company && (
             <View style={styles.gradeBadge}>
@@ -98,8 +100,12 @@ export const CardChainScreen = ({ navigation, route }) => {
           </View>
           {current_owner ? (
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.ownerLabel}>Current owner</Text>
-              <Text style={styles.ownerName}>@{current_owner.username}</Text>
+              <Text style={styles.ownerLabel}>{current_owner.off_platform ? 'Left Card Shop' : 'Current owner'}</Text>
+              <Text style={styles.ownerName}>
+                {current_owner.off_platform
+                  ? (current_owner.display_name || 'Sold off-platform')
+                  : `@${current_owner.username}`}
+              </Text>
             </View>
           ) : null}
         </View>

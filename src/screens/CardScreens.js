@@ -908,6 +908,34 @@ const SiblingRows = ({ topCandidate, scannedPrintRun, onPick }) => {
   );
 };
 
+// Parse a scanned slab code into { cert, company }. Two formats, so
+// either side of the slab works:
+//   - BACK label barcode (Code 128/39) encodes the bare cert digits.
+//   - FRONT label QR encodes a URL to the grader's cert page
+//     (e.g. https://www.psacard.com/cert/12345678). We pull the cert
+//     out of the URL and, when the domain identifies the grader,
+//     auto-select the grading company so the user doesn't have to.
+// Returns null when no plausible cert number is present (e.g. a random
+// QR), so the caller can ignore it and keep scanning.
+function parseSlabCode(data) {
+  const raw = String(data || '').trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  let company = null;
+  if (lower.includes('psacard')) company = 'psa';
+  else if (lower.includes('beckett')) company = 'bgs';
+  else if (lower.includes('gosgc') || lower.includes('sgccard')) company = 'sgc';
+  else if (lower.includes('cgccards') || lower.includes('csgcards')) company = 'csg';
+  else if (lower.includes('hybridgrading') || lower.includes('hgagrading')) company = 'hga';
+  // Prefer the digits that follow a "cert" path segment (front QR URL);
+  // fall back to the first 6-12 digit run (back barcode = bare digits).
+  const m =
+    raw.match(/cert(?:ification)?[^0-9]{0,4}(\d{6,12})/i) ||
+    raw.match(/(\d{6,12})(?!\d)/);
+  const cert = m ? m[1] : null;
+  return cert ? { cert, company } : null;
+}
+
 export const RegisterCardScreen = ({ navigation, route }) => {
   const qrCode = route.params?.qrCode;
   const catalogId = route.params?.catalogId;
@@ -987,6 +1015,9 @@ export const RegisterCardScreen = ({ navigation, route }) => {
   // instead of typing the cert # by hand.
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [barcodePermission, requestBarcodePermission] = useCameraPermissions();
+  // Guards against onBarcodeScanned firing repeatedly before the
+  // scanner view unmounts. Reset to false each time we open it.
+  const barcodeLockRef = React.useRef(false);
 
   // Cascade state — each level records the picked value, narrowing
   // the options for the next level. Order matters: each dimension
@@ -1898,7 +1929,10 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <Text style={styles.headerTitle}>Review scan</Text>
           <View style={{ width: 22 }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+        {/* Distinct key per step forces a fresh ScrollView mount on each
+            step change so the new step always starts scrolled to the top
+            instead of inheriting the previous step's scroll offset. */}
+        <ScrollView key="rc-review" contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
           {/* Confidence pill — surfaces the model's certainty so the
               user knows when to trust auto-fields vs double-check. */}
           {(() => {
@@ -2401,6 +2435,57 @@ export const RegisterCardScreen = ({ navigation, route }) => {
 
   if (step === 'cert_entry') {
     const claimed = certLookupResult?.already_claimed;
+
+    // Full-screen slab barcode scanner. Rendered as a plain view, NOT
+    // an RN <Modal> — CameraView inside a Modal silently fails to scan
+    // (black preview, onBarcodeScanned never fires, esp. on Android).
+    // Mirrors the working QRScannerScreen setup: absolute-fill camera,
+    // facing="back", autofocus on, scan-lock to ignore repeat reads.
+    if (barcodeScannerOpen) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.base }}>
+            <TouchableOpacity onPress={() => setBarcodeScannerOpen(false)}>
+              <Text style={{ color: '#fff', fontSize: 16 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Scan slab barcode</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              autofocus="on"
+              barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'code93', 'qr'] }}
+              onBarcodeScanned={({ data }) => {
+                if (barcodeLockRef.current) return;
+                // Back barcode (bare cert digits) OR front QR (cert URL).
+                // parseSlabCode handles both and, for front QRs, also
+                // auto-detects the grading company from the URL domain.
+                const parsed = parseSlabCode(data);
+                if (!parsed) return;
+                barcodeLockRef.current = true;
+                setCertForm((f) => ({
+                  ...f,
+                  cert_number: parsed.cert,
+                  // Only override the company when the scan identified it
+                  // (front QR); a back barcode leaves the user's choice.
+                  company: parsed.company || f.company,
+                }));
+                setBarcodeScannerOpen(false);
+              }}
+            />
+            <View pointerEvents="none" style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ width: 280, height: 80, borderWidth: 2, borderColor: '#fff', borderRadius: 8 }} />
+              <Text style={{ color: '#fff', marginTop: Spacing.md, paddingHorizontal: Spacing.lg, textAlign: 'center' }}>
+                Scan the barcode on the back — or the QR code on the front. Auto-fires.
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.header}>
@@ -2411,49 +2496,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <View style={{ width: 22 }} />
         </View>
 
-        {/* Barcode scanner modal — Code 128 (PSA/BGS/CSG/CGC/HGA)
-            and Code 39 fallback. Auto-fills cert # on a successful
-            read; the user can still edit before tapping Look up. */}
-        <Modal
-          visible={barcodeScannerOpen}
-          animationType="slide"
-          presentationStyle="fullScreen"
-          onRequestClose={() => setBarcodeScannerOpen(false)}
-        >
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.base }}>
-              <TouchableOpacity onPress={() => setBarcodeScannerOpen(false)}>
-                <Text style={{ color: '#fff', fontSize: 16 }}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Scan slab barcode</Text>
-              <View style={{ width: 50 }} />
-            </View>
-            <CameraView
-              style={{ flex: 1 }}
-              barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'code93', 'qr'] }}
-              onBarcodeScanned={({ data, type }) => {
-                // Strip whitespace + clamp to a reasonable cert#
-                // length (PSA: 8-9 digits; BGS: 8-9; SGC: 7-9).
-                // QR codes might also encode a URL — just take the
-                // last digit run if so.
-                const raw = String(data || '').trim();
-                const digits = (raw.match(/\d{6,12}/) || [raw])[0];
-                if (!digits) return;
-                setCertForm((f) => ({ ...f, cert_number: digits }));
-                setBarcodeScannerOpen(false);
-              }}
-            >
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: 280, height: 80, borderWidth: 2, borderColor: '#fff', borderRadius: 8 }} />
-                <Text style={{ color: '#fff', marginTop: Spacing.md, paddingHorizontal: Spacing.lg, textAlign: 'center' }}>
-                  Frame the barcode on the back of the slab. Auto-fires.
-                </Text>
-              </View>
-            </CameraView>
-          </SafeAreaView>
-        </Modal>
-
-        <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
+        <ScrollView key="rc-cert" contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md }}>
           <Text style={{ color: Colors.textMuted, fontSize: 13, lineHeight: 18 }}>
             Enter the cert number off the slab label. We'll pull the card info when
             possible and check that nobody else on Card Shop has already claimed
@@ -2525,6 +2568,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
                   return;
                 }
               }
+              barcodeLockRef.current = false;
               setBarcodeScannerOpen(true);
             }}
             style={{
@@ -2679,7 +2723,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           <Text style={styles.headerTitle}>Card Details</Text>
           <View style={{ width: 22 }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }}>
+        <ScrollView key="rc-manual" contentContainerStyle={{ padding: Spacing.base, paddingBottom: Spacing.xxxl }}>
           <Text style={[styles.catalogSet, { marginBottom: Spacing.xs }]}>
             Enter the card's info. You'll take photos on the next screen.
           </Text>
@@ -2922,7 +2966,7 @@ export const RegisterCardScreen = ({ navigation, route }) => {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 100 }}>
+      <ScrollView key="rc-details" contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 100 }}>
         {/* Selected card preview */}
         {!selectedCatalog ? <LoadingScreen /> : <View style={styles.selectedCard}>
           {selectedCatalog.front_image_url
@@ -3657,9 +3701,6 @@ function InlineVideoPlayer({ uri, onClose }) {
 export const CardDetailScreen = ({ navigation, route }) => {
   const { cardId } = route.params;
   const queryClient = useQueryClient();
-  const ebayStatus = useEbayStatus();
-  const ebayEnabled = !!ebayStatus?.feature_enabled;
-  const ebayConnected = !!ebayStatus?.connected;
   const currentUserId = useAuthStore((s) => s.user?.id);
 
   const { data: card, isLoading } = useQuery({
@@ -3898,6 +3939,37 @@ export const CardDetailScreen = ({ navigation, route }) => {
     );
   };
 
+  // Off-platform sale/trade — record selling/trading the card to someone
+  // who isn't on Card Shop (a local shop, a friend). Preserves the chain
+  // and works even for cards that can't be deleted.
+  const [offPlatformVisible, setOffPlatformVisible] = useState(false);
+  const [opMethod, setOpMethod] = useState('sold');
+  const [opName, setOpName] = useState('');
+  const [opPrice, setOpPrice] = useState('');
+  const [opNotes, setOpNotes] = useState('');
+  const exitOffPlatformMutation = useMutation({
+    mutationFn: () => cardsApi.exitOffPlatform(cardId, {
+      method: opMethod,
+      to_name: opName.trim(),
+      price: opPrice ? parseFloat(opPrice) : undefined,
+      notes: opNotes.trim() || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+      setOffPlatformVisible(false);
+      Alert.alert(
+        'Recorded',
+        `Marked ${opMethod} off-platform${opName.trim() ? ' to ' + opName.trim() : ''}. It's left your collection and the chain of custody shows the exit.`,
+        [{ text: 'Done', onPress: () => navigation.goBack() }],
+      );
+    },
+    onError: (err) => Alert.alert('Could not record', err.response?.data?.error || 'Please try again.'),
+  });
+  const openOffPlatform = () => {
+    setOpMethod('sold'); setOpName(''); setOpPrice(''); setOpNotes('');
+    setOffPlatformVisible(true);
+  };
+
   // Cancel an in-flight peer-to-peer transfer. The card row's
   // pending_transfer_* fields drive the banner UI; cancel flips the
   // transfer to 'cancelled' on the API and unlocks the card.
@@ -4029,6 +4101,19 @@ export const CardDetailScreen = ({ navigation, route }) => {
               <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '700' }}>Transfer</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            onPress={openOffPlatform}
+            accessibilityLabel="Record a sale or trade off Card Shop"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+              backgroundColor: 'transparent',
+              borderWidth: 1, borderColor: Colors.border,
+            }}
+          >
+            <Ionicons name="exit-outline" size={13} color={Colors.textMuted} />
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '700' }}>Sold off</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={confirmDelete}
             accessibilityLabel="Delete this card"
@@ -4189,11 +4274,18 @@ export const CardDetailScreen = ({ navigation, route }) => {
             );
           }
           return (
+            // NOTE: do NOT use styles.cardImageArea here — its
+            // justifyContent/alignItems:'center' centers the row, and on
+            // a horizontal ScrollView whose content overflows the screen
+            // (3+ photos) Android clips the LEADING items and makes them
+            // unreachable — the carousel then starts mid-list (on the
+            // back image) and you can't scroll back to the front. Use a
+            // plain non-centering container so it starts at the left.
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.base }}
-              style={styles.cardImageArea}
+              style={{ height: 280, backgroundColor: Colors.surface2 }}
             >
               {ownPhotos.map((uri, i) => (
                 <TouchableOpacity key={`${uri}-${i}`} activeOpacity={0.85} onPress={() => openLightbox(i)}>
@@ -4251,6 +4343,57 @@ export const CardDetailScreen = ({ navigation, route }) => {
           initialIndex={zoomIndex}
           onClose={() => setZoomOpen(false)}
         />
+
+        {/* Off-platform sale/trade — record selling/trading this card to
+            someone who isn't on Card Shop (a local shop, a friend). */}
+        <Modal
+          visible={offPlatformVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOffPlatformVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.lg }}>
+            <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.base, borderWidth: 1, borderColor: Colors.border }}>
+              <Text style={{ color: Colors.text, fontSize: Typography.md, fontWeight: Typography.bold, marginBottom: 4 }}>
+                Sold or traded off Card Shop
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, lineHeight: 18, marginBottom: Spacing.md }}>
+                Record that this card left your collection to someone who isn't on Card Shop (a local shop, a friend). It stays on the card's chain of custody and leaves your collection.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
+                {['sold', 'traded'].map((m) => {
+                  const on = opMethod === m;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      onPress={() => setOpMethod(m)}
+                      style={{
+                        flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.md,
+                        borderWidth: 1, borderColor: on ? Colors.accent : Colors.border,
+                        backgroundColor: on ? Colors.accent : Colors.surface2,
+                      }}
+                    >
+                      <Text style={{ color: on ? Colors.bg : Colors.textMuted, fontWeight: '700', textTransform: 'capitalize' }}>{m}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Input label="Sold/traded to" value={opName} onChangeText={setOpName} placeholder="e.g. Dave's Card Shop" autoCapitalize="words" />
+              <Input label="Price (optional)" value={opPrice} onChangeText={setOpPrice} placeholder="0.00" keyboardType="decimal-pad" />
+              <Input label="Notes (optional)" value={opNotes} onChangeText={setOpNotes} placeholder="Anything to remember" multiline numberOfLines={2} />
+              <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+                <Button title="Cancel" variant="secondary" onPress={() => setOffPlatformVisible(false)} style={{ flex: 1 }} />
+                <Button
+                  title={exitOffPlatformMutation.isPending ? 'Saving…' : 'Record'}
+                  onPress={() => exitOffPlatformMutation.mutate()}
+                  disabled={!opName.trim() || exitOffPlatformMutation.isPending}
+                  loading={exitOffPlatformMutation.isPending}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Binder picker — scrollable modal so N binders all fit
             (Alert.alert caps at 3 buttons on Android). */}
@@ -5163,41 +5306,6 @@ export const CardDetailScreen = ({ navigation, route }) => {
             />
           )}
 
-          {/* List on eBay — gated until the feature flag flips on,
-              and suppressed entirely whenever the card is locked in
-              a pending CSTX or peer transfer. */}
-          {actionsLocked ? null : (
-            <View style={{ marginTop: Spacing.md }}>
-              {!ebayEnabled ? (
-                <View style={styles.ebayDisabled}>
-                  <Ionicons name="pricetags-outline" size={16} color={Colors.textMuted} />
-                  <Text style={styles.ebayDisabledText}>List on eBay</Text>
-                  <View style={styles.ebayComingSoon}>
-                    <Text style={styles.ebayComingSoonText}>Coming Soon</Text>
-                  </View>
-                </View>
-              ) : (
-                <Button
-                  title="List on eBay"
-                  variant="teal"
-                  onPress={() => {
-                    if (!ebayConnected) {
-                      try {
-                        navigation.navigate('Integrations');
-                      } catch (_e) {
-                        Alert.alert(
-                          'Connect eBay',
-                          'Open Profile › Integrations to connect your eBay account first.'
-                        );
-                      }
-                      return;
-                    }
-                    Alert.alert('Coming Soon', 'Listing flow coming soon.');
-                  }}
-                />
-              )}
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>

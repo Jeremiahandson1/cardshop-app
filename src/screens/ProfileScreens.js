@@ -319,15 +319,13 @@ export const ProfileScreen = ({ navigation }) => {
       items: [
         { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
         { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
-        { icon: 'swap-horizontal-outline', label: 'Transfer History', onPress: () => navigation.navigate('Transfers') },
-        { icon: 'receipt-outline', label: 'Transactions', onPress: () => navigation.navigate('Transaction', { transactionId: null }) },
+        { icon: 'swap-horizontal-outline', label: 'Transfers & sales', onPress: () => navigation.navigate('Transfers') },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
         { icon: 'shield-half-outline', label: 'Stolen-card match review', onPress: () => navigation.navigate('StolenMatchReview') },
         { icon: 'grid-outline', label: 'Set completion', onPress: () => navigation.navigate('SetsList') },
         { icon: 'search-outline', label: 'Browse sets', onPress: () => navigation.navigate('BrowseSets') },
         { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
         { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
-        { icon: 'link-outline', label: 'Integrations', onPress: () => navigation.navigate('Integrations') },
         { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
         {

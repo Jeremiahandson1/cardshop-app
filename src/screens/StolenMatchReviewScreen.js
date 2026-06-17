@@ -8,10 +8,11 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert,
-  Linking,
+  Linking, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stolenMatchesApi } from '../services/api';
 import { Button, LoadingScreen, EmptyState } from '../components/ui';
@@ -27,9 +28,11 @@ export const StolenMatchReviewScreen = ({ navigation }) => {
 
   const confirmMut = useMutation({
     mutationFn: ({ id, notes }) => stolenMatchesApi.ownerConfirm(id, notes),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['my-stolen-matches'] });
-      Alert.alert('Confirmed', 'We\'ll file a takedown report. You\'ll be notified when there\'s an update.');
+      // Take the owner straight to their recovery kit — the evidence
+      // packet + exactly where to file for their case.
+      navigation.navigate('RecoveryKit', { id: variables.id });
     },
     onError: (e) => Alert.alert('Error', e.response?.data?.error || e.message),
   });
@@ -64,7 +67,7 @@ export const StolenMatchReviewScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 80 }}>
           <Text style={styles.intro}>
             We may have spotted your stolen card on eBay. Compare carefully — you know this card best.
-            If it's yours, we'll handle the takedown.
+            If it's yours, we'll build you a recovery kit: a ready-to-file report plus exactly where to send it.
           </Text>
 
           {candidates.map((c) => (
@@ -165,7 +168,7 @@ const Candidate = ({ c, onConfirm, onDismiss, loading }) => {
           title="Yes, my card"
           onPress={() => Alert.alert(
             'Confirm this is your card?',
-            'We\'ll file a takedown report and notify you when there\'s an update.',
+            'We\'ll put together your recovery kit — a ready-to-file report and where to send it for your case.',
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Confirm', onPress: () => onConfirm('') },
@@ -220,4 +223,133 @@ const styles = StyleSheet.create({
   viewListingText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
 
   actionRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+
+  // Recovery kit
+  sectionTitle: { color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.bold, marginBottom: 4 },
+  reportBox: {
+    color: Colors.text, fontSize: 12, lineHeight: 18,
+    fontFamily: 'Courier', backgroundColor: Colors.bg,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm,
+    padding: Spacing.sm, marginTop: 4,
+  },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  linkText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
+  authName: { color: Colors.text, fontSize: Typography.sm, fontWeight: Typography.bold },
+  authWhy: { color: Colors.textMuted, fontSize: Typography.xs, lineHeight: 17, marginTop: 2 },
+  authAction: { color: Colors.text, fontSize: Typography.xs, lineHeight: 17, marginTop: 4 },
+  disclaimer: { color: Colors.textMuted, fontSize: 11, lineHeight: 16, fontStyle: 'italic', marginTop: Spacing.sm },
 });
+
+// ============================================================
+// Recovery kit — owner's evidence packet + where to file, tailored to
+// their case. Reached automatically after confirming a match. We do
+// NOT file takedowns on the user's behalf; we assemble, they submit.
+// ============================================================
+export const RecoveryKitScreen = ({ navigation, route }) => {
+  const { id } = route.params || {};
+  const { data, isLoading } = useQuery({
+    queryKey: ['recovery-kit', id],
+    queryFn: () => stolenMatchesApi.recoveryKit(id).then((r) => r.data),
+    enabled: !!id,
+  });
+
+  if (isLoading) return <LoadingScreen />;
+  const kit = data || {};
+  const authorities = kit.authorities || [];
+  const report = kit.report_summary || '';
+
+  const copyReport = async () => {
+    try {
+      await Clipboard.setStringAsync(report);
+      Alert.alert('Copied', 'Report copied to your clipboard.');
+    } catch {
+      Alert.alert("Couldn't copy", 'Try the Share button instead.');
+    }
+  };
+  const shareReport = () => { Share.share({ message: report }).catch(() => {}); };
+  const open = (url) => { if (url) Linking.openURL(url).catch(() => {}); };
+  const call = (phone) => { if (phone) Linking.openURL(`tel:${phone.replace(/[^0-9+]/g, '')}`).catch(() => {}); };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Recover your card</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.md, paddingBottom: 100 }}>
+        <Text style={styles.intro}>
+          Confirmed. We assembled the evidence below — you (and the police) file the reports.
+          Card Shop doesn't file takedowns on your behalf, but everything you need is right here.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>{kit.card?.label || 'Your card'}</Text>
+          {kit.card?.graded ? (
+            <Text style={styles.cardMeta}>
+              {String(kit.card.grading_company || '').toUpperCase()} {kit.card.grade || ''}
+              {kit.card.cert_number ? ` · Cert #${kit.card.cert_number}` : ''}
+            </Text>
+          ) : null}
+          {kit.listing?.url ? (
+            <TouchableOpacity onPress={() => open(kit.listing.url)} style={styles.viewListingBtn}>
+              <Ionicons name="open-outline" size={14} color={Colors.accent} />
+              <Text style={styles.viewListingText}>View the eBay listing</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Ready-to-file report</Text>
+          <Text style={styles.reportBox} selectable>{report}</Text>
+          <View style={styles.actionRow}>
+            <Button title="Copy" variant="secondary" onPress={copyReport} style={{ flex: 1 }} />
+            <Button title="Share" onPress={shareReport} style={{ flex: 1 }} />
+          </View>
+        </View>
+
+        {(kit.evidence?.chain_of_custody_url || kit.evidence?.registry_url) ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Your ownership evidence</Text>
+            {kit.evidence.chain_of_custody_url ? (
+              <TouchableOpacity onPress={() => open(kit.evidence.chain_of_custody_url)} style={styles.linkRow}>
+                <Ionicons name="link-outline" size={16} color={Colors.accent} />
+                <Text style={styles.linkText}>Chain of custody</Text>
+              </TouchableOpacity>
+            ) : null}
+            {kit.evidence.registry_url ? (
+              <TouchableOpacity onPress={() => open(kit.evidence.registry_url)} style={styles.linkRow}>
+                <Ionicons name="shield-outline" size={16} color={Colors.accent} />
+                <Text style={styles.linkText}>Public stolen registry</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionTitle}>Where to file — for your case</Text>
+        {authorities.map((a, i) => (
+          <View key={i} style={styles.card}>
+            <Text style={styles.authName}>{a.name}</Text>
+            {a.why ? <Text style={styles.authWhy}>{a.why}</Text> : null}
+            {a.action ? <Text style={styles.authAction}>→ {a.action}</Text> : null}
+            {(a.url || a.phone) ? (
+              <View style={styles.actionRow}>
+                {a.url ? (
+                  <Button title="Open" variant="secondary" onPress={() => open(a.url)} style={{ flex: 1 }} />
+                ) : null}
+                {a.phone ? (
+                  <Button title={`Call ${a.phone}`} variant="secondary" onPress={() => call(a.phone)} style={{ flex: 1 }} />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ))}
+
+        {kit.disclaimer ? <Text style={styles.disclaimer}>{kit.disclaimer}</Text> : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
