@@ -44,13 +44,25 @@ describe('useAuthStore', () => {
       expect(useAuthStore.getState().isLoading).toBe(false);
     });
 
-    it('clears tokens on auth failure', async () => {
+    it('clears tokens on a 401 (real logout)', async () => {
       SecureStore.getItemAsync.mockResolvedValue('expired-token');
-      authApi.me.mockRejectedValue(new Error('unauthorized'));
+      authApi.me.mockRejectedValue({ response: { status: 401 } });
       await useAuthStore.getState().initialize();
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
       expect(useAuthStore.getState().user).toBeNull();
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+      expect(useAuthStore.getState().isLoading).toBe(false);
+    });
+
+    it('keeps tokens and stays authed on a transient (non-401) error', async () => {
+      // Network/5xx flake must NOT bounce a logged-in user to the login
+      // screen — initialize() keeps creds and stays optimistically authed.
+      SecureStore.getItemAsync.mockResolvedValue('valid-token');
+      authApi.me.mockRejectedValue({ response: { status: 503 } });
+      await useAuthStore.getState().initialize();
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalledWith('access_token');
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
       expect(useAuthStore.getState().isLoading).toBe(false);
     });
   });

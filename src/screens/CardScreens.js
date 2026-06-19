@@ -24,6 +24,8 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousDa
 import { cardsApi, catalogApi, ebayApi, bindersApi, moveCardToBinder, setCardIntent, taggingSessionsApi, vaultApi, transfersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, StatusBadge, SectionHeader, LoadingScreen, Divider, VerificationBadge, LogoMark } from '../components/ui';
+import { CardFields } from '../components/CardFields';
+import { ChainOfCustody } from '../components/ChainOfCustody';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 import Svg, { Polyline, Line as SvgLine, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
@@ -3067,31 +3069,11 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Availability — two independent toggles. Off/off = the
-            card is private (not for sale or trade). */}
-        <View>
-          <SectionHeader title="Availability" />
-          <View style={styles.statusRow}>
-            <TouchableOpacity
-              style={[styles.statusBtn, form.for_sale && styles.statusBtnActive]}
-              onPress={() => set('for_sale')(!form.for_sale)}
-            >
-              <Text style={[styles.statusBtnLabel, form.for_sale && { color: Colors.accent }]}>
-                {form.for_sale ? '✓ For sale' : 'For sale'}
-              </Text>
-              <Text style={styles.statusBtnDesc}>Open to cash offers</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.statusBtn, form.for_trade && styles.statusBtnActive]}
-              onPress={() => set('for_trade')(!form.for_trade)}
-            >
-              <Text style={[styles.statusBtnLabel, form.for_trade && { color: Colors.accent }]}>
-                {form.for_trade ? '✓ For trade' : 'For trade'}
-              </Text>
-              <Text style={styles.statusBtnDesc}>Lists it on the trade board</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Listing fields — shared with the edit screen (CardFields):
+            availability, asking price, serial, public + private notes.
+            Condition is rendered above (coupled to the grade picker), so
+            it's suppressed here. */}
+        <CardFields form={form} set={set} card={selectedCatalog || {}} showCondition={false} />
 
         {/* Vault declaration — for cards held by a third-party vault
             (PSA Vault, Goldin, eBay Vault, etc.). When set, the card
@@ -3151,66 +3133,6 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           ) : null}
         </View>
 
-        {/* Asking price — only meaningful when for sale */}
-        {form.for_sale && (
-          <Input
-            label="Asking Price (optional)"
-            value={form.asking_price}
-            onChangeText={set('asking_price')}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-        )}
-
-        {/* Public notes — visible on the listing and trade board */}
-        <View>
-          <SectionHeader title="Public Notes" />
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
-            Shown to anyone viewing this card. Good for context like
-            "part of my Flux rainbow, willing to trade toward the Pink".
-          </Text>
-          <Input
-            value={form.public_notes}
-            onChangeText={set('public_notes')}
-            placeholder="Notes visible to everyone..."
-            multiline
-          />
-        </View>
-
-        {/* Personal Details (private) */}
-        <View>
-          <SectionHeader title="Personal Details (Private)" />
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
-            These are never shown to other users.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Purchase Price"
-                value={form.purchase_price}
-                onChangeText={set('purchase_price')}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Your Valuation"
-                value={form.personal_valuation}
-                onChangeText={set('personal_valuation')}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
-          <Input
-            label="Private Notes"
-            value={form.notes}
-            onChangeText={set('notes')}
-            placeholder="Personal notes about this card..."
-            multiline
-          />
-        </View>
 
         {/* How did you get this? — self-reported chain genesis.
             Optional. Stamped on the chain as an UNVERIFIED
@@ -5332,7 +5254,6 @@ export const EditCardScreen = ({ navigation, route }) => {
 
   const [form, setForm] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]); // newly-added file:// URIs
-  const [conditionDescFor, setConditionDescFor] = useState(null);
 
   // Re-link picker — reuses the same cascade (sport → year →
   // manufacturer → set → player → card # → subset/parallel) used by
@@ -5438,28 +5359,6 @@ export const EditCardScreen = ({ navigation, route }) => {
     });
   }, [card, form]);
 
-  // Reuse the same eBay condition table the register screen uses
-  // so the definitions stay in one place. Duplicated structurally
-  // to avoid splitting the component file further; if a third
-  // copy shows up this should move to a module-level constant.
-  const CONDITIONS = [
-    { key: 'gem_mint',  label: 'Gem Mint',   ebay: 'Graded — Gem Mint',
-      desc: 'Perfect centering, sharp corners, no printing defects visible under magnification.' },
-    { key: 'mint',      label: 'Mint',       ebay: 'Mint or Mint 9',
-      desc: 'Near-perfect centering (55/45+), sharp corners, clean surface. One very minor flaw acceptable.' },
-    { key: 'near_mint', label: 'Near Mint',  ebay: 'Near Mint–Mint or NM 8',
-      desc: 'Slight off-centering, minor corner wear, light surface scratches at an angle. No creases.' },
-    { key: 'excellent', label: 'Excellent',  ebay: 'Excellent',
-      desc: 'Mild corner rounding, minor edge wear. Image still sharp, no creases.' },
-    { key: 'very_good', label: 'Very Good',  ebay: 'Very Good',
-      desc: 'Noticeable corner wear and edge fuzz. May have a single very light crease.' },
-    { key: 'good',      label: 'Good',       ebay: 'Good',
-      desc: 'Rounded corners, visible creases, surface scratches. Image intact.' },
-    { key: 'fair',      label: 'Fair',       ebay: 'Fair',
-      desc: 'Heavy wear, multiple creases, possible minor tears. Image recognizable.' },
-    { key: 'poor',      label: 'Poor',       ebay: 'Poor',
-      desc: 'Major damage — tears, water damage, stains, writing, pin-holes.' },
-  ];
 
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -5536,19 +5435,15 @@ export const EditCardScreen = ({ navigation, route }) => {
           Alert.alert('Video read failed', err?.message || 'Could not read the recorded video.');
         }
       }
-      // Show price: empty string → null (clear the override, use asking_price);
-      // a number → parseFloat; undefined would leave it unchanged on the server.
-      // We always send the field so saving with an empty box clears it.
-      const showPriceValue = form.display_asking_price && form.display_asking_price.trim()
-        ? parseFloat(form.display_asking_price)
-        : null;
+      // Show-floor price (display_asking_price) is intentionally NOT sent
+      // from Edit — it's owned by Case Mode / Manage Booth, so Edit can't
+      // clobber a newer show price with a stale form value.
       return cardsApi.update(cardId, {
         for_sale: form.for_sale,
         for_trade: form.for_trade,
         condition: form.condition,
         condition_notes: form.condition_notes || undefined,
         asking_price: form.asking_price ? parseFloat(form.asking_price) : undefined,
-        display_asking_price: showPriceValue,
         serial_number: form.serial_number ? parseInt(form.serial_number, 10) : undefined,
         purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : undefined,
         personal_valuation: form.personal_valuation ? parseFloat(form.personal_valuation) : undefined,
@@ -5650,109 +5545,11 @@ export const EditCardScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         ) : null}
 
-        {/* Condition */}
-        {card.grading_company === 'raw' || !card.grading_company ? (
-          <View>
-            <SectionHeader title="Condition (eBay scale)" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Spacing.base }} contentContainerStyle={{ paddingHorizontal: Spacing.base, gap: Spacing.sm }}>
-              {CONDITIONS.map((c) => (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[styles.condBtn, form.condition === c.key && styles.condBtnActive]}
-                  onPress={() => { set('condition')(c.key); setConditionDescFor(c.key); }}
-                >
-                  <Text style={[styles.condText, form.condition === c.key && styles.condTextActive]}>{c.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {conditionDescFor ? (() => {
-              const picked = CONDITIONS.find((c) => c.key === conditionDescFor);
-              if (!picked) return null;
-              return (
-                <View style={{ marginTop: Spacing.sm, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2 }}>
-                  <Text style={{ color: Colors.text, fontWeight: '700', marginBottom: 2 }}>{picked.label}</Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 6 }}>eBay equivalent: {picked.ebay}</Text>
-                  <Text style={{ color: Colors.text, fontSize: 13, lineHeight: 18 }}>{picked.desc}</Text>
-                </View>
-              );
-            })() : null}
-          </View>
-        ) : null}
+        {/* Chain of custody — provenance for the card you're editing. */}
+        <ChainOfCustody cardId={cardId} navigation={navigation} />
 
-        {/* Status */}
-        <View>
-          <SectionHeader title="Availability" />
-          <View style={styles.statusRow}>
-            <TouchableOpacity
-              style={[styles.statusBtn, form.for_sale && styles.statusBtnActive]}
-              onPress={() => set('for_sale')(!form.for_sale)}
-            >
-              <Text style={[styles.statusBtnLabel, form.for_sale && { color: Colors.accent }]}>
-                {form.for_sale ? '✓ For sale' : 'For sale'}
-              </Text>
-              <Text style={styles.statusBtnDesc}>Open to cash offers</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.statusBtn, form.for_trade && styles.statusBtnActive]}
-              onPress={() => set('for_trade')(!form.for_trade)}
-            >
-              <Text style={[styles.statusBtnLabel, form.for_trade && { color: Colors.accent }]}>
-                {form.for_trade ? '✓ For trade' : 'For trade'}
-              </Text>
-              <Text style={styles.statusBtnDesc}>Lists it on the trade board</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {form.for_sale && (
-          <View style={{ gap: Spacing.xs }}>
-            <Input label="Asking Price" value={form.asking_price} onChangeText={set('asking_price')} placeholder="0.00" keyboardType="decimal-pad" />
-            <Input
-              label="Show price (optional)"
-              value={form.display_asking_price}
-              onChangeText={set('display_asking_price')}
-              placeholder="leave blank to use asking price"
-              keyboardType="decimal-pad"
-            />
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: -4 }}>
-              Auto-applies when you go live at a show. Set once, applies every show.
-            </Text>
-          </View>
-        )}
-
-        {/* Serial — only if the card is numbered */}
-        {card.print_run ? (
-          <Input
-            label={`Your copy (1-${card.print_run})`}
-            value={form.serial_number}
-            onChangeText={set('serial_number')}
-            placeholder={`e.g. 7 of ${card.print_run}`}
-            keyboardType="number-pad"
-          />
-        ) : null}
-
-        {/* Public notes */}
-        <View>
-          <SectionHeader title="Public Notes" />
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.sm }}>
-            Shown to anyone viewing the card.
-          </Text>
-          <Input value={form.public_notes} onChangeText={set('public_notes')} placeholder="Notes visible to everyone..." multiline />
-        </View>
-
-        {/* Private details */}
-        <View>
-          <SectionHeader title="Private Details" />
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <Input label="Purchase Price" value={form.purchase_price} onChangeText={set('purchase_price')} placeholder="0.00" keyboardType="decimal-pad" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Input label="Your Valuation" value={form.personal_valuation} onChangeText={set('personal_valuation')} placeholder="0.00" keyboardType="decimal-pad" />
-            </View>
-          </View>
-          <Input label="Private Notes" value={form.notes} onChangeText={set('notes')} placeholder="Only you can see these..." multiline />
-        </View>
+        {/* Card listing fields — shared with the register flow (CardFields). */}
+        <CardFields form={form} set={set} card={card} />
 
         {/* Photos */}
         <View>

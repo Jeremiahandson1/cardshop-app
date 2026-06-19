@@ -375,6 +375,7 @@ const SearchStack = () => (
     <SearchStackNav.Screen name="InitiateTransfer" component={InitiateTransferScreen} />
     <SearchStackNav.Screen name="ShowTransferQR" component={ShowTransferQRScreen} />
     <SearchStackNav.Screen name="ClaimTransfer" component={ClaimTransferScreen} />
+    <SearchStackNav.Screen name="CardChain" component={CardChainScreen} />
   </SearchStackNav.Navigator>
 );
 

@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'react-native-flash-message';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bindersApi, cardsApi, offersApi, cstxApi, followsApi, safetyApi, stalledTransfersApi, reviewsApi, catalogApi } from '../services/api';
+import { ChainOfCustody } from '../components/ChainOfCustody';
 import { useAuthStore } from '../store/authStore';
 import {
   Button, Input, StatusBadge, EmptyState, LoadingScreen,
@@ -1530,6 +1531,11 @@ export const BinderCardDetailScreen = ({ navigation, route }) => {
               <Text style={styles.ownerNoteText}>{card.owner_note}</Text>
             </View>
           )}
+
+          {/* Chain of custody */}
+          {card.owned_card_id ? (
+            <ChainOfCustody cardId={card.owned_card_id} navigation={navigation} style={{ marginTop: Spacing.md }} />
+          ) : null}
         </View>
       </ScrollView>
 

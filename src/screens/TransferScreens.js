@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { transfersApi, cardsApi, safetyApi } from '../services/api';
+import { ChainOfCustody } from '../components/ChainOfCustody';
 import { useAuthStore } from '../store/authStore';
 import { Button, Input, LoadingScreen, LogoMark } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
@@ -145,6 +146,9 @@ export const InitiateTransferScreen = ({ navigation, route }) => {
             </View>
           );
         })()}
+
+        {/* Chain of custody — see the card's history before handing it off */}
+        <ChainOfCustody cardId={cardId} navigation={navigation} style={{ marginBottom: Spacing.md }} />
 
         {/* Method selector */}
         <View>
@@ -396,7 +400,7 @@ export const TransfersScreen = ({ navigation }) => {
 // SHOW TRANSFER QR (seller) — display the code, wait for the buyer
 // ============================================================
 export const ShowTransferQRScreen = ({ navigation, route }) => {
-  const { offer, cardName, cardSub } = route.params;
+  const { cardId, offer, cardName, cardSub } = route.params;
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Math.max(0, Math.round((new Date(offer.expires_at).getTime() - Date.now()) / 1000)));
 
@@ -438,6 +442,7 @@ export const ShowTransferQRScreen = ({ navigation, route }) => {
       <ScrollView contentContainerStyle={{ padding: Spacing.base, gap: Spacing.lg, alignItems: 'center' }}>
         <Text style={styles.cardName}>{cardName}</Text>
         {!!cardSub && <Text style={styles.cardSub}>{cardSub}</Text>}
+        {cardId ? <ChainOfCustody cardId={cardId} navigation={navigation} style={{ alignSelf: 'stretch' }} /> : null}
 
         {claimed ? (
           <View style={{ alignItems: 'center', gap: Spacing.md, paddingVertical: 40 }}>
@@ -557,6 +562,8 @@ export const ClaimTransferScreen = ({ navigation, route }) => {
           </View>
           <Ionicons name="arrow-down" size={20} color={Colors.accent2} />
         </View>
+
+        {c.owned_card_id ? <ChainOfCustody cardId={c.owned_card_id} navigation={navigation} /> : null}
 
         <Text style={{ color: Colors.text, fontSize: Typography.base, textAlign: 'center' }}>
           From <Text style={{ fontWeight: Typography.bold }}>@{offer.seller_username}</Text>
