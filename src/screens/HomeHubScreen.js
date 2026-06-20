@@ -217,7 +217,10 @@ export const HomeHubScreen = ({ navigation }) => {
 
   const onTilePress = (tile) => {
     switch (tile.key) {
-      case 'collection': return safeNav('Binders');
+      case 'collection':
+        try { navigation.navigate('MyCollectionHub'); }
+        catch (e) { console.warn('[home] navigate failed', e?.message); }
+        return undefined;
       case 'sell': return safeNav('Profile', 'MyListings');
       case 'show-floor': return safeNav('Profile', 'ShowFloorHub');
       case 'local-lcs': return safeNav('LCS');

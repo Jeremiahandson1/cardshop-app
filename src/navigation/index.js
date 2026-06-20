@@ -20,6 +20,7 @@ import { Colors, Typography } from '../theme';
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/AuthScreens';
 import { SuspendedScreen } from '../screens/SuspendedScreen';
 import { HomeHubScreen } from '../screens/HomeHubScreen';
+import { MyCollectionHubScreen } from '../screens/MyCollectionHubScreen';
 import { ContestScreen } from '../screens/ContestScreen';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
@@ -349,6 +350,7 @@ const CollectionStack = () => (
 const HomeStack = () => (
   <HomeStackNav.Navigator screenOptions={screenOptions}>
     <HomeStackNav.Screen name="HomeHub" component={HomeHubScreen} />
+    <HomeStackNav.Screen name="MyCollectionHub" component={MyCollectionHubScreen} />
     <HomeStackNav.Screen name="Contest" component={ContestScreen} />
   </HomeStackNav.Navigator>
 );
