@@ -160,7 +160,8 @@ export const IntegrationsScreen = ({ navigation }) => {
     enabled: connectedNow,
   });
   const counts = summary?.counts || {};
-  const writeEnabled = !!status?.feature_enabled || !!summary?.listing_write_enabled;
+  // Cross-post (writes TO eBay) keys off the write flag, NOT connect.
+  const writeEnabled = !!summary?.listing_write_enabled || !!status?.listing_write_enabled;
 
   const [jobId, setJobId] = useState(null);
   const [job, setJob] = useState(null);
