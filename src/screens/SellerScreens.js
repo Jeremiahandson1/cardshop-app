@@ -275,6 +275,16 @@ export const CreateListingScreen = ({ navigation, route }) => {
     },
   });
 
+  // Step-0 card picker — the seller chooses which card from THEIR
+  // collection to list. Only fetched when no card was pre-selected
+  // (entering from a card's "List for sale" passes owned_card_id and
+  // skips the picker). Without this query cardsData was undefined and
+  // referencing it threw "cardsData is not defined" on render.
+  const { data: cardsData } = useQuery({
+    queryKey: ['my-cards-for-listing'],
+    queryFn: () => cardsApi.mine({ limit: 200 }).then((r) => r.data),
+    enabled: !ownedCardId,
+  });
   const cards = cardsData?.cards || [];
 
   // Loading the wallet status pre-empts the form. Brief blocking
