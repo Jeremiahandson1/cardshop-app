@@ -221,7 +221,10 @@ export const HomeHubScreen = ({ navigation }) => {
         try { navigation.navigate('MyCollectionHub'); }
         catch (e) { console.warn('[home] navigate failed', e?.message); }
         return undefined;
-      case 'sell': return safeNav('Profile', 'MyListings');
+      case 'sell':
+        try { navigation.navigate('SellHub'); }
+        catch (e) { console.warn('[home] navigate failed', e?.message); }
+        return undefined;
       case 'show-floor': return safeNav('Profile', 'ShowFloorHub');
       case 'local-lcs': return safeNav('LCS');
       default: return undefined;

@@ -21,6 +21,7 @@ import { LoginScreen, RegisterScreen, ForgotPasswordScreen } from '../screens/Au
 import { SuspendedScreen } from '../screens/SuspendedScreen';
 import { HomeHubScreen } from '../screens/HomeHubScreen';
 import { MyCollectionHubScreen } from '../screens/MyCollectionHubScreen';
+import { SellHubScreen } from '../screens/SellHubScreen';
 import { ContestScreen } from '../screens/ContestScreen';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { CollectionImportExportScreen } from '../screens/CollectionImportExportScreen';
@@ -351,6 +352,7 @@ const HomeStack = () => (
   <HomeStackNav.Navigator screenOptions={screenOptions}>
     <HomeStackNav.Screen name="HomeHub" component={HomeHubScreen} />
     <HomeStackNav.Screen name="MyCollectionHub" component={MyCollectionHubScreen} />
+    <HomeStackNav.Screen name="SellHub" component={SellHubScreen} />
     <HomeStackNav.Screen name="Contest" component={ContestScreen} />
   </HomeStackNav.Navigator>
 );
