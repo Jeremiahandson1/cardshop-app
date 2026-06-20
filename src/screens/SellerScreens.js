@@ -372,7 +372,11 @@ export const CreateListingScreen = ({ navigation, route }) => {
                   setStep(1);
                 }}
               >
-                <Image source={{ uri: c.front_image_url }} style={styles.thumb} />
+                <Image
+                  source={{ uri: c.display_image_front || (Array.isArray(c.photo_urls) && c.photo_urls[0]) || c.front_image_url || undefined }}
+                  style={styles.thumb}
+                  resizeMode="contain"
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardPickTitle} numberOfLines={2}>
                     {c.year ? `${c.year} ` : ''}{c.set_name}
