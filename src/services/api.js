@@ -817,6 +817,13 @@ export const ebayApi = {
   joinWaitlist: () => api.post('/connect/ebay/waitlist'),
   authorize: () => api.post('/connect/ebay/authorize'),
   disconnect: () => api.post('/connect/ebay/disconnect'),
+  // Two-way sync (parity with dashboard ebaySyncApi — same field names).
+  summary: () => api.get('/ebay/sync-summary'),
+  importStart: (store_id) => api.post('/ebay/import/start', { store_id }),
+  importPublicStart: (username, store_id) => api.post('/ebay/import/public-start', { username, store_id }),
+  importJob: (id) => api.get(`/ebay/import/jobs/${id}`),
+  syncSettings: (opts) => api.post('/ebay/sync-settings', opts),
+  crosspost: (opts) => api.post('/ebay/crosspost', opts, { timeout: 120000 }),
 };
 
 // ============================================================

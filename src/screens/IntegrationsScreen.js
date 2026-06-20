@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Linking,
+  Alert, Linking, TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -152,6 +152,86 @@ export const IntegrationsScreen = ({ navigation }) => {
     },
   });
 
+  // ---------- Sync: summary, import, cross-post ----------
+  const connectedNow = !!status?.connected;
+  const { data: summary, refetch: refetchSummary } = useQuery({
+    queryKey: ['ebay', 'summary'],
+    queryFn: () => ebayApi.summary().then((r) => r.data),
+    enabled: connectedNow,
+  });
+  const counts = summary?.counts || {};
+  const writeEnabled = !!status?.feature_enabled || !!summary?.listing_write_enabled;
+
+  const [jobId, setJobId] = useState(null);
+  const [job, setJob] = useState(null);
+  const jobTimer = useRef(null);
+
+  const importMutation = useMutation({
+    mutationFn: () => ebayApi.importStart().then((r) => r.data),
+    onSuccess: (data) => {
+      setJobId(data.job_id);
+      showMessage({ message: data.already_running ? 'Import already running' : 'Import started', type: 'success' });
+    },
+    onError: (err) => Alert.alert('Error', err?.response?.data?.error || 'Could not start import'),
+  });
+
+  const [publicUsername, setPublicUsername] = useState('');
+  const publicImportMutation = useMutation({
+    mutationFn: () => ebayApi.importPublicStart(publicUsername.trim()).then((r) => r.data),
+    onSuccess: (data) => {
+      setJobId(data.job_id);
+      showMessage({ message: `Importing from @${data.username || publicUsername}…`, type: 'success' });
+    },
+    onError: (err) => Alert.alert('Error', err?.response?.data?.error || 'Could not start import'),
+  });
+
+  useEffect(() => {
+    if (!jobId) return undefined;
+    const tick = async () => {
+      try {
+        const data = await ebayApi.importJob(jobId).then((r) => r.data.job);
+        setJob(data);
+        if (['committed', 'failed'].includes(data.status)) {
+          clearInterval(jobTimer.current);
+          refetchSummary();
+        }
+      } catch (_) { /* keep polling */ }
+    };
+    tick();
+    jobTimer.current = setInterval(tick, 3000);
+    return () => clearInterval(jobTimer.current);
+  }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [maxDollars, setMaxDollars] = useState('');
+  const [crossposting, setCrossposting] = useState(false);
+
+  const excludeMutation = useMutation({
+    mutationFn: (cents) => ebayApi.syncSettings({ enabled: false, min_price_cents: cents }).then((r) => r.data),
+    onSuccess: (d) => { showMessage({ message: `Excluded ${d.updated} listing(s)`, type: 'success' }); refetchSummary(); },
+    onError: () => Alert.alert('Error', 'Could not update sync settings'),
+  });
+
+  const runCrosspost = async () => {
+    setCrossposting(true);
+    try {
+      const maxCents = maxDollars ? Math.round(Number(maxDollars) * 100) : undefined;
+      let guard = 0; let posted = 0; let failed = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        guard += 1;
+        const r = await ebayApi.crosspost({ all: true, max_price_cents: maxCents, batch_size: 25 }).then((x) => x.data);
+        posted += r.posted; failed += r.failed;
+        if (r.remaining <= 0 || r.processed === 0 || guard > 400) break;
+      }
+      showMessage({ message: `Cross-post done: ${posted} listed${failed ? `, ${failed} failed` : ''}`, type: 'success' });
+      refetchSummary();
+    } catch (err) {
+      Alert.alert('Error', err?.response?.data?.message || 'Cross-post failed');
+    } finally {
+      setCrossposting(false);
+    }
+  };
+
   if (isLoading) return <LoadingScreen message="Loading integrations..." />;
 
   const connected = !!status?.connected;
@@ -267,6 +347,131 @@ export const IntegrationsScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Quick import — no eBay login required (public listings) */}
+        <View style={[styles.card, { marginTop: Spacing.base }]}>
+          <Text style={styles.serviceName}>Quick import — no login</Text>
+          <Text style={styles.subLine}>
+            Have a public eBay store? Enter the username and we'll pull the listings into your
+            inventory as drafts. No account connection needed.
+          </Text>
+          <View style={styles.priceRow}>
+            <TextInput
+              style={styles.priceInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="eBay username"
+              placeholderTextColor={Colors.textDim}
+              value={publicUsername}
+              onChangeText={setPublicUsername}
+            />
+            <TouchableOpacity
+              style={[styles.smallBtn, !publicUsername.trim() && { opacity: 0.5 }]}
+              disabled={!publicUsername.trim() || publicImportMutation.isPending}
+              onPress={() => publicImportMutation.mutate()}
+            >
+              <Text style={styles.smallBtnText}>{publicImportMutation.isPending ? '…' : 'Import'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {job && ['running', 'committing'].includes(job.status) && (
+            <View style={styles.progressRow}>
+              <ActivityIndicator color={Colors.accent} />
+              <Text style={styles.metaLine}>
+                Importing… {job.imported} in · {job.matched} matched · {job.low_confidence} to review
+              </Text>
+            </View>
+          )}
+          {job && job.status === 'committed' && (
+            <Text style={[styles.metaLine, { color: Colors.success, marginTop: Spacing.sm }]}>
+              ✓ Imported {job.imported} cards ({job.listings_created} drafts). {job.low_confidence} need review.
+            </Text>
+          )}
+        </View>
+
+        {/* Sync tools — only once connected */}
+        {connected && (
+          <>
+            <View style={[styles.card, { marginTop: Spacing.base }]}>
+              <Text style={styles.serviceName}>Import from eBay</Text>
+              <Text style={styles.subLine}>
+                Pulls your active eBay listings — prices, condition, and photos — into your
+                inventory as drafts. Nothing publishes until you review them.
+              </Text>
+
+              {job && ['running', 'committing'].includes(job.status) && (
+                <View style={styles.progressRow}>
+                  <ActivityIndicator color={Colors.accent} />
+                  <Text style={styles.metaLine}>
+                    Importing… {job.imported} in · {job.matched} matched · {job.low_confidence} to review
+                  </Text>
+                </View>
+              )}
+              {job && job.status === 'committed' && (
+                <Text style={[styles.metaLine, { color: Colors.success, marginTop: Spacing.sm }]}>
+                  ✓ Imported {job.imported} cards ({job.listings_created} drafts). {job.low_confidence} need review.
+                </Text>
+              )}
+              {job && job.status === 'failed' && (
+                <Text style={[styles.metaLine, { color: Colors.error, marginTop: Spacing.sm }]}>
+                  Import failed: {job.error || 'unknown error'}
+                </Text>
+              )}
+
+              <View style={{ marginTop: Spacing.base }}>
+                <Button
+                  title="Import my eBay listings"
+                  onPress={() => importMutation.mutate()}
+                  loading={importMutation.isPending}
+                  disabled={job && ['running', 'committing'].includes(job.status)}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.card, { marginTop: Spacing.base }]}>
+              <Text style={styles.serviceName}>Cross-post to eBay</Text>
+              <Text style={styles.subLine}>
+                {(counts.crosspost_pending || 0)} active card(s) ready to list on eBay ·
+                {' '}{(counts.sync_excluded || 0)} excluded.
+              </Text>
+
+              {!writeEnabled && (
+                <Text style={[styles.metaLine, { color: Colors.warning, marginTop: Spacing.sm }]}>
+                  Listing to eBay is turned off server-side. Import and sync still work.
+                </Text>
+              )}
+
+              <Text style={[styles.metaLine, { marginTop: Spacing.base }]}>Keep cards over this price OFF eBay</Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.dollar}>$</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  keyboardType="numeric"
+                  placeholder="200"
+                  placeholderTextColor={Colors.textDim}
+                  value={maxDollars}
+                  onChangeText={setMaxDollars}
+                />
+                <TouchableOpacity
+                  style={[styles.smallBtn, !maxDollars && { opacity: 0.5 }]}
+                  disabled={!maxDollars || excludeMutation.isPending}
+                  onPress={() => excludeMutation.mutate(Math.round(Number(maxDollars) * 100))}
+                >
+                  <Text style={styles.smallBtnText}>Exclude</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ marginTop: Spacing.base }}>
+                <Button
+                  title={crossposting ? 'Posting…' : `Cross-post ${counts.crosspost_pending || 0} to eBay`}
+                  onPress={runCrosspost}
+                  loading={crossposting}
+                  disabled={!writeEnabled || !counts.crosspost_pending}
+                />
+              </View>
+            </View>
+          </>
+        )}
+
         <Text style={styles.footnote}>
           We never see or store your eBay password. Connections use eBay's
           official OAuth and can be revoked at any time.
@@ -324,6 +529,23 @@ const styles = StyleSheet.create({
     color: Colors.textDim, fontSize: Typography.xs,
     marginTop: Spacing.lg, textAlign: 'center', lineHeight: 18,
   },
+  progressRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md,
+  },
+  priceRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs,
+  },
+  dollar: { color: Colors.textMuted, fontSize: Typography.base },
+  priceInput: {
+    flex: 1, backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    color: Colors.text, fontSize: Typography.base,
+  },
+  smallBtn: {
+    backgroundColor: Colors.accent + '22', borderWidth: 1, borderColor: Colors.accent + '66',
+    borderRadius: Radius.md, paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm,
+  },
+  smallBtnText: { color: Colors.accent, fontSize: Typography.sm, fontWeight: Typography.semibold },
 });
 
 export default IntegrationsScreen;
