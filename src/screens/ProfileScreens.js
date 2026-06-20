@@ -240,6 +240,7 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'cart-outline', label: 'Marketplace', onPress: () => navigation.navigate('MarketplaceHome') },
         { icon: 'wallet-outline', label: 'Wallet', onPress: () => navigation.navigate('Wallet') },
         { icon: 'list-outline', label: 'My listings', onPress: () => navigation.navigate('MyListings') },
+        { icon: 'sync-outline', label: 'eBay Sync', onPress: () => navigation.navigate('Integrations') },
         { icon: 'receipt-outline', label: 'Orders', onPress: () => navigation.navigate('MyOrders') },
         { icon: 'pricetags-outline', label: 'Offers', onPress: () => navigation.navigate('MyOffers') },
         { icon: 'stats-chart-outline', label: 'Seller analytics', onPress: () => navigation.navigate('SellerAnalytics') },
