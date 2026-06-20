@@ -114,6 +114,8 @@ const ProfileStackNav = createNativeStackNavigator();
 const LCSStackNav = createNativeStackNavigator();
 const TradeStackNav = createNativeStackNavigator();
 const AuthStackNav = createNativeStackNavigator();
+const MessagesStackNav = createNativeStackNavigator();
+const WalletStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const screenOptions = {
@@ -157,6 +159,25 @@ function resetOnTabPress(tabName, initialRouteName) {
     },
   });
 }
+
+// Messages + Wallet are bar tabs. Their screens only navigate within
+// themselves (ConversationList→Conversation, Wallet→Payout/Topup), so a
+// dedicated mini-stack is safe — no cross-stack card routes to break. The
+// same screens stay registered in ProfileStack too, so existing
+// navigate('ConversationList' | 'Wallet' | ...) calls keep working.
+const MessagesStack = () => (
+  <MessagesStackNav.Navigator screenOptions={screenOptions}>
+    <MessagesStackNav.Screen name="ConversationList" component={ConversationListScreen} />
+    <MessagesStackNav.Screen name="Conversation" component={ConversationScreen} />
+  </MessagesStackNav.Navigator>
+);
+const WalletStack = () => (
+  <WalletStackNav.Navigator screenOptions={screenOptions}>
+    <WalletStackNav.Screen name="Wallet" component={WalletScreen} />
+    <WalletStackNav.Screen name="Payout" component={PayoutScreen} />
+    <WalletStackNav.Screen name="Topup" component={TopupScreen} />
+  </WalletStackNav.Navigator>
+);
 
 // ============================================================
 // BOTTOM TAB NAVIGATOR
@@ -208,6 +229,15 @@ const TabNavigator = () => {
         }}
         listeners={resetOnTabPress('Home', 'HomeHub')}
       />
+      <Tab.Screen
+        name="Messages"
+        component={MessagesStack}
+        options={{
+          tabBarLabel: 'Messages',
+          tabBarIcon: ({ color, size }) => <Ionicons name="mail" size={size} color={color} />,
+        }}
+        listeners={resetOnTabPress('Messages', 'ConversationList')}
+      />
       {/* Binders is THE home for cards. Every card auto-files into
           a Default binder (migration 033), so there's no separate
           "Collection" — the binders ARE the collection.
@@ -217,10 +247,7 @@ const TabNavigator = () => {
       <Tab.Screen
         name="Binders"
         component={BinderStack}
-        options={{
-          tabBarLabel: 'Collection',
-          tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
-        }}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }}
         listeners={resetOnTabPress('Binders', 'BinderList')}
       />
       <Tab.Screen
@@ -245,6 +272,15 @@ const TabNavigator = () => {
           tabBarLabel: '',
         }}
       />
+      <Tab.Screen
+        name="WalletTab"
+        component={WalletStack}
+        options={{
+          tabBarLabel: 'Wallet',
+          tabBarIcon: ({ color, size }) => <Ionicons name="wallet" size={size} color={color} />,
+        }}
+        listeners={resetOnTabPress('WalletTab', 'Wallet')}
+      />
       {/* The Search tab was a top-level tab that duplicated Trade
           Board search and Binder browsing — three different search
           UIs over the same data. Removed to keep the bottom bar
@@ -255,19 +291,14 @@ const TabNavigator = () => {
       <Tab.Screen
         name="Trade"
         component={TradeStack}
-        options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal" size={size} color={color} />,
-        }}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }}
         listeners={resetOnTabPress('Trade', 'TradeBoardMain')}
       />
       {LCS_ENABLED && (
         <Tab.Screen
           name="LCS"
           component={LCSStack}
-          options={{
-            tabBarLabel: 'LCS',
-            tabBarIcon: ({ color, size }) => <Ionicons name="storefront" size={size} color={color} />,
-          }}
+          options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }}
           listeners={resetOnTabPress('LCS', 'LCSHome')}
         />
       )}
