@@ -635,6 +635,7 @@ export const setsApi = {
   // default view; list() is for the Add/Browse screen.
   list: (params) => api.get('/sets', { params }),
   mine: () => api.get('/sets/mine'),
+  auto: () => api.get('/sets/auto'),
   subscribe: ({ manufacturer, year, set_name }) =>
     api.post('/sets/subscribe', { manufacturer, year, set_name }),
   unsubscribe: ({ manufacturer, year, set_name }) =>

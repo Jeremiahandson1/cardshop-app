@@ -44,8 +44,8 @@ const SetCard = ({ item, onPress }) => (
 
 export const SetsListScreen = ({ navigation }) => {
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['sets-mine'],
-    queryFn: () => setsApi.mine().then((r) => r.data),
+    queryKey: ['sets-auto'],
+    queryFn: () => setsApi.auto().then((r) => r.data),
   });
 
   const sets = data?.sets || [];
@@ -56,7 +56,7 @@ export const SetsListScreen = ({ navigation }) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
         title="My Sets"
-        subtitle="Sets you're tracking — completion updates automatically."
+        subtitle="Every set you own a card from — tracked automatically."
         right={
           <TouchableOpacity
             onPress={() => navigation.navigate('BrowseSets')}
@@ -89,8 +89,8 @@ export const SetsListScreen = ({ navigation }) => {
         ListEmptyComponent={
           <EmptyState
             icon="📋"
-            title="No sets tracked yet"
-            message="Pick the releases you actually collect. Completion % updates automatically as you register cards."
+            title="No sets yet"
+            message="Register cards and the sets you're collecting show up here automatically, with live completion %."
             action={
               <Button
                 title="Add a set"
