@@ -1,7 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
-import { Alert, AppState, View } from 'react-native';
-import * as Linking from 'expo-linking';
+import { Alert, AppState, View, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -125,12 +124,11 @@ const AppInner = () => {
   // the app already authenticated, owning the card they just claimed.
   useEffect(() => {
     const handleUrl = async (url) => {
-      if (!url) return;
+      if (!url || !url.includes('claim-success')) return;
       try {
-        const { path, hostname, queryParams } = Linking.parse(url);
-        if ((path === 'claim-success' || hostname === 'claim-success') && queryParams?.token) {
-          await useAuthStore.getState().loginWithToken(String(queryParams.token));
-        }
+        const m = url.match(/[?&]token=([^&]+)/);
+        const token = m ? decodeURIComponent(m[1]) : null;
+        if (token) await useAuthStore.getState().loginWithToken(token);
       } catch { /* ignore malformed links */ }
     };
     Linking.getInitialURL().then(handleUrl).catch(() => {});
