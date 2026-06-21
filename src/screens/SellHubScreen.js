@@ -55,10 +55,10 @@ export const SellHubScreen = ({ navigation }) => {
   useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]));
   const toShip = pending?.counts?.marketplace_sales || 0;
 
-  const go = (nav) => {
+  const go = (nav, params) => {
     try {
       if (nav.length === 1) navigation.navigate(nav[0]);
-      else navigation.navigate(nav[0], { screen: nav[1] });
+      else navigation.navigate(nav[0], params ? { screen: nav[1], params } : { screen: nav[1] });
     } catch (e) {
       console.warn('[sell-hub] nav failed', e?.message);
     }
@@ -82,7 +82,7 @@ export const SellHubScreen = ({ navigation }) => {
             <TouchableOpacity
               key={a.key}
               activeOpacity={0.85}
-              onPress={() => go(a.nav)}
+              onPress={() => go(a.nav, a.key === 'create' ? { fresh: Date.now() } : undefined)}
               style={[styles.action, a.main && styles.actionMain]}
             >
               <Ionicons name={a.icon} size={18} color={a.main ? Colors.bg : Colors.text} />

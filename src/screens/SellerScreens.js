@@ -209,6 +209,28 @@ export const CreateListingScreen = ({ navigation, route }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultsData]);
 
+  // "List a card" passes a fresh nonce each time it's tapped. Because this
+  // screen lives in the Profile tab, leaving via another tab doesn't unmount
+  // it — so without this, re-entering showed the previously-picked card and
+  // wouldn't let you choose another. When the nonce changes (and no card was
+  // pre-selected), restart at the picker with a clean form.
+  React.useEffect(() => {
+    if (route.params?.fresh && !route.params?.owned_card_id) {
+      setStep(0);
+      setOwnedCardId(null);
+      setCardCatalogId(null);
+      setPhotos([]);
+      setAskingPrice('');
+      setCondition(null);
+      setGrade('');
+      setGradingCompany(null);
+      setDescription('');
+      setAcceptsOffers(false);
+      photosPrefilledRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.fresh]);
+
   const onboardMut = useMutation({
     mutationFn: () => walletApi.startOnboarding({
       return_url: 'cardshop://wallet/return',
@@ -342,6 +364,61 @@ export const CreateListingScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Step 0 — card picker. Rendered as a virtualized FlatList: a seller can
+  // have hundreds of cards, and mapping them all (with images) inside a
+  // ScrollView made the scroll janky.
+  if (step === 0) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScreenHeader title="Pick a card" />
+        <View style={styles.stepDots}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={[styles.dot, i <= 0 && styles.dotActive]} />
+          ))}
+        </View>
+        <FlatList
+          data={cards}
+          keyExtractor={(c) => String(c.id)}
+          contentContainerStyle={{ padding: Spacing.md, paddingBottom: 100 }}
+          ListHeaderComponent={(
+            <>
+              <FirstTimeSellerIntro />
+              <Text style={styles.help}>Pick the card you want to list. Listings backed by your chain
+              get a "Verified ownership" badge buyers can see.</Text>
+            </>
+          )}
+          ListEmptyComponent={<EmptyState title="No cards yet" message="Add a card to your collection first." />}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
+          renderItem={({ item: c }) => (
+            <TouchableOpacity
+              style={styles.cardPickRow}
+              onPress={() => {
+                setOwnedCardId(c.id);
+                setCardCatalogId(c.card_catalog_id);
+                setStep(1);
+              }}
+            >
+              <Image
+                source={{ uri: c.display_image_front || (Array.isArray(c.photo_urls) && c.photo_urls[0]) || c.front_image_url || undefined }}
+                style={styles.thumb}
+                resizeMode="contain"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardPickTitle} numberOfLines={2}>
+                  {c.year ? `${c.year} ` : ''}{c.set_name}{c.parallel ? ` · ${c.parallel}` : ''}
+                </Text>
+                <Text style={styles.cardPickSub}>{c.player_name}{c.card_number ? ` #${c.card_number}` : ''}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
       </SafeAreaView>
     );
   }
