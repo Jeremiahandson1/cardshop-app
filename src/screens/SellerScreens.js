@@ -290,9 +290,14 @@ export const CreateListingScreen = ({ navigation, route }) => {
         refetchWallet();
         return;
       }
-      const msg = data?.errors
-        ? data.errors.map((e) => e.message).join('\n')
-        : data?.error || err.message;
+      // The API returns field errors under `details` ([{field, message}]).
+      // (The old code read `data.errors`, which never exists — so every
+      // rejection showed the generic "Validation failed" with no clue.)
+      const msg = Array.isArray(data?.details) && data.details.length
+        ? data.details.map((e) => e.message || `${e.field} is invalid`).join('\n')
+        : Array.isArray(data?.errors)
+          ? data.errors.map((e) => e.message || e.msg).join('\n')
+          : data?.error || err.message;
       Alert.alert('Listing rejected', msg);
     },
   });
