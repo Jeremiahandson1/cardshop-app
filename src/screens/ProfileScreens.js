@@ -234,21 +234,12 @@ export const ProfileScreen = ({ navigation }) => {
   // links that exist but aren't daily-use.
   const MENU = [
     {
-      // Daily-use stuff: trades, conversations, the upgrade pitch.
-      section: 'Activity',
+      // Selling, collecting, orders, messages, show floor, wallet — all
+      // moved to their hubs (Sell / My Collection / Show Floor) + the
+      // bottom bar. Profile is now settings + a short tail of tools.
+      section: 'Tools',
       items: [
-        { icon: 'cart-outline', label: 'Marketplace', onPress: () => navigation.navigate('MarketplaceHome') },
-        { icon: 'wallet-outline', label: 'Wallet', onPress: () => navigation.navigate('Wallet') },
-        { icon: 'list-outline', label: 'My listings', onPress: () => navigation.navigate('MyListings') },
-        { icon: 'sync-outline', label: 'eBay Sync', onPress: () => navigation.navigate('Integrations') },
-        { icon: 'receipt-outline', label: 'Orders', onPress: () => navigation.navigate('MyOrders') },
-        { icon: 'pricetags-outline', label: 'Offers', onPress: () => navigation.navigate('MyOffers') },
-        { icon: 'stats-chart-outline', label: 'Seller analytics', onPress: () => navigation.navigate('SellerAnalytics') },
-        { icon: 'book-outline', label: 'Binders', onPress: () => navigation.navigate('BinderList') },
-        { icon: 'chatbubbles-outline', label: 'Messages', onPress: () => navigation.navigate('ConversationList') },
-        { icon: 'flash-outline', label: 'Show Floor — live now', onPress: () => navigation.navigate('ShowFloorHub') },
         { icon: 'storefront-outline', label: 'Case Mode (per card)', onPress: () => navigation.navigate('CaseMode') },
-        { icon: 'pricetag-outline', label: 'Order stickers', onPress: () => navigation.navigate('OrderStickers') },
         { icon: 'print-outline', label: 'Reprint my stickers', onPress: async () => {
           // Opens an HTML print sheet with new URL-format QRs for
           // every sticker the user has attached. Existing bare-code
@@ -273,7 +264,6 @@ export const ProfileScreen = ({ navigation }) => {
             Alert.alert('Failed to open', err?.message || 'unknown error');
           }
         } },
-        { icon: 'sparkles-outline', label: 'Plans & upgrade', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
     {
@@ -308,8 +298,8 @@ export const ProfileScreen = ({ navigation }) => {
             Alert.alert('Push registration failed', `Reason: ${r?.reason || 'unknown'}\n${r?.error || ''}`);
           }
         } },
-        { icon: 'options-outline', label: 'Listing defaults', onPress: () => navigation.navigate('ListingDefaults') },
         { icon: 'card-outline', label: 'Manage subscription', onPress: () => navigation.navigate('SubscriptionManage') },
+        { icon: 'sparkles-outline', label: 'Plans & upgrade', onPress: () => navigation.navigate('Upgrade') },
       ]
     },
     {
@@ -319,13 +309,9 @@ export const ProfileScreen = ({ navigation }) => {
       section: 'More',
       items: [
         { icon: 'shield-checkmark-outline', label: 'Trust Profile', onPress: () => navigation.navigate('TrustProfile', {}) },
-        { icon: 'heart-outline', label: 'Want List', onPress: () => navigation.navigate('WantList') },
         { icon: 'swap-horizontal-outline', label: 'Transfers & sales', onPress: () => navigation.navigate('Transfers') },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
         { icon: 'shield-half-outline', label: 'Stolen-card match review', onPress: () => navigation.navigate('StolenMatchReview') },
-        { icon: 'grid-outline', label: 'Set completion', onPress: () => navigation.navigate('SetsList') },
-        { icon: 'search-outline', label: 'Browse sets', onPress: () => navigation.navigate('BrowseSets') },
-        { icon: 'qr-code-outline', label: 'Scan QR Code', onPress: () => navigation.navigate('QRScanner') },
         { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
         { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
