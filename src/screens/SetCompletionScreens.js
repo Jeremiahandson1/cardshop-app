@@ -486,11 +486,12 @@ export const SetCompletionScreen = ({ navigation, route }) => {
 
   // ---- LEVEL 1: players you own a card from in this set ----
   const players = data.players || [];
+  const ownedPlayerCount = players.filter((p) => p.owned_cards > 0).length;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
         title={setName ? `${setYear || ''} ${setName}`.trim() : 'Set'}
-        subtitle="Your cards — tap a player to see all their cards"
+        subtitle={`${players.length} players · you have ${ownedPlayerCount} · tap any to see their cards`}
         right={
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={Colors.text} />
@@ -502,6 +503,7 @@ export const SetCompletionScreen = ({ navigation, route }) => {
         keyExtractor={(p) => p.player_name}
         contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
         ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
+        initialNumToRender={20}
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
         }
@@ -513,17 +515,20 @@ export const SetCompletionScreen = ({ navigation, route }) => {
               setId, setName, setYear, player: item.player_name,
             })}
           >
+            <StateDot state={item.owned_cards > 0 ? 'owned' : 'needed'} />
             <View style={{ flex: 1 }}>
               <Text style={styles.cardRowTitle} numberOfLines={1}>{item.player_name}</Text>
               <Text style={styles.cardRowParallel}>
-                {item.owned_cards} card{item.owned_cards === 1 ? '' : 's'} owned · tap for all
+                {item.owned_cards > 0
+                  ? `You have ${item.owned_cards} of ${item.total_cards}`
+                  : `${item.total_cards} card${item.total_cards === 1 ? '' : 's'} to chase`}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <EmptyState icon="📦" title="No cards from this set yet" message="Cards you own from this set show up here." />
+          <EmptyState icon="📦" title="No players listed" message="This set has no players in the catalog yet." />
         }
       />
     </SafeAreaView>
