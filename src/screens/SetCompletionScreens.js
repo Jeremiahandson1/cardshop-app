@@ -102,7 +102,9 @@ export const SetsListScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <SetCard
             item={item}
-            onPress={() => navigation.navigate('SetCompletion', { setCode: item.set_code })}
+            onPress={() => navigation.navigate('SetCompletion', {
+              setId: item.set_id, setName: item.set_name, setYear: item.year,
+            })}
           />
         )}
         ListEmptyComponent={
@@ -409,114 +411,119 @@ export const BrowseSetsScreen = ({ navigation }) => {
 // SET COMPLETION — grid/list view of a set with per-card state
 // ============================================================
 export const SetCompletionScreen = ({ navigation, route }) => {
-  const { setCode } = route.params;
+  const { setId, setName, setYear, player } = route.params;
+  const isPlayerView = !!player;
   const qc = useQueryClient();
-  const [filter, setFilter] = useState('all'); // 'all' | 'owned' | 'wanted' | 'needed'
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['set-completion', setCode],
-    queryFn: () => setsApi.completion(setCode).then((r) => r.data),
+    queryKey: isPlayerView ? ['set-player-cards', setId, player] : ['set-players', setId],
+    queryFn: () => (isPlayerView
+      ? setsApi.playerCards(setId, player).then((r) => r.data)
+      : setsApi.players(setId).then((r) => r.data)),
+    enabled: !!setId,
   });
 
   const addWantMutation = useMutation({
     mutationFn: (catalogId) => wantListApi.add({ catalog_id: catalogId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['set-completion', setCode] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['set-player-cards', setId, player] }),
     onError: (err) => {
       Alert.alert('Could not add to want list', err?.response?.data?.error || 'Please try again.');
     },
   });
 
-  const filteredCards = useMemo(() => {
-    const cards = data?.cards || [];
-    if (filter === 'all') return cards;
-    return cards.filter((c) => c.state === filter);
-  }, [data, filter]);
+  if (isLoading || !data) return <LoadingScreen message={isPlayerView ? 'Loading cards...' : 'Loading set...'} />;
 
-  if (isLoading || !data) return <LoadingScreen message="Loading set..." />;
+  // ---- LEVEL 2: one player's full rainbow — every card + parallel ----
+  if (isPlayerView) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
+        <ScreenHeader
+          title={player}
+          subtitle={`${setName || 'Set'} · ${data.owned}/${data.total} owned`}
+          right={
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+          }
+        />
+        <FlatList
+          data={data.cards}
+          keyExtractor={(c) => c.catalog_id}
+          contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
+          ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.cardRow}>
+              <StateDot state={item.state} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardRowTitle} numberOfLines={1}>
+                  {item.subset_name || 'Base'}{item.card_number ? ` · #${item.card_number}` : ''}
+                  {item.is_rookie ? ' · RC' : ''}
+                </Text>
+                <Text style={styles.cardRowParallel} numberOfLines={1}>
+                  {item.parallel || 'Base'}{item.serial_max ? ` /${item.serial_max}` : ''}
+                </Text>
+              </View>
+              {item.state === 'needed' ? (
+                <TouchableOpacity
+                  onPress={() => addWantMutation.mutate(item.catalog_id)}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="heart-outline" size={18} color={Colors.accent} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+          ListEmptyComponent={
+            <EmptyState icon="📦" title="No cards" message="No cards found for this player." />
+          }
+        />
+      </SafeAreaView>
+    );
+  }
 
+  // ---- LEVEL 1: players you own a card from in this set ----
+  const players = data.players || [];
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
-        title={data.set_name ? `${data.year || ''} ${data.set_name}`.trim() : setCode}
-        subtitle={
-          data.manufacturer
-            ? `${data.manufacturer} · ${data.owned}/${data.total} owned · ${data.percent_complete}% complete`
-            : `${data.owned}/${data.total} owned · ${data.percent_complete}% complete`
-        }
+        title={setName ? `${setYear || ''} ${setName}`.trim() : 'Set'}
+        subtitle="Your cards — tap a player to see all their cards"
         right={
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={Colors.text} />
           </TouchableOpacity>
         }
       />
-
-      {/* Progress + counts */}
-      <View style={styles.statsRow}>
-        <Stat label="Owned" count={data.owned} color={Colors.success} />
-        <Stat label="Wanted" count={data.wanted} color={Colors.accent} />
-        <Stat label="Needed" count={data.needed} color={Colors.textMuted} />
-      </View>
-      <View style={{ paddingHorizontal: Spacing.base }}>
-        <View style={styles.progressBarBg}>
-          <View
-            style={[
-              styles.progressBarFill,
-              { width: `${Math.max(0, Math.min(100, data.percent_complete))}%` },
-            ]}
-          />
-        </View>
-      </View>
-
-      {/* Filter tabs */}
-      <View style={styles.filterTabs}>
-        <FilterTab label="All" count={data.total} active={filter === 'all'} onPress={() => setFilter('all')} />
-        <FilterTab label="Owned" count={data.owned} active={filter === 'owned'} onPress={() => setFilter('owned')} />
-        <FilterTab label="Wanted" count={data.wanted} active={filter === 'wanted'} onPress={() => setFilter('wanted')} />
-        <FilterTab label="Needed" count={data.needed} active={filter === 'needed'} onPress={() => setFilter('needed')} />
-      </View>
-
       <FlatList
-        data={filteredCards}
-        keyExtractor={(c) => c.catalog_id}
+        data={players}
+        keyExtractor={(p) => p.player_name}
         contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
         ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
         }
         renderItem={({ item }) => (
-          <View style={styles.cardRow}>
-            <StateDot state={item.state} />
+          <TouchableOpacity
+            style={styles.cardRow}
+            activeOpacity={0.7}
+            onPress={() => navigation.push('SetCompletion', {
+              setId, setName, setYear, player: item.player_name,
+            })}
+          >
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardRowTitle} numberOfLines={1}>
-                {item.card_number ? `#${item.card_number} · ` : ''}{item.player_name}
-                {item.is_rookie ? ' · RC' : ''}
+              <Text style={styles.cardRowTitle} numberOfLines={1}>{item.player_name}</Text>
+              <Text style={styles.cardRowParallel}>
+                {item.owned_cards} card{item.owned_cards === 1 ? '' : 's'} owned · tap for all
               </Text>
-              {item.parallel ? (
-                <Text style={styles.cardRowParallel} numberOfLines={1}>
-                  {item.parallel}
-                  {item.serial_max ? ` /${item.serial_max}` : ''}
-                  {item.box_type ? ` · ${item.box_type} exclusive` : ''}
-                </Text>
-              ) : null}
             </View>
-            {item.state === 'needed' ? (
-              <TouchableOpacity
-                onPress={() => addWantMutation.mutate(item.catalog_id)}
-                style={styles.actionButton}
-              >
-                <Ionicons name="heart-outline" size={18} color={Colors.accent} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <EmptyState
-            icon="📦"
-            title="Nothing in this filter"
-            message="Try a different filter."
-          />
+          <EmptyState icon="📦" title="No cards from this set yet" message="Cards you own from this set show up here." />
         }
       />
     </SafeAreaView>

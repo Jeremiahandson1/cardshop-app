@@ -641,6 +641,8 @@ export const setsApi = {
   unsubscribe: ({ manufacturer, year, set_name }) =>
     api.delete('/sets/subscribe', { data: { manufacturer, year, set_name } }),
   completion: (setCode) => api.get(`/sets/${setCode}/completion`),
+  players: (setId) => api.get(`/sets/set/${setId}/players`),
+  playerCards: (setId, player) => api.get(`/sets/set/${setId}/cards`, { params: { player } }),
   // Admin-only — returns 403 otherwise
   adminImport: (data) => api.post('/sets/admin/import', data),
   adminPending: (params) => api.get('/sets/admin/pending', { params }),
