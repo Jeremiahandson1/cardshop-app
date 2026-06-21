@@ -20,8 +20,7 @@ const SECTIONS = [
   {
     title: 'YOUR CARDS',
     rows: [
-      { key: 'binders', icon: 'albums', color: '#7dd3fc', label: 'Binders', sub: 'Your collection', nav: ['Binders'] },
-      { key: 'add', icon: 'add-circle', color: '#4ade80', label: 'Add a card', sub: 'Search the catalog, enter manually, or scan a sticker', nav: ['Binders', { screen: 'RegisterCard' }] },
+      { key: 'binders', icon: 'albums', color: '#7dd3fc', label: 'Binders', sub: 'Your cards — open a binder to add to it', nav: ['Binders'] },
     ],
   },
   {
@@ -31,7 +30,6 @@ const SECTIONS = [
       { key: 'trades', icon: 'swap-horizontal', color: '#a78bfa', label: 'Trades', sub: 'Trade card-for-card', nav: ['Trade'] },
       { key: 'wantlist', icon: 'heart', color: '#f87171', label: 'Want list', sub: "Cards you're hunting", nav: ['Profile', 'WantList'] },
       { key: 'sets', icon: 'grid', color: '#e8c547', label: 'Set completion', sub: 'Track sets you collect', nav: ['Profile', 'SetsList'] },
-      { key: 'dealradar', icon: 'pulse', color: '#fbbf24', label: 'Deal Radar', sub: 'Underpriced cards near comps', nav: ['Profile', 'DealRadarSettings'] },
     ],
   },
   {
