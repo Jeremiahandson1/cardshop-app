@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { homeApi, contestsApi, notificationsApi, showFloorApi } from '../services/api';
+import { homeApi, contestsApi, notificationsApi, showFloorApi, listingsApi } from '../services/api';
 import { getPushPermissionStatus, registerForPushNotificationsAsync } from '../services/pushRegistration';
 
 const LCS_ENABLED = Constants.expoConfig?.extra?.LCS_ENABLED === true
@@ -174,6 +174,15 @@ export const HomeHubScreen = ({ navigation }) => {
   useFocusEffect(React.useCallback(() => { refetchSf(); }, [refetchSf]));
   const liveSession = sfData?.check_in || null;
 
+  // Seller summary — drives the "drafts to publish" action item.
+  const { data: sellSummary, refetch: refetchSell } = useQuery({
+    queryKey: ['home-sell-summary'],
+    queryFn: () => listingsApi.sellSummary(),
+    staleTime: 30000,
+  });
+  useFocusEffect(React.useCallback(() => { refetchSell(); }, [refetchSell]));
+  const draftsCount = sellSummary?.drafts || 0;
+
   // Active contest banners — empty array when none flagged.
   const { data: contestBanners, refetch: refetchBanners } = useQuery({
     queryKey: ['home-contest-banners'],
@@ -244,6 +253,13 @@ export const HomeHubScreen = ({ navigation }) => {
 
   // "Needs you" — actionable items only. Hidden entirely when nothing waits.
   const needs = [];
+  if (draftsCount > 0) {
+    needs.push({
+      key: 'drafts', icon: 'pricetags-outline', color: '#4ade80',
+      label: `${draftsCount} draft${draftsCount === 1 ? '' : 's'} to publish`,
+      onPress: () => safeNav('Profile', 'MyListings'),
+    });
+  }
   if (marketplaceCount > 0) {
     needs.push({
       key: 'ship', icon: 'cube-outline', color: '#4ade80',

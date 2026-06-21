@@ -234,39 +234,6 @@ export const ProfileScreen = ({ navigation }) => {
   // links that exist but aren't daily-use.
   const MENU = [
     {
-      // Selling, collecting, orders, messages, show floor, wallet — all
-      // moved to their hubs (Sell / My Collection / Show Floor) + the
-      // bottom bar. Profile is now settings + a short tail of tools.
-      section: 'Tools',
-      items: [
-        { icon: 'storefront-outline', label: 'Case Mode (per card)', onPress: () => navigation.navigate('CaseMode') },
-        { icon: 'print-outline', label: 'Reprint my stickers', onPress: async () => {
-          // Opens an HTML print sheet with new URL-format QRs for
-          // every sticker the user has attached. Existing bare-code
-          // stickers don't work in stock phone cameras; reprinting
-          // these and swapping them on the cards migrates the
-          // install. Auth via ?token= since browser tabs don't
-          // carry the Authorization header.
-          try {
-            const token = await SecureStore.getItemAsync('access_token');
-            if (!token) {
-              Alert.alert('Sign in required', 'Please sign in again to load your sticker sheet.');
-              return;
-            }
-            const url = `${API_BASE_URL}/api/qr/my-stickers/sheet?token=${encodeURIComponent(token)}`;
-            const can = await Linking.canOpenURL(url);
-            if (!can) {
-              Alert.alert('Cannot open browser', 'Unable to open the print page on this device.');
-              return;
-            }
-            await Linking.openURL(url);
-          } catch (err) {
-            Alert.alert('Failed to open', err?.message || 'unknown error');
-          }
-        } },
-      ]
-    },
-    {
       // Settings — the things a profile screen is FOR. Everything
       // here changes how the account works, not what's in the
       // collection.
@@ -312,7 +279,6 @@ export const ProfileScreen = ({ navigation }) => {
         { icon: 'swap-horizontal-outline', label: 'Transfers & sales', onPress: () => navigation.navigate('Transfers') },
         { icon: 'warning-outline', label: 'Disputes', onPress: () => navigation.navigate('DisputeList') },
         { icon: 'shield-half-outline', label: 'Stolen-card match review', onPress: () => navigation.navigate('StolenMatchReview') },
-        { icon: 'pulse-outline', label: 'Deal Radar', onPress: () => navigation.navigate('DealRadarSettings') },
         { icon: 'megaphone-outline', label: 'Send feedback', onPress: () => navigation.navigate('Feedback') },
         { icon: 'download-outline', label: 'Download My Data', onPress: () => navigation.navigate('DownloadData') },
         {

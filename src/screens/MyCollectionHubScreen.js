@@ -31,6 +31,7 @@ const SECTIONS = [
       { key: 'trades', icon: 'swap-horizontal', color: '#a78bfa', label: 'Trades', sub: 'Trade card-for-card', nav: ['Trade'] },
       { key: 'wantlist', icon: 'heart', color: '#f87171', label: 'Want list', sub: "Cards you're hunting", nav: ['Profile', 'WantList'] },
       { key: 'sets', icon: 'grid', color: '#e8c547', label: 'Set completion', sub: 'Track sets you collect', nav: ['Profile', 'SetsList'] },
+      { key: 'dealradar', icon: 'pulse', color: '#fbbf24', label: 'Deal Radar', sub: 'Underpriced cards near comps', nav: ['Profile', 'DealRadarSettings'] },
     ],
   },
   {

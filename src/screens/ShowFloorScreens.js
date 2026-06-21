@@ -212,6 +212,21 @@ export const ShowFloorHubScreen = ({ navigation }) => {
           <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.actionTile, { backgroundColor: 'rgba(232,197,71,0.10)', borderColor: 'rgba(232,197,71,0.40)' }]}
+          onPress={() => navigation.navigate('CaseMode')}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(232,197,71,0.20)' }]}>
+            <Ionicons name="albums" size={28} color="#e8c547" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>Case Mode</Text>
+            <Text style={styles.actionSubtitle}>Mark cards for your display case</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         {/* Optional secondary affordance — see who else is live */}
         <TouchableOpacity
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.md, marginTop: Spacing.xs }}

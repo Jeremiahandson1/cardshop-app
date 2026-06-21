@@ -6,13 +6,14 @@
 // snapshot (active/drafts/offers counts) is a follow-up needing a summary
 // endpoint. See project_mobile_ia_redesign.
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
-import { listingsApi } from '../services/api';
+import { listingsApi, API_BASE_URL } from '../services/api';
 
 const PRIMARY = [
   { key: 'create', icon: 'add', label: 'List a card', nav: ['Profile', 'CreateListing'], main: true },
@@ -42,6 +43,7 @@ const SECTIONS = [
     rows: [
       { key: 'defaults', icon: 'options', color: '#9ca3af', label: 'Listing defaults', sub: 'Shipping & preferences', nav: ['Profile', 'ListingDefaults'] },
       { key: 'stickers', icon: 'pricetag', color: '#9ca3af', label: 'Order stickers', sub: 'QR sticker sheets', nav: ['Profile', 'OrderStickers'] },
+      { key: 'reprint', icon: 'print', color: '#9ca3af', label: 'Reprint my stickers', sub: 'Print sheet of your QR codes', action: 'reprint' },
     ],
   },
 ];
@@ -61,6 +63,20 @@ export const SellHubScreen = ({ navigation }) => {
       else navigation.navigate(nav[0], params ? { screen: nav[1], params } : { screen: nav[1] });
     } catch (e) {
       console.warn('[sell-hub] nav failed', e?.message);
+    }
+  };
+
+  // Reprint sticker sheet — opens an HTML print sheet of the seller's QR
+  // codes (auth via ?token= since browser tabs don't carry the header).
+  const reprintStickers = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) { Alert.alert('Sign in required', 'Please sign in again to load your sticker sheet.'); return; }
+      const url = `${API_BASE_URL}/api/qr/my-stickers/sheet?token=${encodeURIComponent(token)}`;
+      if (!(await Linking.canOpenURL(url))) { Alert.alert('Cannot open browser', 'Unable to open the print page on this device.'); return; }
+      await Linking.openURL(url);
+    } catch (err) {
+      Alert.alert('Failed to open', err?.message || 'unknown error');
     }
   };
 
@@ -108,7 +124,7 @@ export const SellHubScreen = ({ navigation }) => {
                     key={r.key}
                     style={[styles.row, i > 0 && styles.rowBorder]}
                     activeOpacity={0.7}
-                    onPress={() => go(r.nav)}
+                    onPress={() => (r.action === 'reprint' ? reprintStickers() : go(r.nav))}
                   >
                     <View style={[styles.iconBubble, { backgroundColor: r.color + '20' }]}>
                       <Ionicons name={r.icon} size={20} color={r.color} />
