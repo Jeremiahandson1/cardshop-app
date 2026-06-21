@@ -21,7 +21,7 @@ const SECTIONS = [
     title: 'YOUR CARDS',
     rows: [
       { key: 'binders', icon: 'albums', color: '#7dd3fc', label: 'Binders', sub: 'Your collection', nav: ['Binders'] },
-      { key: 'add', icon: 'add-circle', color: '#4ade80', label: 'Add / scan a card', sub: 'Register a new card', nav: ['Scan'] },
+      { key: 'add', icon: 'add-circle', color: '#4ade80', label: 'Add a card', sub: 'Search the catalog, enter manually, or scan a sticker', nav: ['Binders', { screen: 'RegisterCard' }] },
     ],
   },
   {
