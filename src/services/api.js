@@ -203,6 +203,7 @@ export const catalogApi = {
 // ============================================================
 export const cardsApi = {
   mine: (params) => api.get('/cards/mine', { params }),
+  collectionSummary: () => api.get('/cards/collection-summary').then((r) => r.data),
   get: (id) => api.get(`/cards/${id}`),
   getPrivate: (id) => api.get(`/cards/${id}/private`),
   // Register/update may include base64 photos — each image is
@@ -869,6 +870,7 @@ export const listingsApi = {
   publishDrafts: (ids) =>
     api.post('/listings/mine/publish-drafts', ids ? { ids } : {}).then((r) => r.data),
   myAnalytics: () => api.get('/listings/mine/analytics').then((r) => r.data),
+  sellSummary: () => api.get('/listings/sell-summary').then((r) => r.data),
 };
 
 // Saved buyer addresses.

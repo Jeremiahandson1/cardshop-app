@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
-import { homeApi } from '../services/api';
+import { listingsApi } from '../services/api';
 
 const PRIMARY = [
   { key: 'create', icon: 'add', label: 'List a card', nav: ['Profile', 'CreateListing'], main: true },
@@ -24,9 +24,9 @@ const SECTIONS = [
   {
     title: 'MANAGE',
     rows: [
-      { key: 'listings', icon: 'pricetags', color: '#4ade80', label: 'My Listings', sub: 'Active · drafts · sold', nav: ['Profile', 'MyListings'] },
+      { key: 'listings', icon: 'pricetags', color: '#4ade80', label: 'My Listings', sub: 'Active · drafts · sold', nav: ['Profile', 'MyListings'], badge: 'drafts' },
       { key: 'orders', icon: 'cube', color: '#60a5fa', label: 'Orders', sub: 'Ship & track', nav: ['Profile', 'MyOrders'], badge: 'ship' },
-      { key: 'offers', icon: 'chatbubbles', color: '#a78bfa', label: 'Offers', sub: 'Respond to buyers', nav: ['Profile', 'MyOffers'] },
+      { key: 'offers', icon: 'chatbubbles', color: '#a78bfa', label: 'Offers', sub: 'Respond to buyers', nav: ['Profile', 'MyOffers'], badge: 'offers' },
       { key: 'analytics', icon: 'stats-chart', color: '#e8c547', label: 'Seller analytics', sub: '30-day performance', nav: ['Profile', 'SellerAnalytics'] },
     ],
   },
@@ -47,13 +47,13 @@ const SECTIONS = [
 ];
 
 export const SellHubScreen = ({ navigation }) => {
-  const { data: pending, refetch } = useQuery({
-    queryKey: ['home-pending'],
-    queryFn: () => homeApi.pending(),
+  const { data: summary, refetch } = useQuery({
+    queryKey: ['sell-summary'],
+    queryFn: () => listingsApi.sellSummary(),
     staleTime: 30000,
   });
   useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]));
-  const toShip = pending?.counts?.marketplace_sales || 0;
+  const s = summary || {};
 
   const go = (nav, params) => {
     try {
@@ -64,7 +64,10 @@ export const SellHubScreen = ({ navigation }) => {
     }
   };
 
-  const badgeFor = (row) => (row.badge === 'ship' && toShip > 0 ? toShip : null);
+  const badgeFor = (row) => {
+    const v = { drafts: s.drafts, ship: s.orders_to_ship, offers: s.offers_open }[row.badge];
+    return v > 0 ? v : null;
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -75,6 +78,9 @@ export const SellHubScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={styles.title}>Sell</Text>
         </View>
+        <Text style={styles.snapshot}>
+          {(s.active_listings || 0)} active · {(s.sold || 0)} sold · ${(((Number(s.sold_7d_cents) || 0)) / 100).toFixed(0)} this week
+        </Text>
 
         {/* Primary actions */}
         <View style={styles.actionsRow}>
@@ -132,6 +138,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: Spacing.lg, paddingBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   back: { padding: 2 },
   title: { fontFamily: Typography.display, fontSize: 26, fontWeight: '700', color: Colors.text, letterSpacing: -0.5 },
+  snapshot: { color: Colors.textMuted, fontSize: 13, marginLeft: 2, marginTop: -2, marginBottom: 2 },
 
   actionsRow: { flexDirection: 'row', gap: Spacing.sm },
   action: {

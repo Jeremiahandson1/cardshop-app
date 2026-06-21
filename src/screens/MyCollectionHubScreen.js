@@ -7,7 +7,10 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { cardsApi } from '../services/api';
 
 // Each row's `nav` is the navigation target:
 //   ['TabName']                          -> switch to that tab
@@ -39,6 +42,14 @@ const SECTIONS = [
 ];
 
 export const MyCollectionHubScreen = ({ navigation }) => {
+  const { data: summary, refetch } = useQuery({
+    queryKey: ['collection-summary'],
+    queryFn: () => cardsApi.collectionSummary(),
+    staleTime: 30000,
+  });
+  useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]));
+  const s = summary || {};
+
   const go = (nav) => {
     try {
       if (nav.length === 1) navigation.navigate(nav[0]);
@@ -58,6 +69,9 @@ export const MyCollectionHubScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={styles.title}>My Collection</Text>
         </View>
+        <Text style={styles.snapshot}>
+          {(s.cards || 0)} cards · {(s.listed || 0)} listed · {(s.want_list || 0)} on want list
+        </Text>
 
         {SECTIONS.map((sec) => (
           <View key={sec.title} style={styles.section}>
@@ -94,6 +108,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: Spacing.lg, paddingBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   back: { padding: 2 },
   title: { fontFamily: Typography.display, fontSize: 26, fontWeight: '700', color: Colors.text, letterSpacing: -0.5 },
+  snapshot: { color: Colors.textMuted, fontSize: 13, marginLeft: 2, marginTop: -2, marginBottom: 2 },
   section: { gap: Spacing.xs },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: Colors.textMuted, marginLeft: 4 },
   card: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, overflow: 'hidden' },

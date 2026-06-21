@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { useAuthStore } from '../store/authStore';
-import { homeApi, contestsApi, notificationsApi } from '../services/api';
+import { homeApi, contestsApi, notificationsApi, showFloorApi } from '../services/api';
 import { getPushPermissionStatus, registerForPushNotificationsAsync } from '../services/pushRegistration';
 
 const LCS_ENABLED = Constants.expoConfig?.extra?.LCS_ENABLED === true
@@ -165,6 +165,15 @@ export const HomeHubScreen = ({ navigation }) => {
   useFocusEffect(React.useCallback(() => { refetchNotif(); }, [refetchNotif]));
   const unreadCount = notifData?.unread_count || 0;
 
+  // Show Floor live session — drives the "● LIVE" banner when checked in.
+  const { data: sfData, refetch: refetchSf } = useQuery({
+    queryKey: ['home-show-floor-me'],
+    queryFn: () => showFloorApi.me().then((r) => r.data),
+    staleTime: 30000,
+  });
+  useFocusEffect(React.useCallback(() => { refetchSf(); }, [refetchSf]));
+  const liveSession = sfData?.check_in || null;
+
   // Active contest banners — empty array when none flagged.
   const { data: contestBanners, refetch: refetchBanners } = useQuery({
     queryKey: ['home-contest-banners'],
@@ -296,6 +305,24 @@ export const HomeHubScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Show Floor LIVE — only when checked in at a show */}
+        {liveSession ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => safeNav('Profile', 'ManageBooth')}
+            style={styles.liveBanner}
+          >
+            <View style={styles.liveDot} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.liveTitle}>● LIVE at a show</Text>
+              <Text style={styles.liveSub} numberOfLines={1}>
+                {[liveSession.event_name || liveSession.venue_name, liveSession.table_number ? `Table ${liveSession.table_number}` : null].filter(Boolean).join(' · ') || 'Tap to manage your booth'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#4ade80" />
+          </TouchableOpacity>
+        ) : null}
+
         {/* Contest banner(s) */}
         {Array.isArray(contestBanners) && contestBanners.length > 0 ? (
           contestBanners.length === 1 ? (
@@ -395,6 +422,15 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
+  liveBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1,
+    backgroundColor: 'rgba(74,222,128,0.10)', borderColor: 'rgba(74,222,128,0.5)',
+  },
+  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#4ade80' },
+  liveTitle: { color: '#4ade80', fontWeight: '800', fontSize: 14 },
+  liveSub: { color: Colors.textMuted, fontSize: 12, marginTop: 1 },
 
   needsCard: {
     borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border,
