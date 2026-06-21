@@ -18,29 +18,48 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 // search screen where users can subscribe to any set in the
 // catalog they actually collect.
 // ============================================================
-const SetCard = ({ item, onPress }) => (
-  <TouchableOpacity style={styles.setCard} onPress={onPress} activeOpacity={0.85}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.setName} numberOfLines={1}>
-        {item.year ? `${item.year} ` : ''}{item.set_name}
+const CompletionBar = ({ label, owned, total, pct, color }) => (
+  <View style={{ marginTop: 8 }}>
+    <View style={styles.barRow}>
+      <Text style={styles.barLabel}>{label}</Text>
+      <Text style={[styles.barValue, { color }]}>
+        {owned} / {total}{pct != null ? `  ·  ${pct}%` : ''}
       </Text>
-      <Text style={styles.setMeta}>
-        {item.manufacturer ? `${item.manufacturer} · ` : ''}
-        {item.owned_cards} / {item.total_cards} cards
-      </Text>
-      <View style={styles.progressBarBg}>
-        <View
-          style={[
-            styles.progressBarFill,
-            { width: `${Math.max(0, Math.min(100, item.percent_complete))}%` },
-          ]}
-        />
-      </View>
-      <Text style={styles.percentLabel}>{item.percent_complete}% complete</Text>
     </View>
-    <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-  </TouchableOpacity>
+    <View style={styles.progressBarBg}>
+      <View
+        style={[
+          styles.progressBarFill,
+          { width: `${Math.max(0, Math.min(100, pct || 0))}%`, backgroundColor: color },
+        ]}
+      />
+    </View>
+  </View>
 );
+
+const SetCard = ({ item, onPress }) => {
+  const hasParallels = (item.full_total || 0) > (item.base_total || 0);
+  return (
+    <TouchableOpacity style={styles.setCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.setName} numberOfLines={1}>
+          {item.year ? `${item.year} ` : ''}{item.set_name}
+        </Text>
+        <Text style={styles.setMeta}>
+          {item.manufacturer ? `${item.manufacturer} · ` : ''}
+          {item.owned_all} card{item.owned_all === 1 ? '' : 's'} owned
+        </Text>
+        {item.base_total ? (
+          <CompletionBar label="Base set" owned={item.owned_base} total={item.base_total} pct={item.base_pct} color={Colors.accent} />
+        ) : null}
+        {hasParallels ? (
+          <CompletionBar label="Master · with parallels" owned={item.owned_all} total={item.full_total} pct={item.master_pct} color="#a78bfa" />
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+};
 
 export const SetsListScreen = ({ navigation }) => {
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -572,6 +591,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.xs,
     fontWeight: Typography.semibold,
     marginTop: 4,
+  },
+  barRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  barLabel: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+    fontWeight: Typography.semibold,
+  },
+  barValue: {
+    fontSize: Typography.xs,
+    fontWeight: Typography.semibold,
   },
   browseHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
