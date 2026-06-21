@@ -113,6 +113,30 @@ export const useAuthStore = create((set, get) => ({
     return { user, deletion_cancelled: !!deletion_cancelled };
   },
 
+  // Sign in with an access token handed off out-of-band — used by the eBay
+  // claim flow's cardshop://claim-success?token= deep link (a brand-new user
+  // who just claimed their card on the web). No password round-trip: store
+  // the token and hydrate the user from /auth/me. There's no refresh token
+  // in the handoff, so the access token lasts until it expires, after which
+  // they re-auth (eBay login or by setting a password).
+  loginWithToken: async (accessToken) => {
+    if (!accessToken) return false;
+    try {
+      await SecureStore.setItemAsync('access_token', accessToken);
+      await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+      await SecureStore.deleteItemAsync('_impersonating').catch(() => {});
+      wipeQueryCache();
+      const res = await authApi.me();
+      set({ user: res.data, isAuthenticated: true, isLoading: false, impersonating: null });
+      return true;
+    } catch {
+      // Token stored but /auth/me flaked — treat as authenticated; the next
+      // request resolves or hits a real 401.
+      set({ isAuthenticated: true, isLoading: false });
+      return true;
+    }
+  },
+
   register: async (data) => {
     const res = await authApi.register(data);
     const { user, accessToken, refreshToken } = res.data || {};

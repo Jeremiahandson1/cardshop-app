@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
 import { Alert, AppState, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -116,6 +117,26 @@ const AppInner = () => {
     return () => sub.remove();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialize]);
+
+  // Deep-link sign-in for the eBay claim flow. After a brand-new buyer
+  // claims their card on the web (logged in with eBay), the success page
+  // hands off cardshop://claim-success?token=<jwt>. Catch it on cold start
+  // and while running, store the token, and sign them in — they land in
+  // the app already authenticated, owning the card they just claimed.
+  useEffect(() => {
+    const handleUrl = async (url) => {
+      if (!url) return;
+      try {
+        const { path, hostname, queryParams } = Linking.parse(url);
+        if ((path === 'claim-success' || hostname === 'claim-success') && queryParams?.token) {
+          await useAuthStore.getState().loginWithToken(String(queryParams.token));
+        }
+      } catch { /* ignore malformed links */ }
+    };
+    Linking.getInitialURL().then(handleUrl).catch(() => {});
+    const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
+    return () => sub.remove();
+  }, []);
 
   // Once authenticated, register for push + identify to analytics +
   // alias the RevenueCat anonymous purchaser to our user_id so the
