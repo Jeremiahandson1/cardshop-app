@@ -431,6 +431,8 @@ export const SetCompletionScreen = ({ navigation, route }) => {
     },
   });
 
+  const [playerSearch, setPlayerSearch] = useState('');
+
   if (isLoading || !data) return <LoadingScreen message={isPlayerView ? 'Loading cards...' : 'Loading set...'} />;
 
   // ---- LEVEL 2: one player's full rainbow — every card + parallel ----
@@ -487,6 +489,10 @@ export const SetCompletionScreen = ({ navigation, route }) => {
   // ---- LEVEL 1: players you own a card from in this set ----
   const players = data.players || [];
   const ownedPlayerCount = players.filter((p) => p.owned_cards > 0).length;
+  const pq = playerSearch.trim().toLowerCase();
+  const shown = pq
+    ? players.filter((p) => (p.player_name || '').toLowerCase().includes(pq))
+    : players;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.bg }} edges={['top']}>
       <ScreenHeader
@@ -498,12 +504,36 @@ export const SetCompletionScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         }
       />
+      <View style={{ paddingHorizontal: Spacing.base, paddingTop: Spacing.sm }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: Colors.surface, borderRadius: Radius.md,
+          paddingHorizontal: 10, borderWidth: 1, borderColor: Colors.border,
+        }}>
+          <Ionicons name="search" size={16} color={Colors.textMuted} />
+          <TextInput
+            value={playerSearch}
+            onChangeText={setPlayerSearch}
+            placeholder="Search players in this set…"
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{ flex: 1, color: Colors.text, paddingVertical: 8 }}
+          />
+          {playerSearch ? (
+            <TouchableOpacity onPress={() => setPlayerSearch('')}>
+              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
       <FlatList
-        data={players}
+        data={shown}
         keyExtractor={(p) => p.player_name}
         contentContainerStyle={{ padding: Spacing.base, paddingBottom: 80 }}
         ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
         initialNumToRender={20}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={Colors.accent} />
         }
@@ -528,7 +558,11 @@ export const SetCompletionScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <EmptyState icon="📦" title="No players listed" message="This set has no players in the catalog yet." />
+          <EmptyState
+            icon={pq ? '🔍' : '📦'}
+            title={pq ? 'No players match' : 'No players listed'}
+            message={pq ? `No players matching "${playerSearch}".` : 'This set has no players in the catalog yet.'}
+          />
         }
       />
     </SafeAreaView>
