@@ -10,7 +10,7 @@
 // Tiles route to where each area currently lives, so this screen is safe to
 // ship ahead of the bar/hub work.
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, Platform, AppState } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Platform, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -66,78 +66,6 @@ const TILES = [
   },
 ];
 
-// Single-banner layout: full-width row with icon/card, title, pitch + CTA.
-const SingleBanner = ({ contest, onPress }) => (
-  <TouchableOpacity
-    activeOpacity={0.85}
-    onPress={() => onPress(contest.slug)}
-    style={{
-      flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-      padding: Spacing.md,
-      borderRadius: Radius.lg,
-      borderWidth: 1,
-      backgroundColor: 'rgba(232,197,71,0.14)',
-      borderColor: 'rgba(232,197,71,0.55)',
-      marginBottom: Spacing.md,
-    }}
-  >
-    {contest.prize_card?.front_image_url ? (
-      <Image
-        source={{ uri: contest.prize_card.front_image_url }}
-        style={{ width: 42, height: 58, borderRadius: 4, backgroundColor: '#0f172a' }}
-        resizeMode="contain"
-      />
-    ) : (
-      <Ionicons name="gift" size={22} color="#e8c547" />
-    )}
-    <View style={{ flex: 1 }}>
-      <Text style={{ color: '#e8c547', fontSize: 14, fontWeight: '700' }}>
-        {contest.title}
-      </Text>
-      <Text style={{ color: Colors.text, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
-        {contest.banner_text || contest.prize_description || contest.prize_card?.title || ''}
-      </Text>
-    </View>
-    <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '600' }}>
-      {contest.banner_cta_text || 'See contest'} →
-    </Text>
-  </TouchableOpacity>
-);
-
-// Split-banner layout: card image + title only, two side-by-side.
-const SplitBanner = ({ contest, onPress }) => (
-  <TouchableOpacity
-    activeOpacity={0.85}
-    onPress={() => onPress(contest.slug)}
-    style={{
-      flexBasis: '48%', flexGrow: 1,
-      padding: Spacing.sm,
-      borderRadius: Radius.lg,
-      borderWidth: 1,
-      backgroundColor: 'rgba(232,197,71,0.14)',
-      borderColor: 'rgba(232,197,71,0.55)',
-      flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    }}
-  >
-    {contest.prize_card?.front_image_url ? (
-      <Image
-        source={{ uri: contest.prize_card.front_image_url }}
-        style={{ width: 38, height: 52, borderRadius: 4, backgroundColor: '#0f172a' }}
-        resizeMode="contain"
-      />
-    ) : (
-      <View style={{ width: 38, height: 52, borderRadius: 4, backgroundColor: 'rgba(232,197,71,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name="gift" size={20} color="#e8c547" />
-      </View>
-    )}
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <Text style={{ color: '#e8c547', fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
-        {contest.title}
-      </Text>
-    </View>
-  </TouchableOpacity>
-);
-
 export const HomeHubScreen = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const greeting = (() => {
@@ -183,22 +111,40 @@ export const HomeHubScreen = ({ navigation }) => {
   useFocusEffect(React.useCallback(() => { refetchSell(); }, [refetchSell]));
   const draftsCount = sellSummary?.drafts || 0;
 
-  // Active contest banners — empty array when none flagged.
-  const { data: contestBanners, refetch: refetchBanners } = useQuery({
-    queryKey: ['home-contest-banners'],
-    queryFn: () => contestsApi.banners(),
+  // Active contests — drives the single "Contests" hub pill. We fetch
+  // the full list (not just banner-flagged ones) so the pill appears
+  // whenever a contest is live, and can nudge the user with their own
+  // progress toward maxing out their entries.
+  const { data: contestList, refetch: refetchContests } = useQuery({
+    queryKey: ['home-contests'],
+    queryFn: () => contestsApi.list(),
     staleTime: 60000,
   });
-  useFocusEffect(React.useCallback(() => { refetchBanners(); }, [refetchBanners]));
-  const openContest = (slug) => {
-    if (!slug) return;
-    try {
-      navigation.navigate('Home', { screen: 'Contest', params: { slug } });
-    } catch (e) {
-      console.warn('[home] contest nav failed, falling back to web:', e?.message);
-      Linking.openURL(`https://cardshop.twomiah.com/contests/${slug}`).catch(() => {});
-    }
+  useFocusEffect(React.useCallback(() => { refetchContests(); }, [refetchContests]));
+  const openContests = Array.isArray(contestList) ? contestList.filter((c) => c.status === 'open') : [];
+  const goToContests = () => {
+    try { navigation.navigate('ContestsList'); }
+    catch (e) { console.warn('[home] contests nav failed', e?.message); }
   };
+
+  // Pill subtitle: a single live contest nudges entry progress; multiple
+  // just shows the count.
+  const contestPillSub = (() => {
+    if (openContests.length === 0) return null;
+    if (openContests.length === 1) {
+      const c = openContests[0];
+      const rules = c.entry_rules && typeof c.entry_rules === 'object' ? c.entry_rules : {};
+      const ways = Object.keys(rules).filter((k) => k.startsWith('per_') && rules[k]).length;
+      const mine = c.my_entries || 0;
+      if (c.one_entry_per_source_type && ways > 0) {
+        return mine >= ways
+          ? 'All entries earned — you’re in! 🎉'
+          : `${mine} / ${ways} entries earned — tap to finish`;
+      }
+      return 'Free to enter — tap for details';
+    }
+    return `${openContests.length} live giveaways · tap to enter`;
+  })();
 
   const tradeOffersCount = pending?.counts?.active_trade_offers || 0;
   const marketplaceCount = pending?.counts?.marketplace_sales || 0;
@@ -339,17 +285,20 @@ export const HomeHubScreen = ({ navigation }) => {
           </TouchableOpacity>
         ) : null}
 
-        {/* Contest banner(s) */}
-        {Array.isArray(contestBanners) && contestBanners.length > 0 ? (
-          contestBanners.length === 1 ? (
-            <SingleBanner contest={contestBanners[0]} onPress={openContest} />
-          ) : (
-            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-              {contestBanners.map((b) => (
-                <SplitBanner key={b.id} contest={b} onPress={openContest} />
-              ))}
+        {/* Contests — single pill into the contests list */}
+        {openContests.length > 0 ? (
+          <TouchableOpacity activeOpacity={0.85} onPress={goToContests} style={styles.contestPill}>
+            <View style={styles.contestIconBubble}>
+              <Ionicons name="gift" size={22} color="#e8c547" />
             </View>
-          )
+            <View style={{ flex: 1 }}>
+              <Text style={styles.contestPillTitle}>Contests</Text>
+              {contestPillSub ? (
+                <Text style={styles.contestPillSub} numberOfLines={1}>{contestPillSub}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.contestPillCta}>Enter →</Text>
+          </TouchableOpacity>
         ) : null}
 
         {/* Push-permission warning */}
@@ -447,6 +396,20 @@ const styles = StyleSheet.create({
   liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#4ade80' },
   liveTitle: { color: '#4ade80', fontWeight: '800', fontSize: 14 },
   liveSub: { color: Colors.textMuted, fontSize: 12, marginTop: 1 },
+
+  contestPill: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1,
+    backgroundColor: 'rgba(232,197,71,0.14)', borderColor: 'rgba(232,197,71,0.55)',
+  },
+  contestIconBubble: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(232,197,71,0.20)',
+  },
+  contestPillTitle: { color: '#e8c547', fontSize: 15, fontWeight: '800' },
+  contestPillSub: { color: Colors.text, fontSize: 12, marginTop: 2 },
+  contestPillCta: { color: '#e8c547', fontSize: 13, fontWeight: '700' },
 
   needsCard: {
     borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border,

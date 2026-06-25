@@ -410,6 +410,10 @@ export const contestsApi = {
   // recent one.
   banner: () => api.get('/contests/banner').then((r) => r.data?.banner || null),
   banners: () => api.get('/contests/banners').then((r) => r.data?.banners || []),
+  // Full list of active/recent contests (open, closed, drawn, awarded).
+  // Includes the caller's per-contest entry progress (my_entries) when
+  // authenticated — drives the Contests list screen's progress badges.
+  list: () => api.get('/contests').then((r) => r.data?.contests || []),
   get: (slug) => api.get(`/contests/${slug}`).then((r) => r.data),
 };
 

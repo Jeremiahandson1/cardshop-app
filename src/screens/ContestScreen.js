@@ -191,6 +191,15 @@ export const ContestScreen = ({ route, navigation }) => {
               ) : null}
             </View>
           </View>
+        ) : c.cover_image_url ? (
+          // No single prize card (e.g. pick-your-prize box giveaways) —
+          // show the promo art, then the prize description beneath it.
+          <View style={S.coverWrap}>
+            <Image source={{ uri: c.cover_image_url }} style={S.coverImg} resizeMode="cover" />
+            {c.prize_description ? (
+              <Text style={S.coverCaption}>{c.prize_description}</Text>
+            ) : null}
+          </View>
         ) : (
           <View style={S.prizeCardNoCard}>
             <Ionicons name="gift" size={28} color={Colors.accent} />
@@ -317,6 +326,15 @@ const S = {
     backgroundColor: 'rgba(232,197,71,0.08)',
     borderWidth: 1, borderColor: 'rgba(232,197,71,0.4)',
     marginBottom: Spacing.md,
+  },
+  coverWrap: { marginBottom: Spacing.md },
+  coverImg: {
+    width: '100%', aspectRatio: 2 / 3, borderRadius: Radius.lg,
+    backgroundColor: '#0f172a',
+  },
+  coverCaption: {
+    color: Colors.text, fontSize: 13, fontWeight: '600',
+    marginTop: Spacing.sm, lineHeight: 18,
   },
   prizeImg: { width: 92, height: 128, borderRadius: 6, backgroundColor: '#0f172a' },
   prizeKicker: { color: Colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
