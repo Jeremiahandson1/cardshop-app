@@ -452,6 +452,10 @@ export const ListingDetailScreen = ({ navigation, route }) => {
 
   const isOwner = listing.is_owner;
   const isActive = listing.status === 'active';
+  // Owner can take down anything not already in a terminal state —
+  // including drafts (e.g. eBay imports that were never published).
+  const canManage = isOwner && ['active', 'draft', 'flagged'].includes(listing.status);
+  const isDraft = listing.status === 'draft';
   const photos = Array.isArray(listing.photos) ? listing.photos : [];
 
   return (
@@ -578,19 +582,26 @@ export const ListingDetailScreen = ({ navigation, route }) => {
           />
         </View>
       )}
-      {isOwner && isActive && (
+      {canManage && (
         <View style={styles.ctaBar}>
           <Button
-            title="Cancel listing"
+            title={isDraft ? 'Delete draft' : 'Cancel listing'}
             variant="ghost"
             onPress={() => Alert.alert(
-              'Cancel listing?',
-              'This removes the listing from the marketplace.',
+              isDraft ? 'Delete draft?' : 'Cancel listing?',
+              isDraft
+                ? 'This permanently removes the draft.'
+                : 'This removes the listing from the marketplace.',
               [
                 { text: 'Keep', style: 'cancel' },
-                { text: 'Cancel listing', style: 'destructive', onPress: async () => {
-                  try { await listingsApi.cancel(id); navigation.goBack(); }
-                  catch (e) { Alert.alert('Failed', e.message); }
+                { text: isDraft ? 'Delete' : 'Cancel listing', style: 'destructive', onPress: async () => {
+                  try {
+                    await listingsApi.cancel(id);
+                    qc.invalidateQueries({ queryKey: ['my-listings'] });
+                    navigation.goBack();
+                  } catch (e) {
+                    Alert.alert('Failed', e.response?.data?.error || e.message);
+                  }
                 }},
               ],
             )}

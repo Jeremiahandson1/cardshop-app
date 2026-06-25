@@ -275,6 +275,35 @@ export const DraftsReviewScreen = ({ navigation }) => {
     onError: (err) => Alert.alert('Publish failed', err.response?.data?.error || err.message),
   });
 
+  // Delete the selected drafts. Imported drafts you don't want to list
+  // (e.g. items you've since sold/removed on eBay) had no way out before
+  // — Review only published. Bulk-cancels each selected draft.
+  const deleteMut = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selected);
+      const results = await Promise.allSettled(ids.map((id) => listingsApi.cancel(id)));
+      return results.filter((r) => r.status === 'fulfilled').length;
+    },
+    onSuccess: (deleted) => {
+      qc.invalidateQueries({ queryKey: ['my-listings'] });
+      setSelected(new Set());
+      Alert.alert('Deleted', `${deleted} draft${deleted === 1 ? '' : 's'} removed.`);
+    },
+    onError: (err) => Alert.alert('Delete failed', err.response?.data?.error || err.message),
+  });
+
+  const confirmDelete = () => {
+    if (!selected.size) return;
+    Alert.alert(
+      `Delete ${selected.size} draft${selected.size === 1 ? '' : 's'}?`,
+      'This permanently removes the selected drafts. It does not affect anything on eBay.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMut.mutate() },
+      ],
+    );
+  };
+
   if (isLoading) return <LoadingScreen />;
 
   return (
@@ -329,7 +358,17 @@ export const DraftsReviewScreen = ({ navigation }) => {
       )}
 
       {drafts.length > 0 && (
-        <View style={styles.ctaBar}>
+        <View style={[styles.ctaBar, { flexDirection: 'row', gap: Spacing.sm }]}>
+          <Button
+            title={
+              deleteMut.isPending ? 'Deleting…' :
+              selected.size === 0 ? 'Delete' : `Delete ${selected.size}`
+            }
+            variant="ghost"
+            onPress={confirmDelete}
+            disabled={selected.size === 0 || deleteMut.isPending || publishMut.isPending}
+            style={{ flex: 1 }}
+          />
           <Button
             title={
               publishMut.isPending ? 'Publishing…' :
@@ -338,8 +377,8 @@ export const DraftsReviewScreen = ({ navigation }) => {
                 : `Publish ${selected.size}`
             }
             onPress={() => publishMut.mutate()}
-            disabled={publishMut.isPending}
-            style={{ flex: 1 }}
+            disabled={publishMut.isPending || deleteMut.isPending}
+            style={{ flex: 1.4 }}
           />
         </View>
       )}
