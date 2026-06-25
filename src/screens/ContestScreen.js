@@ -47,6 +47,11 @@ const SOURCE_META = {
     hint: 'Share your username. The entry fires when they confirm their email.',
     icon: 'person-add',
   },
+  facebook: {
+    label: 'Like, share & tag us on Facebook',
+    hint: 'Like our Facebook page, share the contest post, and tag a friend in the comments. We verify on Facebook and credit your entry.',
+    icon: 'logo-facebook',
+  },
   referral_qualified: {
     label: 'Invite a friend who registers a card',
     hint: 'Friend signs up with your username, verifies email, AND adds a card. Each qualifying friend = 1 entry.',
@@ -229,7 +234,7 @@ export const ContestScreen = ({ route, navigation }) => {
           {isTopCount ? 'How to earn referrals' : `Your entries (${myEntries} / ${c.max_entries_per_user})`}
         </Text>
         {!isTopCount && c.one_entry_per_source_type ? (
-          <Text style={S.sectionHint}>One entry per action. Do all five to max out.</Text>
+          <Text style={S.sectionHint}>One entry per action. Do all {sources.length} to max out.</Text>
         ) : null}
 
         {sources.length === 0 ? (
