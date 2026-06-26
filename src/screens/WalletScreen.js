@@ -46,7 +46,10 @@ export const WalletScreen = ({ navigation }) => {
         setTimeout(() => qc.invalidateQueries({ queryKey: ['wallet-summary'] }), 1500);
       }
     },
-    onError: (err) => Alert.alert('Onboarding failed', err.response?.data?.error || err.message),
+    onError: (err) => Alert.alert(
+      'Onboarding failed',
+      err.response?.data?.detail || err.response?.data?.error || err.message,
+    ),
   });
 
   const dashboardMut = useMutation({

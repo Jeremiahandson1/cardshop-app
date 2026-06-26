@@ -243,7 +243,10 @@ export const CreateListingScreen = ({ navigation, route }) => {
         Alert.alert('Onboarding unavailable', out?.detail || 'Try again in a minute.');
       }
     },
-    onError: (err) => Alert.alert('Onboarding failed', err?.response?.data?.error || err.message),
+    onError: (err) => Alert.alert(
+      'Onboarding failed',
+      err?.response?.data?.detail || err?.response?.data?.error || err.message,
+    ),
   });
 
   const createMut = useMutation({
