@@ -1381,6 +1381,7 @@ export const PublicBinderScreen = ({ navigation, route }) => {
                     : (scanQuota?.remaining ?? 0) > 0
                       ? `\n\nYou have ${scanQuota.remaining} free scan${scanQuota.remaining === 1 ? '' : 's'} left today — try it now!`
                       : '')
+                  + '\n\nAlready added cards? Nothing’s lost — this binder is just empty. Your cards live in whichever binder you saved them to. Tap the back arrow (←) to see all your binders.'
                 : 'This binder doesn\'t have any cards yet.'
               }
               action={isOwner ? {
