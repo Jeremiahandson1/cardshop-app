@@ -32,9 +32,18 @@ const TILES = [
     icon: 'albums',
     iconColor: '#7dd3fc',
     title: 'My Collection',
-    subtitle: 'Binders · cards · trades · shop',
+    subtitle: 'Binders · cards · trades',
     bg: 'rgba(125,211,252,0.10)',
     border: 'rgba(125,211,252,0.40)',
+  },
+  {
+    key: 'marketplace',
+    icon: 'cart',
+    iconColor: '#5eead4',
+    title: 'Shop',
+    subtitle: 'Buy cards from other sellers',
+    bg: 'rgba(94,234,212,0.10)',
+    border: 'rgba(94,234,212,0.40)',
   },
   {
     key: 'sell',
@@ -189,6 +198,7 @@ export const HomeHubScreen = ({ navigation }) => {
         try { navigation.navigate('SellHub'); }
         catch (e) { console.warn('[home] navigate failed', e?.message); }
         return undefined;
+      case 'marketplace': return safeNav('Profile', 'MarketplaceHome');
       case 'show-floor': return safeNav('Profile', 'ShowFloorHub');
       case 'local-lcs': return safeNav('LCS');
       default: return undefined;
