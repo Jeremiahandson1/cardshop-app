@@ -126,6 +126,59 @@ export const WalletScreen = ({ navigation }) => {
   );
 };
 
+// Stripe returns raw requirement codes (e.g. "representative.dob.day",
+// "external_account", "tos_acceptance.ip"). Showing those to a seller
+// reads like an error dump. Map them to plain-English, de-duped items
+// (the three dob.* fields collapse to one "date of birth", first/last
+// name to "legal name", etc.). Unknown codes fall back to a prettified
+// version rather than the raw path.
+const REQ_LABELS = [
+  ['individual.verification.document', 'A photo of your ID'],
+  ['representative.verification.document', 'A photo of your ID'],
+  ['individual.dob', 'Your date of birth'],
+  ['representative.dob', 'Your date of birth'],
+  ['individual.first_name', 'Your legal name'],
+  ['individual.last_name', 'Your legal name'],
+  ['representative.first_name', 'Your legal name'],
+  ['representative.last_name', 'Your legal name'],
+  ['individual.address', 'Your home address'],
+  ['representative.address', 'Your home address'],
+  ['individual.phone', 'Your phone number'],
+  ['representative.phone', 'Your phone number'],
+  ['individual.email', 'Your email'],
+  ['representative.email', 'Your email'],
+  ['individual.ssn_last_4', 'Last 4 digits of your SSN'],
+  ['representative.ssn_last_4', 'Last 4 digits of your SSN'],
+  ['individual.id_number', 'Your SSN or tax ID'],
+  ['representative.id_number', 'Your SSN or tax ID'],
+  ['external_account', 'A bank account or debit card for payouts'],
+  ['business_type', 'Whether you’re an individual or a business'],
+  ['business_profile.url', 'A website or short description of what you sell'],
+  ['business_profile.product_description', 'A short description of what you sell'],
+  ['business_profile.mcc', 'What you sell'],
+  ['tos_acceptance', 'Agreeing to Stripe’s terms'],
+  ['settings.payments.statement_descriptor', 'How charges show on buyers’ statements'],
+  ['company', 'Your business details'],
+];
+
+function humanizeRequirements(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const code of raw) {
+    let label = null;
+    for (const [match, friendly] of REQ_LABELS) {
+      if (code === match || code.startsWith(match + '.')) { label = friendly; break; }
+    }
+    if (!label) {
+      const tail = String(code).split('.').pop().replace(/_/g, ' ');
+      label = tail.charAt(0).toUpperCase() + tail.slice(1);
+    }
+    if (!seen.has(label)) { seen.add(label); out.push(label); }
+  }
+  return out;
+}
+
 const OnboardingCard = ({ status, requirements, onStart, loading }) => {
   // Stripe Connect Express has several intermediate states between
   // "never started" and "fully enabled." We render different copy
@@ -150,9 +203,9 @@ const OnboardingCard = ({ status, requirements, onStart, loading }) => {
     ctaLabel = null;
     showCta = false;
   } else if (needsMoreInfo) {
-    title = 'A few more details needed';
-    body = "Stripe needs additional information to finish verifying your account. Continue where you left off and they'll let you through.";
-    ctaLabel = 'Continue verification';
+    title = 'One step left to get paid';
+    body = "To send you your money, our payment partner Stripe needs to confirm a few details. It's a one-time check — finish it and your payouts are unlocked for good.";
+    ctaLabel = 'Finish setup';
     showCta = true;
   } else if (isRestricted) {
     title = 'Your account needs attention';
@@ -176,11 +229,19 @@ const OnboardingCard = ({ status, requirements, onStart, loading }) => {
       />
       <Text style={styles.kycTitle}>{title}</Text>
       <Text style={styles.kycBody}>{body}</Text>
-      {status && status !== 'none' && !isReview && (
-        <Text style={styles.kycStatus}>Status: {status}</Text>
-      )}
       {hasReqs && (
-        <Text style={styles.kycReqs}>Still needed: {requirements.join(', ')}</Text>
+        <View style={styles.kycReqsBox}>
+          <Text style={styles.kycReqsHeading}>Stripe still needs:</Text>
+          {humanizeRequirements(requirements).map((label) => (
+            <View key={label} style={styles.kycReqRow}>
+              <Ionicons name="ellipse" size={5} color={Colors.textMuted} style={{ marginTop: 7 }} />
+              <Text style={styles.kycReqItem}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {isRestricted && (
+        <Text style={styles.kycStatus}>Account status: needs attention</Text>
       )}
       {showCta && (
         <Button title={ctaLabel} onPress={onStart} disabled={loading} />
@@ -435,6 +496,19 @@ const styles = StyleSheet.create({
   kycBody: { ...Typography.body, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing.md },
   kycStatus: { color: Colors.textDim, textAlign: 'center', fontSize: 13 },
   kycReqs: { color: Colors.accent3, textAlign: 'center', fontSize: 12, fontStyle: 'italic' },
+  kycReqsBox: {
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: 6,
+  },
+  kycReqsHeading: { color: Colors.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  kycReqRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  kycReqItem: { color: Colors.textMuted, fontSize: 13, flex: 1, lineHeight: 18 },
 
   balanceCard: {
     backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg,
