@@ -447,6 +447,27 @@ export const ListingDetailScreen = ({ navigation, route }) => {
     onError: (err) => Alert.alert('Add failed', err.response?.data?.error || err.message),
   });
 
+  // Publish a draft to the marketplace. Runs the same validation as the
+  // bulk Review-drafts flow; on failure we surface the human-readable
+  // reasons (e.g. "At least 2 photos are required") so the seller knows
+  // what to fix instead of being stuck with a draft they can't publish.
+  const publishMut = useMutation({
+    mutationFn: () => listingsApi.publishDrafts([id]),
+    onSuccess: (res) => {
+      if ((res?.published || 0) > 0) {
+        qc.invalidateQueries({ queryKey: ['listing', id] });
+        qc.invalidateQueries({ queryKey: ['my-listings'] });
+        Alert.alert('Your listing is live', 'This card is now on the marketplace.');
+      } else {
+        const r = res?.results?.[0];
+        const why = (r?.errors || []).map((e) => e.message || e.code).join('\n')
+          || "It didn't pass our listing checks yet.";
+        Alert.alert("Can't publish yet", why);
+      }
+    },
+    onError: (e) => Alert.alert('Publish failed', e.response?.data?.error || e.message),
+  });
+
   if (isLoading) return <LoadingScreen />;
   if (!listing) return <EmptyState icon="❌" title="Listing not found" />;
 
@@ -584,9 +605,18 @@ export const ListingDetailScreen = ({ navigation, route }) => {
       )}
       {canManage && (
         <View style={styles.ctaBar}>
+          {isDraft && (
+            <Button
+              title={publishMut.isPending ? 'Publishing…' : 'Make it live'}
+              onPress={() => publishMut.mutate()}
+              disabled={publishMut.isPending}
+              style={{ flex: 1.4 }}
+            />
+          )}
           <Button
             title={isDraft ? 'Delete draft' : 'Cancel listing'}
             variant="ghost"
+            style={isDraft ? { flex: 1 } : undefined}
             onPress={() => Alert.alert(
               isDraft ? 'Delete draft?' : 'Cancel listing?',
               isDraft
