@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
-import { listingsApi, API_BASE_URL } from '../services/api';
+import { listingsApi, walletApi, API_BASE_URL } from '../services/api';
 
 const PRIMARY = [
   { key: 'create', icon: 'add', label: 'List a card', nav: ['Profile', 'CreateListing'], main: true },
@@ -57,6 +57,15 @@ export const SellHubScreen = ({ navigation }) => {
   useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]));
   const s = summary || {};
 
+  // Whether the seller still needs payout verification — drives the
+  // upfront heads-up so the Stripe identity step isn't a surprise mid-flow.
+  const { data: walletSummary } = useQuery({
+    queryKey: ['wallet-summary-sell-hub'],
+    queryFn: () => walletApi.summary(),
+    staleTime: 60000,
+  });
+  const notOnboarded = walletSummary && walletSummary.configured && !walletSummary.onboarded;
+
   const go = (nav, params) => {
     try {
       if (nav.length === 1) navigation.navigate(nav[0]);
@@ -97,6 +106,25 @@ export const SellHubScreen = ({ navigation }) => {
         <Text style={styles.snapshot}>
           {(s.active_listings || 0)} active · {(s.sold || 0)} sold · ${(((Number(s.sold_7d_cents) || 0)) / 100).toFixed(0)} this week
         </Text>
+
+        {/* Upfront heads-up: payout verification is required to sell, so
+            nobody is surprised by the Stripe identity step mid-listing. */}
+        {notOnboarded ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => go(['WalletTab'])}
+            style={styles.verifyBanner}
+          >
+            <Ionicons name="shield-checkmark-outline" size={24} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.verifyTitle}>First, a one-time setup to get paid</Text>
+              <Text style={styles.verifyBody}>
+                Before you can sell, you'll do a quick identity check with our payment partner Stripe (about 3 minutes). It's a one-time, legally required step for any platform that sends you money. Tap to set it up.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
 
         {/* Primary actions */}
         <View style={styles.actionsRow}>
@@ -155,6 +183,14 @@ const styles = StyleSheet.create({
   back: { padding: 2 },
   title: { fontFamily: Typography.display, fontSize: 26, fontWeight: '700', color: Colors.text, letterSpacing: -0.5 },
   snapshot: { color: Colors.textMuted, fontSize: 13, marginLeft: 2, marginTop: -2, marginBottom: 2 },
+
+  verifyBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1,
+    backgroundColor: 'rgba(232,197,71,0.10)', borderColor: 'rgba(232,197,71,0.45)',
+  },
+  verifyTitle: { color: Colors.accent, fontSize: 14, fontWeight: '700' },
+  verifyBody: { color: Colors.text, fontSize: 12, marginTop: 3, lineHeight: 17 },
 
   actionsRow: { flexDirection: 'row', gap: Spacing.sm },
   action: {
