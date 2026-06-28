@@ -3024,6 +3024,33 @@ export const RegisterCardScreen = ({ navigation, route }) => {
           </View>
         </View>}
 
+        {/* Wrong card? Jump back to the variant picker WITHOUT losing
+            anything entered — grade, condition, serial, photos all live
+            in `form`, which we don't touch. Seed the cascade from the
+            current card so the list is scoped to the same player + set
+            even if the card was first resolved via scan or search. */}
+        {selectedCatalog ? (
+          <TouchableOpacity
+            onPress={() => {
+              setCascade((c) => ({
+                ...c,
+                sport: selectedCatalog.sport ?? c.sport,
+                year: selectedCatalog.year ?? c.year,
+                manufacturer: selectedCatalog.manufacturer ?? c.manufacturer,
+                set_name: selectedCatalog.set_name ?? c.set_name,
+                player_name: selectedCatalog.player_name ?? c.player_name,
+              }));
+              setCascadeDim('card_number');
+              setStep('cascade');
+            }}
+            style={{ alignSelf: 'flex-start', paddingVertical: 4, marginTop: -4 }}
+          >
+            <Text style={{ color: Colors.accent, fontWeight: '600', fontSize: 13 }}>
+              Wrong card? Pick a different one →
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* Graded or raw */}
         <View>
           <SectionHeader title="Card Type" />
