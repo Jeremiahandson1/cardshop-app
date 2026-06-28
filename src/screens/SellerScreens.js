@@ -944,7 +944,7 @@ const feeStyles = StyleSheet.create({
   savedTxt: { flex: 1, color: '#4ade80', fontSize: 12, lineHeight: 17, fontWeight: '600' },
 });
 
-const ShipOptionsPicker = ({ value, onChange, highValue }) => {
+export const ShipOptionsPicker = ({ value, onChange, highValue }) => {
   // Canonical 5-tier set — matches cardshop-api/src/routes/listing-defaults.js
   // SHIPPING_TIERS_KNOWN and the auto-list defaults in cards.js. Default
   // prices line up with auto-list so a manually-built listing prices the

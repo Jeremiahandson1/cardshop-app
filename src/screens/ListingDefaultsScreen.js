@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
 import { listingDefaultsApi } from '../services/api';
+import { ShipOptionsPicker } from './SellerScreens';
 import { Button, LoadingScreen, ScreenHeader } from '../components/ui';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
@@ -38,6 +39,12 @@ export const ListingDefaultsScreen = ({ navigation }) => {
   const [shippingPref, setShippingPref] = useState('either');
   const [acceptsBundles, setAcceptsBundles] = useState(false);
   const [timeLimitHours, setTimeLimitHours] = useState(null);
+  // Default carrier tiers applied to every new listing. Seller can
+  // still change them per-listing in the listing flow's shipping step.
+  const [shippingOptions, setShippingOptions] = useState([
+    { tier: 'pwe', price_cents: 130 },
+    { tier: 'gmg', price_cents: 600 },
+  ]);
 
   useEffect(() => {
     if (!data?.defaults) return;
@@ -45,6 +52,7 @@ export const ListingDefaultsScreen = ({ navigation }) => {
     if (d.shipping_pref) setShippingPref(d.shipping_pref);
     if (typeof d.accepts_bundles === 'boolean') setAcceptsBundles(d.accepts_bundles);
     if (d.offer_time_limit_hours !== undefined) setTimeLimitHours(d.offer_time_limit_hours);
+    if (Array.isArray(d.shipping_options) && d.shipping_options.length) setShippingOptions(d.shipping_options);
   }, [data]);
 
   const save = useMutation({
@@ -52,6 +60,7 @@ export const ListingDefaultsScreen = ({ navigation }) => {
       shipping_pref: shippingPref,
       accepts_bundles: acceptsBundles,
       offer_time_limit_hours: timeLimitHours,
+      shipping_options: shippingOptions,
     }),
     onSuccess: () => {
       Alert.alert('Saved', 'Your listing defaults are updated.', [
@@ -84,6 +93,13 @@ export const ListingDefaultsScreen = ({ navigation }) => {
             />
           ))}
         </View>
+
+        <Text style={styles.label}>Shipping rates</Text>
+        <Text style={styles.subnote}>
+          The carrier options buyers can choose from. Set them once here — you can still
+          change them on any individual listing.
+        </Text>
+        <ShipOptionsPicker value={shippingOptions} onChange={setShippingOptions} highValue={false} />
 
         <Text style={styles.label}>Accept bundle offers?</Text>
         <View style={styles.row}>
@@ -139,6 +155,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
+  subnote: { color: Colors.textMuted, fontSize: Typography.sm, marginTop: -Spacing.xs, marginBottom: Spacing.sm, lineHeight: 18 },
   row: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
     paddingHorizontal: Spacing.md,

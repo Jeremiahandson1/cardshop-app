@@ -241,6 +241,7 @@ export const ProfileScreen = ({ navigation }) => {
       items: [
         { icon: 'person-circle-outline', label: 'Profile & brand', onPress: () => navigation.navigate('BrandProfile') },
         { icon: 'home-outline', label: 'Shipping addresses', onPress: () => navigation.navigate('Addresses') },
+        { icon: 'pricetags-outline', label: 'Shipping rates & listing defaults', onPress: () => navigation.navigate('ListingDefaults') },
         { icon: 'mail-outline', label: 'Change Email', onPress: () => navigation.navigate('ChangeEmail') },
         { icon: 'lock-closed-outline', label: 'Security (2FA)', onPress: () => navigation.navigate('Security') },
         { icon: 'notifications-outline', label: 'Notifications', onPress: () => navigation.navigate('NotificationPreferences') },
