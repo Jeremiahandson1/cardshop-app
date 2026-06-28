@@ -1763,6 +1763,40 @@ export const RegisterCardScreen = ({ navigation, route }) => {
       });
     },
     onSuccess: (res) => {
+      // Optimistic insert: drop the new card into the collection cache
+      // immediately — built from the owned-card response + the catalog
+      // row the user just picked — so it's already there the instant
+      // they open My Collection, instead of waiting on a refetch. The
+      // invalidate below still runs and replaces it with the
+      // authoritative row (and corrects any status-filter cache it
+      // shouldn't be in). Dedupe-guarded so a fast refetch can't double it.
+      const owned = res.data;
+      if (owned?.id && selectedCatalog) {
+        const optimisticRow = {
+          ...owned,
+          catalog_id: selectedCatalog.id,
+          player_name: selectedCatalog.player_name,
+          year: selectedCatalog.year,
+          set_name: selectedCatalog.set_name,
+          manufacturer: selectedCatalog.manufacturer,
+          subset_name: selectedCatalog.subset_name ?? null,
+          card_number: selectedCatalog.card_number ?? null,
+          parallel: selectedCatalog.parallel ?? null,
+          print_run: selectedCatalog.print_run ?? owned.print_run ?? null,
+          is_rookie: selectedCatalog.is_rookie ?? false,
+          is_autograph: selectedCatalog.is_autograph ?? false,
+          is_one_of_one: selectedCatalog.is_one_of_one ?? false,
+          front_image_url: selectedCatalog.front_image_url ?? null,
+          back_image_url: selectedCatalog.back_image_url ?? null,
+          own_image_front: owned.image_front_url ?? null,
+          own_image_back: owned.image_back_url ?? null,
+        };
+        queryClient.setQueriesData({ queryKey: ['my-cards'] }, (old) => {
+          if (!old || !Array.isArray(old.cards)) return old;
+          if (old.cards.some((c) => c && c.id === owned.id)) return old;
+          return { ...old, cards: [optimisticRow, ...old.cards], total: (old.total || 0) + 1 };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['my-cards'] });
       const go = () => navigation.replace('CardDetail', { cardId: res.data?.id });
       if (res.data?.stolen_flagged) {
@@ -5483,10 +5517,19 @@ export const EditCardScreen = ({ navigation, route }) => {
     // hitting Save. Other edits still require the explicit Save.
     const existing = Array.isArray(card.photo_urls) ? card.photo_urls.filter(Boolean) : [];
     const next = existing.filter((_, i) => i !== idx);
+    // Optimistic: drop it from the cache now so the grid updates
+    // instantly instead of waiting on the server round-trip. Roll back
+    // to the snapshot if the save fails.
+    const key = ['card-private', cardId];
+    const prev = queryClient.getQueryData(key);
+    queryClient.setQueryData(key, (old) => (old ? { ...old, photo_urls: next } : old));
     cardsApi.update(cardId, { photo_urls: next }).then(() => {
       queryClient.invalidateQueries({ queryKey: ['card', cardId] });
       queryClient.invalidateQueries({ queryKey: ['card-private', cardId] });
-    }).catch((err) => Alert.alert('Could not remove photo', err.response?.data?.error || 'Please try again.'));
+    }).catch((err) => {
+      queryClient.setQueryData(key, prev);
+      Alert.alert('Could not remove photo', err.response?.data?.error || 'Please try again.');
+    });
   };
 
   // Rotate an already-saved photo 90° clockwise via ImageManipulator.
