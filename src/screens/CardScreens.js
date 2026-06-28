@@ -5254,6 +5254,10 @@ export const EditCardScreen = ({ navigation, route }) => {
 
   const [form, setForm] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]); // newly-added file:// URIs
+  // Parallel to newPhotos: 'camera' (live in-app capture) | 'gallery'.
+  // Sent to the API so a live re-shoot upgrades the card's trust badge
+  // (verification_level) and clears the listing live-photo gate.
+  const [newPhotoSources, setNewPhotoSources] = useState([]);
 
   // Re-link picker — reuses the same cascade (sport → year →
   // manufacturer → set → player → card # → subset/parallel) used by
@@ -5374,6 +5378,7 @@ export const EditCardScreen = ({ navigation, route }) => {
     });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+      setNewPhotoSources((s) => [...s, ...result.assets.map(() => 'camera')]);
     }
   };
   const pickFromGallery = async () => {
@@ -5383,6 +5388,7 @@ export const EditCardScreen = ({ navigation, route }) => {
     });
     if (!result.canceled && result.assets?.length) {
       setNewPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+      setNewPhotoSources((s) => [...s, ...result.assets.map(() => 'gallery')]);
     }
   };
   const addPhoto = () => {
@@ -5425,7 +5431,15 @@ export const EditCardScreen = ({ navigation, route }) => {
           }
         })
       );
-      const merged = [...existing, ...newlyConverted.filter(Boolean)];
+      // Keep each converted photo paired with its source so the API
+      // can tell a live camera re-shoot ('camera') from a gallery
+      // upload. Existing hosted photos are tagged 'existing' (unknown
+      // origin — they don't grant the live badge).
+      const newPairs = newlyConverted
+        .map((url, i) => ({ url, source: newPhotoSources[i] || 'gallery' }))
+        .filter((x) => x.url);
+      const merged = [...existing, ...newPairs.map((x) => x.url)];
+      const photoSources = [...existing.map(() => 'existing'), ...newPairs.map((x) => x.source)];
       let videoPayload;
       if (newVideoUri) {
         try {
@@ -5450,6 +5464,7 @@ export const EditCardScreen = ({ navigation, route }) => {
         notes: form.notes || undefined,
         public_notes: form.public_notes || undefined,
         photo_urls: merged,
+        photo_sources: photoSources,
         video_url: videoPayload || undefined,
       });
     },
