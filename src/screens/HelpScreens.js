@@ -50,7 +50,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What\'s the difference between Free and Collector Pro?',
-    a: 'Free works for cataloging, scanning, and viewing chains. Collector Pro unlocks Case Mode (per-card show floor), Show Floor check-ins, unlimited binders/cards, and analytics. Manage your subscription from Profile → Manage subscription.',
+    a: 'Free works for cataloging, scanning, and viewing chains. Collector Pro ($9.99/mo) unlocks unlimited binders/cards and analytics. Show Floor ($24.99/mo or $249/yr) includes everything in Collector Pro plus show check-ins and Case Mode. Manage your subscription from Profile → Manage subscription.',
   },
 ];
 

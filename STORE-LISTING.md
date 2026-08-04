@@ -1,9 +1,10 @@
 # Card Shop — App Store + Play Store listing copy
 
-Lead with the stolen-card / fingerprint angle. That's the thing
-no other card app has and the thing that pays back the user the
-moment one of their cards walks. Convenience features (scan,
-trade, prices) come after.
+Lead with Show Floor (2026-08-04 pivot: "Sell more with Show Floor").
+That's the concrete, sellable story — run your card-show booth from
+your phone, buyers find your table. The chain of custody is the
+supporting proof point, not the headline. Convenience features
+(scan, trade, prices) come after.
 
 Paste these into:
 - **App Store Connect** → App Information → Subtitle / Promotional Text / Description
@@ -17,54 +18,64 @@ Paste these into:
 `Card Shop by Twomiah`
 
 ### Subtitle (max 30 chars)
-`Track every card you own.`
+`Sell more at every card show.`
 
 ### Promotional text (max 170 chars, can be updated without re-review)
-`If a stolen card surfaces and someone scans it, you find out. Raw, numbered, or slabbed — every card has a fingerprint.`
+`Run your card-show booth from your phone. Go live with your binders — buyers search the whole floor and walk straight to your table.`
 
 ### Description (max 4,000 chars)
 
 ```
-The chain for every card.
+Sell more with Show Floor.
 
-Card theft, mail fraud, and "buyer claims it never arrived" disputes are weekly problems in this hobby. Card Shop solves them with a documented ownership history, not promises.
+A card-show table today: a cash box, prices on sticky notes, and a room full of buyers who can't tell which table has the card they drove three hours for. Show Floor fixes that.
 
-How the chain works:
+• Go live at any show — Pick the binders you brought, set your table number, tap Go Live. Followers get a push with where to find you.
+
+• Buyers search the whole floor — Anyone at the show can search every live seller's inventory in one place and walk straight to your table. While you talk to one buyer, the rest of the floor is still selling.
+
+• Any phone can scan — A QR sticker on every card. Buyers scan with their phone camera — no app, no account — and see the card, your price, and its ownership history.
+
+• Case Mode — Set a show price and trade preferences once per card ("cash only," "trade for /99 or better"). It sticks every weekend you go live. No re-pricing the same inventory show after show.
+
+• End the show, one tap — Check out and optionally auto-list what didn't sell to the marketplace, so your stock keeps working during the week.
+
+EVERY SALE LANDS ON THE CHAIN
+
+Card Shop backs every table with a documented chain of custody:
 
 • Permanent ownership log — Every transfer is signed and timestamped. Sales, trades, gifts. The chain follows the card across owners, forever.
 
-• Pack-out and unpack videos — Required on every shipment $200+. Both parties record. If something goes wrong, the video is the referee — not he-said/she-said.
+• Stolen cards get caught at the table — A scan of a reported-stolen card shows a red stop before money changes hands. And if a card you own surfaces somewhere it shouldn't, you find out.
 
-• 5-day shipping SLA — Sellers ship within 5 days or face stalled-transfer review. If a seller takes your money and disappears, we transfer the card to you anyway. We have the receipts.
+• Card identity at every level — Numbered parallels via serial number. Slabbed cards via PSA/BGS/SGC cert. Raw cards via AI-scan descriptors and photos.
 
-• Card identity at every level — Numbered parallels via serial number. Slabbed cards via PSA/BGS/SGC cert. Raw cards via AI-scan descriptors and photos. QR stickers tie any card to its chain in your app.
-
-If any card you own surfaces somewhere it shouldn't, you'll know — and the chain is your proof.
+• Pack-out and unpack videos on every shipment $200+ — If something goes wrong, the video is the referee, not he-said/she-said.
 
 WHAT ELSE CARD SHOP DOES
 
-• Marketplace — Sell to anyone, not just your trade circle. 10% capped at $1 plus Stripe processing — at $500 we take $1, CollX takes $50. Every sale flows through the chain so the next owner inherits the full ownership history.
+• Marketplace — Sell to anyone, not just your trade circle. 10% capped at $1 plus Stripe processing — at $500 we take $1, CollX takes $50.
 
 • AI scan — Photograph the back of any card. Identifies player, year, set, parallel, and card number in seconds.
 
 • Trade Board — Post a card to your trade groups, your local groups, or publicly. Get private offers; nobody sees what others are bidding.
 
-• Show Floor — Going to a show? Tell your followers your table number and what you brought. They walk straight to you.
-
 • Local card shops — See what your local card shops are charging for sealed boxes. Real prices, crowdsourced, not sticker prices.
 
-• Permanent ownership log — Every transfer is signed and timestamped. If a dispute ever happens, the chain of custody is documented.
+SHOW FLOOR ($24.99/mo or $249/yr)
+• Live booth at any card show — go live, follower push, browseable inventory
+• Buyer search across every live seller at the show
+• Case Mode — per-card show pricing & trade prefs
+• 1 sheet of QR stickers (117) included every month
+• Includes everything in Collector Pro
 
-CARD SHOP PRO ($9.99/mo or $99/yr)
-• Show Floor — go live at card shows, follower push, browseable inventory
-• Case Mode — per-card show-floor pricing & trade prefs
+COLLECTOR PRO ($9.99/mo or $99/yr)
 • Unlimited binders + per-binder analytics
 • Live market view — current ask median + ask-price history
 • Deal Radar (eBay alerts on your want list)
 • Priority support
-(Vinyl QR stickers sold separately at cost — every tier pays the same per-sticker rate.)
 
-CARD SHOP IS FREE TO USE for the trade board, local prices, scans of cards you don't own yet, and verification scans of any card you find. You only need Pro if you want to track and tag your own collection.
+CARD SHOP IS FREE TO USE for the trade board, local prices, scans of cards you don't own yet, and verification scans of any card you find.
 
 Built by collectors. Privacy-respecting. No data sold. Verified ownership stays yours.
 ```
@@ -74,49 +85,60 @@ Built by collectors. Privacy-respecting. No data sold. Verified ownership stays 
 ## Play Console
 
 ### Short description (max 80 chars)
-`Track every card you own. If it walks, the next scan tells you.`
+`Run your card-show booth from your phone. Buyers find your table.`
 
 ### Full description (max 4,000 chars)
 
 ```
-Every card you own has a fingerprint. Card Shop remembers it.
+Sell more with Show Floor — by Twomiah Card Shop.
 
-Card theft is a weekly problem — mail intercepts, table swipes at shows, "buyer claims it never arrived" insurance fraud. Collectors lose hundreds of dollars a month and recover almost none of it. Card Shop is the registry that changes that.
+Run your card-show booth from your phone. Go live with the binders you brought, and buyers searching the floor walk straight to your table.
 
-THREE-LAYER FINGERPRINT — every card you own gets a permanent identity:
+★ Go live at any show — Pick your binders, set your table number, tap Go Live. Followers get a push: you're live, table 12B.
 
-★ QR sticker — Apply a Card Shop vinyl sticker to any card. Every scan, transfer, and ownership change is logged forever.
+★ Buyers search the whole floor — Every live seller's inventory at the show, searchable in one place. No flipping through every binder at every booth.
 
-★ Serial number — Numbered parallels (07/99, 1/1, etc.) are universally unique. Card Shop reads the serial via AI scan and ties it to your account — no modification to the card.
+★ Any phone can scan — A QR sticker on every card. Buyers scan with their phone camera — no app, no account — and see the card, your price, and its ownership history.
 
-★ PSA / BGS cert — Slabbed cards have an immutable cert number. Card Shop verifies it against PSA and Beckett directly.
+★ Case Mode — Show price and trade preferences set once per card, reused every weekend you go live. No re-pricing the same inventory show after show.
 
-If your card surfaces somewhere it shouldn't, the next person who scans it sees it's flagged stolen — and you get a notification with where the scan happened.
+★ End the show, one tap — Check out and optionally auto-list what didn't sell, so your stock keeps working during the week.
+
+EVERY CARD HAS A FINGERPRINT
+
+Card Shop backs every table with a documented chain of custody:
+
+• QR sticker — every scan, transfer, and ownership change logged forever.
+
+• Serial number — numbered parallels (07/99, 1/1) tied to your account via AI scan, no modification to the card.
+
+• PSA / BGS cert — slabbed cards verified against PSA and Beckett directly.
+
+If a card was reported stolen, the next scan shows a red stop — it gets caught at the table, not after the sale. And if a card you own surfaces somewhere it shouldn't, you get a notification with where the scan happened.
 
 WHAT ELSE YOU GET
 
-• Marketplace — List a card for sale. Buyer pays via card or in-app wallet, we generate the shipping label, every sale flows through the chain. 10% capped at $1 plus Stripe — never gouged on big cards like other platforms.
+• Marketplace — List a card for sale. Buyer pays via card or in-app wallet, we generate the shipping label. 10% capped at $1 plus Stripe — never gouged on big cards.
 
-• AI scan — Photograph the back of any card. Card Shop identifies player, year, set, parallel, and card number in seconds.
+• AI scan — Photograph the back of any card. Player, year, set, parallel, and card number in seconds.
 
-• Trade Board — Post cards to your trade groups, your local groups, or publicly. Get private offers; nobody sees what others bid.
-
-• Show Floor — Tell followers your table number and inventory at any card show. They walk straight to you.
+• Trade Board — Post cards to your trade groups, your local groups, or publicly. Private offers; nobody sees what others bid.
 
 • Local card shops — See what nearby card shops are charging for sealed boxes. Crowdsourced, real prices.
 
-• Permanent ownership log — Every transfer is signed and timestamped. Chain of custody is documented forever.
+SHOW FLOOR — $24.99/mo or $249/yr
+• Live booth + follower push + buyer search across the floor
+• Case Mode — per-card show pricing & trade prefs
+• 1 sheet of QR stickers (117) included monthly
+• Includes everything in Collector Pro
 
-CARD SHOP PRO — $9.99/mo or $99/yr
-• Show Floor + Case Mode — go live at card shows
+COLLECTOR PRO — $9.99/mo or $99/yr
 • Unlimited binders + per-binder analytics
 • Unlimited AI scans
-• Set completion tracking
 • Deal Radar (eBay price alerts)
 • Priority support
-(Vinyl QR stickers sold separately at cost.)
 
-CARD SHOP IS FREE for the trade board, local prices, verification scans, and identifying any card you encounter. Pro is for tagging and tracking your own collection.
+CARD SHOP IS FREE for the trade board, local prices, verification scans, and identifying any card you encounter.
 
 Built by collectors. Privacy-respecting. Your verified ownership stays yours.
 ```
@@ -126,7 +148,7 @@ Built by collectors. Privacy-respecting. Your verified ownership stays yours.
 ## Search keywords (App Store, max 100 chars total, comma-separated, no spaces)
 
 ```
-sportscards,trading,collectibles,scan,topps,panini,bowman,trade,beckett,psa,checklist,QR
+cardshow,sportscards,trading,collectibles,scan,topps,panini,bowman,trade,beckett,psa,checklist,QR
 ```
 
 ---
@@ -134,5 +156,5 @@ sportscards,trading,collectibles,scan,topps,panini,bowman,trade,beckett,psa,chec
 ## What's New (release notes — paste into each version's "What's New")
 
 ```
-Three-layer fingerprint registry: QR stickers, serial numbers, and PSA/BGS cert numbers all link to a permanent ownership log. AI scan now identifies parallels and print runs directly from the photo. Show Floor lets you broadcast your table number and inventory at any card show.
+Show Floor: run your card-show booth from your phone. Go live with your binders, buyers search every live seller at the show and walk straight to your table. Any phone can scan a card's QR sticker — no app needed — and every sale lands on the card's chain of custody.
 ```

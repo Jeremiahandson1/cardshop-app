@@ -1,5 +1,5 @@
-// First-run onboarding — 3 swipeable cards covering the core
-// loops a new user can do in the app. Rendered as a top-level
+// First-run onboarding — 4 swipeable cards covering the core
+// loops a new user can do in the app, Show Floor first. Rendered as a top-level
 // Modal overlay (NOT a stack screen) so:
 //   - It can't accidentally persist in any tab's history
 //   - Skip + Get started are guaranteed to dismiss it
@@ -25,6 +25,12 @@ export const ONBOARDING_SEEN_KEY = 'cs_onboarding_seen_v1';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CARDS = [
+  {
+    key: 'show',
+    icon: 'flash',
+    title: 'Sell more with Show Floor',
+    body: 'Selling at a show? Go live with the binders you brought and buyers searching the floor walk straight to your table. Shopping? Search every live seller at the show in one place.',
+  },
   {
     key: 'scan',
     icon: 'qr-code',
