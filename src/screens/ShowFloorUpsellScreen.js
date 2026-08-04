@@ -14,6 +14,11 @@ import { Button } from '../components/ui';
 
 const FEATURES = [
   {
+    icon: 'albums',
+    title: "Sell more than the case holds",
+    body: 'Buyers shop every card you brought from their phone — the binders and boxes behind your table too. More cards for sale means more sales per show.',
+  },
+  {
     icon: 'storefront',
     title: 'Set up your booth in seconds',
     body: 'Pick which binders go live for the show. Cards flip to display mode automatically — buyers can see your asking price the moment they walk by.',
